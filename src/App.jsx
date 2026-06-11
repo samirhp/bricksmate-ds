@@ -163,6 +163,8 @@ const initialState = {
     values: initSpaceVals(100, 120, 1.5),
   },
   gutter: { mobile: 16, desktop: 64 },
+  offset: 80,
+  styles: { textColor: "#1f2937", headingColor: "#111827", textWeight: 400, headingWeight: 700 },
   typography: {
     useScale: true,
     headingScale: 1.25, headingBaseMob: 28, headingBaseDesk: 35,
@@ -298,6 +300,7 @@ function reducer(state, action) {
     case "REMOVE_PALETTE": return { ...state, colors: { ...state.colors, palettes: state.colors.palettes.filter((p) => p.id !== action.id) } };
     case "SET_COLORS": return { ...state, colors: { ...state.colors, ...action.payload } };
     case "SET_GUTTER": return { ...state, gutter: { ...state.gutter, [action.side]: action.value } };
+    case "SET_STYLE": return { ...state, styles: { ...state.styles, [action.field]: action.value } };
     case "SET_GAPS": return { ...state, gaps: { ...state.gaps, [action.field]: action.value } };
     case "SET_RADIUS": return { ...state, radius: { ...state.radius, ...action.payload } };
     case "SET_RADIUS_VAL": return { ...state, radius: { ...state.radius, values: { ...state.radius.values, [action.key]: action.value } } };
@@ -582,6 +585,13 @@ const css_styles = `
   .ds-stepper-btn:hover{background:var(--ds-bg);color:var(--ds-accent)} .ds-stepper-btn:active{transform:scale(.9)}
   .ds-stepper-input{flex:1;min-width:0;width:100%;border:none;background:transparent;text-align:center;font-size:14px;color:var(--ds-text);font-family:inherit;padding:7px 2px;outline:none;-moz-appearance:textfield}
   .ds-stepper-input::-webkit-outer-spin-button,.ds-stepper-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  /* Color field (text/heading color) */
+  .ds-color-field{display:flex;align-items:center;gap:10px;border:1px solid var(--ds-border);border-radius:var(--ds-radius);padding:5px 10px;background:var(--ds-bg-card);box-shadow:var(--ds-shadow);transition:border-color .15s}
+  .ds-color-field:focus-within{border-color:var(--ds-accent);box-shadow:0 0 0 3px var(--ds-accent-ring)}
+  .ds-color-field input[type=color]{width:28px;height:28px;border:none;border-radius:6px;background:transparent;cursor:pointer;padding:0;flex-shrink:0}
+  .ds-color-field input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+  .ds-color-field input[type=color]::-webkit-color-swatch{border:1px solid var(--ds-border);border-radius:6px}
+  .ds-color-field span{font-family:'SF Mono',Consolas,monospace;font-size:12px;color:var(--ds-text-2)}
   /* Color sliders (HSL visual) */
   .ds-cslider{margin-bottom:11px} .ds-cslider:last-child{margin-bottom:0}
   .ds-cslider-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
@@ -696,6 +706,7 @@ function StepLayout() {
         <div className="ds-form-group"><label>Min viewport (px)</label><NumStepper value={minViewport} set={(n) => dispatch({ type: "SET_FIELD", field: "minViewport", value: Math.max(0, n) })} min={0} step={5} /></div>
         <div className="ds-form-group"><label>Max viewport (px)</label><NumStepper value={maxViewport} set={(n) => dispatch({ type: "SET_FIELD", field: "maxViewport", value: Math.max(0, n) })} min={0} step={10} /></div>
       </div>
+      <div className="ds-form-group"><label>Header offset (px) <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— --offset, for anchor scroll</span></label><NumStepper value={state.offset ?? 80} set={(n) => dispatch({ type: "SET_FIELD", field: "offset", value: Math.max(0, n) })} min={0} step={4} /><div className="ds-helper">Sticky header height. Anchored sections offset by --offset so they don't hide under it.</div></div>
       <div className="ds-toggle-row" onClick={() => dispatch({ type: "SET_FIELD", field: "capValues", value: !capValues })}>
         <div className={"ds-toggle-track" + (capValues ? " on" : "")}><div className="ds-toggle-thumb" /></div>
         <div className="ds-toggle-text"><strong>Cap values at max viewport</strong><span>{capValues ? "clamp() — stops at " + maxViewport + "px" : "max() — scales beyond " + maxViewport + "px"}</span></div>
@@ -782,6 +793,8 @@ function StepSectionSpacing() {
 function StepTypography() {
   const { state, dispatch } = useDSContext();
   const t = state.typography;
+  const st = state.styles || { textColor: "#1f2937", headingColor: "#111827", textWeight: 400, headingWeight: 700 };
+  const WEIGHTS = [300, 400, 500, 600, 700, 800];
   const hDesk = ["h1","h2","h3","h4","h5","h6"].map(h => t.headings[h]?.desktop || 0);
   const warns = [];
   if (hDesk.some(v => v > 0 && v < 12)) warns.push({ type: "error", msg: "Heading below 12px on desktop — WCAG accessibility minimum" });
@@ -833,10 +846,24 @@ function StepTypography() {
         <div style={{ flex: 1, minWidth: 0, textAlign: "left", paddingLeft: 12, fontSize: t.texts[k]?.desktop || 14, lineHeight: t.lineHeightBody, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Sample</div>
       </div>))}
     </div>
-    <div className="ds-card"><h4>Line heights</h4><div className="ds-grid-2">
-      <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Headings</label><NumStepper value={t.lineHeightHeading} set={(n) => dispatch({ type: "SET_TYPO", payload: { lineHeightHeading: n || 1 } })} min={0.8} step={0.05} /></div>
-      <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Body</label><NumStepper value={t.lineHeightBody} set={(n) => dispatch({ type: "SET_TYPO", payload: { lineHeightBody: n || 1 } })} min={0.8} step={0.05} /></div>
-    </div></div>
+    <div className="ds-card"><h4>Text &amp; heading styles</h4>
+      <div className="ds-grid-2" style={{ marginBottom: 14 }}>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Body line height</label><NumStepper value={t.lineHeightBody} set={(n) => dispatch({ type: "SET_TYPO", payload: { lineHeightBody: n || 1 } })} min={0.8} step={0.05} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Heading line height</label><NumStepper value={t.lineHeightHeading} set={(n) => dispatch({ type: "SET_TYPO", payload: { lineHeightHeading: n || 1 } })} min={0.8} step={0.05} /></div>
+      </div>
+      <div className="ds-grid-2" style={{ marginBottom: 14 }}>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Text weight</label>
+          <select className="ds-input" value={st.textWeight} onChange={(e) => dispatch({ type: "SET_STYLE", field: "textWeight", value: parseInt(e.target.value) })}>{WEIGHTS.map((w) => <option key={w} value={w}>{w}</option>)}</select></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Heading weight</label>
+          <select className="ds-input" value={st.headingWeight} onChange={(e) => dispatch({ type: "SET_STYLE", field: "headingWeight", value: parseInt(e.target.value) })}>{WEIGHTS.map((w) => <option key={w} value={w}>{w}</option>)}</select></div>
+      </div>
+      <div className="ds-grid-2">
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Text color</label>
+          <div className="ds-color-field"><input type="color" value={st.textColor} onChange={(e) => dispatch({ type: "SET_STYLE", field: "textColor", value: e.target.value })} /><span>{st.textColor}</span></div></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Heading color</label>
+          <div className="ds-color-field"><input type="color" value={st.headingColor} onChange={(e) => dispatch({ type: "SET_STYLE", field: "headingColor", value: e.target.value })} /><span>{st.headingColor}</span></div></div>
+      </div>
+    </div>
   </div>);
 }
 
@@ -1124,6 +1151,13 @@ function generateImporterCSS(state) {
   css += "\n  /* — Typography (static) ————————————————————— */\n";
   css += "  --line-height-heading: " + typography.lineHeightHeading + ";\n";
   css += "  --line-height-body: " + typography.lineHeightBody + ";\n";
+  { const st = state.styles || {};
+    css += "  --text-color: " + (st.textColor || '#1f2937') + ";\n";
+    css += "  --heading-color: " + (st.headingColor || '#111827') + ";\n";
+    css += "  --text-weight: " + (st.textWeight || 400) + ";\n";
+    css += "  --heading-weight: " + (st.headingWeight || 700) + ";\n";
+    css += "  --offset: " + (state.offset ?? 80) + "px;\n";
+  }
   css += "\n  /* — Gaps ———————————————————————————————— */\n";
   css += "  --grid-gap: " + gapVal(gaps.gridGap) + ";\n";
   css += "  --content-gap: " + gapVal(gaps.contentGap) + ";\n";
@@ -1218,6 +1252,13 @@ function generateVariablesJSON(state) {
   // Styles
   vars.push(mk('line-height-heading', String(state.typography.lineHeightHeading), 'Styles'));
   vars.push(mk('line-height-body', String(state.typography.lineHeightBody), 'Styles'));
+  { const st = state.styles || {};
+    vars.push(mk('text-color', st.textColor || '#1f2937', 'Styles'));
+    vars.push(mk('heading-color', st.headingColor || '#111827', 'Styles'));
+    vars.push(mk('text-weight', String(st.textWeight || 400), 'Styles'));
+    vars.push(mk('heading-weight', String(st.headingWeight || 700), 'Styles'));
+    vars.push(mk('offset', (state.offset ?? 80) + 'px', 'Styles'));
+  }
 
   // Categorías con metadata de escala para que Bricks muestre el escalado visual
   const sp = state.spacing;
@@ -1356,11 +1397,38 @@ function generateFrameworkCSS(state) {
   const p = state.varPrefix ? '--' + state.varPrefix + '-' : '--';
   const v = (n) => 'var(' + p + n + ')';
   const ts = new Date().toLocaleString();
+  const primary = v(slugify(state.colors.palettes[0]?.name || 'primary'));
   let css = "/* ================================================\n * BRICKSMATE FRAMEWORK BASE CSS\n * Apply tokens to HTML elements globally\n * Paste into: Bricks → Settings → Custom Code → CSS\n * Generated: " + ts + "\n * ================================================ */\n\n";
-  css += "/* Text */\nbody {\n  font-size: " + v('text-m') + ";\n  line-height: " + v('line-height-body') + ";\n}\n\n";
-  css += "/* Headings */\nh1, h2, h3, h4, h5, h6 {\n  line-height: " + v('line-height-heading') + ";\n}\n";
+
+  css += "/* — Base & smooth scroll ————————————————— */\n";
+  css += "html {\n  scroll-behavior: smooth;\n}\n";
+  css += "[id] {\n  scroll-margin-top: calc(" + v('offset') + " / 1.6);\n}\n";
+  css += "ul {\n  margin: 0;\n  padding: 0;\n}\n\n";
+
+  css += "/* — Accessibility (keyboard focus) ——————— */\n";
+  css += "body.bricks-is-frontend :focus {\n  outline: none;\n}\n";
+  css += "body.bricks-is-frontend :focus-visible {\n  outline: 2px solid " + primary + ";\n  outline-offset: 4px;\n  transition: outline-color .2s;\n}\n\n";
+
+  css += "/* — Text ———————————————————————————————— */\n";
+  css += "body {\n  font-size: " + v('text-m') + ";\n  line-height: " + v('line-height-body') + ";\n  color: " + v('text-color') + ";\n  font-weight: " + v('text-weight') + ";\n}\n\n";
+  css += "/* — Headings —————————————————————————————— */\n";
+  css += "h1, h2, h3, h4, h5, h6 {\n  line-height: " + v('line-height-heading') + ";\n  color: " + v('heading-color') + ";\n  font-weight: " + v('heading-weight') + ";\n}\n";
   ['h1','h2','h3','h4','h5','h6'].forEach(h => { css += h + " { font-size: " + v(h) + "; }\n"; });
-  css += "\n/* Sections */\n:where(section:not(section section)) {\n  padding: " + v('section-space-m') + " " + v('gutter') + ";\n}\nsection:where(:not(.bricks-shape-divider)) {\n  gap: " + v('container-gap') + ";\n}\n:where(.brxe-container) > .brxe-block,\n:where(.brxe-container) {\n  gap: " + v('content-gap') + ";\n}\n\n/* Overflow fix */\nbody.bricks-is-frontend {\n  overflow-x: clip;\n}\n";
+
+  css += "\n/* — Sections —————————————————————————————— */\n";
+  css += ":where(section:not(section section)) {\n  padding: " + v('section-space-m') + " " + v('gutter') + ";\n}\n";
+  css += "section:where(:not(.bricks-shape-divider)) {\n  gap: " + v('container-gap') + ";\n}\n";
+  css += ":where(.brxe-container) > .brxe-block,\n:where(.brxe-container) {\n  gap: " + v('content-gap') + ";\n}\n\n";
+
+  css += "/* — Content links ———————————————————————— */\n";
+  css += "body .brxe-post-content a:not([class]),\nbody .brxe-text a:not([class]),\nbody label a {\n  text-decoration-line: underline;\n  text-decoration-color: " + primary + ";\n  text-underline-offset: .2em;\n  text-decoration-thickness: 1px;\n  transition: all .3s;\n}\n";
+  css += "body .brxe-post-content a:hover:not([class]),\nbody .brxe-text a:hover:not([class]),\nbody label a:hover {\n  color: " + primary + ";\n}\n\n";
+
+  css += "/* — Overflow fix & utilities ————————————— */\n";
+  css += ".bricks-is-frontend header {\n  max-width: 100vw;\n}\n";
+  css += "body.bricks-is-frontend {\n  overflow-x: clip;\n}\n";
+  css += "body.bricks-is-frontend.no-scroll {\n  overflow: hidden !important;\n}\n";
+
   css += generateButtonsCSS(state, v);
   return css;
 }
