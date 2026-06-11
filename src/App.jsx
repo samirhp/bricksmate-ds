@@ -141,15 +141,35 @@ const BTN_SIZE_DEFAULTS = {
 };
 const btnEnabled = (state, id) => state.buttons?.enabled?.[id] !== false; // por defecto activado
 const btnContrast = (l) => (l > 60 ? "#18181b" : "#ffffff");
-// Estilo inline de botón compartido (paso Buttons + Landing) → ambos previews idénticos
-function buttonInlineStyle(state, p, sizeKey, outline) {
+// Estilo inline de botón compartido (paso Buttons + Landing) → ambos previews idénticos.
+// hover=true replica el :hover del CSS exportado (sólido oscurece 10%; outline se rellena).
+function buttonInlineStyle(state, p, sizeKey, outline, hover) {
   const b = state.buttons || { sizes: BTN_SIZE_DEFAULTS, radiusKey: "m" };
   const sz = (b.sizes && b.sizes[sizeKey]) || BTN_SIZE_DEFAULTS[sizeKey];
   const fontPx = state.typography.texts[sz.font]?.desktop || 16;
   const radiusPx = b.radiusKey === "circle" ? state.radius.circle : (state.radius.values[b.radiusKey] || 0);
+  const ms = b.transitionMs ?? 150;
   const col = "hsl(" + p.hue + "," + p.saturation + "%," + p.lightness + "%)";
-  const base = { fontSize: fontPx, padding: sz.py + "em " + sz.px + "em", borderRadius: radiusPx, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", lineHeight: 1.2, border: "1.5px solid " + col, whiteSpace: "nowrap", transition: "all .15s" };
-  return outline ? { ...base, background: "transparent", color: col } : { ...base, background: col, color: btnContrast(p.lightness) };
+  const dark = "hsl(" + p.hue + "," + p.saturation + "%," + Math.max(0, p.lightness - 10) + "%)";
+  const onCol = btnContrast(p.lightness);
+  const base = { fontSize: fontPx, padding: sz.py + "em " + sz.px + "em", borderRadius: radiusPx, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", lineHeight: 1.2, whiteSpace: "nowrap", transition: "all " + ms + "ms" };
+  if (outline) return hover
+    ? { ...base, border: "1.5px solid " + col, background: col, color: onCol }
+    : { ...base, border: "1.5px solid " + col, background: "transparent", color: col };
+  return hover
+    ? { ...base, border: "1.5px solid " + dark, background: dark, color: onCol }
+    : { ...base, border: "1.5px solid " + col, background: col, color: onCol };
+}
+
+// Botón de preview con hover real (los estilos inline no soportan :hover)
+function PreviewButton({ state, palette, sizeKey, outline, children }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button style={buttonInlineStyle(state, palette, sizeKey, outline, hover)}
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+      {children || "Button"}
+    </button>
+  );
 }
 
 const initVariants = (h, s, l) => {
@@ -192,6 +212,7 @@ const initialState = {
   buttons: {
     outline: true,
     radiusKey: "m",
+    transitionMs: 150,
     enabled: {},
     sizes: JSON.parse(JSON.stringify(BTN_SIZE_DEFAULTS)),
   },
@@ -1095,7 +1116,6 @@ function StepButtons() {
   const b = state.buttons;
   const palettes = state.colors.palettes;
   const enabledPalettes = palettes.filter((p) => btnEnabled(state, p.id));
-  const btnStyle = (p, sizeKey, outline) => buttonInlineStyle(state, p, sizeKey, outline);
 
   return (<div>
     {/* SIZES */}
@@ -1126,13 +1146,20 @@ function StepButtons() {
         <div className={"ds-toggle-track" + (b.outline ? " on" : "")}><div className="ds-toggle-thumb" /></div>
         <div className="ds-toggle-text"><strong>Include outline variants</strong><span>Adds a .btn--outline modifier for each enabled color</span></div>
       </div>
-      <div className="ds-form-group" style={{ marginTop: 12, marginBottom: 0 }}>
-        <label style={{ fontSize: 12 }}>Border radius</label>
-        <select className="ds-input" style={{ maxWidth: 220 }} value={b.radiusKey} onChange={(e) => dispatch({ type: "SET_BTN", payload: { radiusKey: e.target.value } })}>
-          {RADIUS_KEYS.map((k) => <option key={k} value={k}>--radius-{k}</option>)}
-          <option value="circle">--radius-circle</option>
-        </select>
+      <div className="ds-grid-2" style={{ marginTop: 12 }}>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}>
+          <label style={{ fontSize: 12 }}>Border radius</label>
+          <select className="ds-input" value={b.radiusKey} onChange={(e) => dispatch({ type: "SET_BTN", payload: { radiusKey: e.target.value } })}>
+            {RADIUS_KEYS.map((k) => <option key={k} value={k}>--radius-{k}</option>)}
+            <option value="circle">--radius-circle</option>
+          </select>
+        </div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}>
+          <label style={{ fontSize: 12 }}>Hover transition (ms) <span style={{ fontWeight: 400, color: "var(--ds-text-3)" }}>— --btn-transition</span></label>
+          <NumStepper value={b.transitionMs ?? 150} set={(n) => dispatch({ type: "SET_BTN", payload: { transitionMs: Math.max(0, n) } })} min={0} step={25} />
+        </div>
       </div>
+      <div className="ds-helper" style={{ marginTop: 8 }}>Hover a button in the preview below to see the transition.</div>
     </div>
 
     {/* COLORS */}
@@ -1156,10 +1183,10 @@ function StepButtons() {
           <div key={p.id} style={{ marginBottom: 18 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ds-text-2)", marginBottom: 8 }}>{p.name}</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: b.outline ? 10 : 0 }}>
-              {BTN_SIZES.map((s) => <button key={s.key} style={btnStyle(p, s.key, false)}>Button</button>)}
+              {BTN_SIZES.map((s) => <PreviewButton key={s.key} state={state} palette={p} sizeKey={s.key} outline={false} />)}
             </div>
             {b.outline && <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-              {BTN_SIZES.map((s) => <button key={s.key} style={btnStyle(p, s.key, true)}>Button</button>)}
+              {BTN_SIZES.map((s) => <PreviewButton key={s.key} state={state} palette={p} sizeKey={s.key} outline={true} />)}
             </div>}
           </div>
         ))}
@@ -1211,6 +1238,7 @@ function generateVariablesJSON(state) {
       vars.push({ name: pn('pad-btn-y-' + s.key), value: sz.py + 'em', id: randId(), category: catIds['Buttons'] });
       vars.push({ name: pn('pad-btn-x-' + s.key), value: sz.px + 'em', id: randId(), category: catIds['Buttons'] });
     });
+    vars.push({ name: pn('btn-transition'), value: (state.buttons.transitionMs ?? 150) + 'ms', id: randId(), category: catIds['Buttons'] });
   }
   // Radius
   RADIUS_KEYS.forEach(k => { vars.push(mk('radius-' + k, (state.radius.values[k] || 0) + 'px', 'Radius')); });
@@ -1359,7 +1387,7 @@ function generateButtonsCSS(state, v) {
   css += ".btn {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  gap: 0.5em;\n";
   css += "  padding: " + v("pad-btn-y-default") + " " + v("pad-btn-x-default") + ";\n";
   css += "  font-size: " + v("text-" + d.font) + ";\n  font-weight: 600;\n  line-height: 1.2;\n  text-decoration: none;\n  cursor: pointer;\n  border: 1.5px solid transparent;\n";
-  css += "  border-radius: " + rad + ";\n  transition: background-color .15s, color .15s, border-color .15s;\n}\n";
+  css += "  border-radius: " + rad + ";\n  transition: background-color " + v("btn-transition") + ", color " + v("btn-transition") + ", border-color " + v("btn-transition") + ";\n}\n";
   BTN_SIZES.filter((s) => s.cls).forEach((s) => {
     const sz = b.sizes[s.key];
     css += "." + s.cls + " {\n  padding: " + v("pad-btn-y-" + s.key) + " " + v("pad-btn-x-" + s.key) + ";\n  font-size: " + v("text-" + sz.font) + ";\n}\n";
@@ -1484,7 +1512,6 @@ function LandingPreview({ state }) {
   const container = isFixed ? "min(" + maxVp + "px, 92%)" : "100%";
 
   // Botones reales del sistema (mismo helper que el paso Buttons) → tamaño, padding em, radius y color configurados
-  const btn = (sizeKey, outline) => buttonInlineStyle(state, p, sizeKey, outline);
   const linkBtn = { background: "transparent", color: "var(--ctext)", border: "none", fontSize: "var(--ts)", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" };
 
   const logoMark = (
@@ -1570,7 +1597,7 @@ function LandingPreview({ state }) {
             {["Home", "Features", "Pricing", "About Us", "Contact"].map((x) => <span key={x} style={{ fontSize: "var(--ts)", color: "var(--ctext)", cursor: "pointer", whiteSpace: "nowrap" }}>{x}</span>)}
           </nav>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--spM)" }}>
-            <button style={btn("sm", false)}>Sign up</button>
+            <PreviewButton state={state} palette={p} sizeKey="sm" outline={false}>Sign up</PreviewButton>
             <button style={linkBtn}>Login</button>
           </div>
         </div>
@@ -1583,8 +1610,8 @@ function LandingPreview({ state }) {
             <h1 style={{ fontSize: "var(--h1)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 800, letterSpacing: "-0.02em", margin: "0 0 var(--spM)" }}>Your digital transformation begins here</h1>
             <p style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)", maxWidth: 420 }}>Unlock the full potential of your business. Start your journey today and watch your operations transform to fit your needs like a glove.</p>
             <div style={{ display: "flex", gap: "var(--spS)", flexWrap: "wrap" }}>
-              <button style={btn("lg", false)}>Learn more</button>
-              <button style={btn("lg", true)}>Watch demo</button>
+              <PreviewButton state={state} palette={p} sizeKey="lg" outline={false}>Learn more</PreviewButton>
+              <PreviewButton state={state} palette={p} sizeKey="lg" outline={true}>Watch demo</PreviewButton>
             </div>
           </div>
           <div style={{ color: "var(--ctext)", display: "flex", justifyContent: "center" }}>{heroArt}</div>
@@ -1598,7 +1625,7 @@ function LandingPreview({ state }) {
           <div>
             <h2 style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 var(--spM)" }}>Dedicated support</h2>
             <p style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)" }}>Zephtor provides ongoing support and training to ensure you maximize the value of our software. Our experts are here to assist you at every step of your digital transformation journey.</p>
-            <button style={btn("default", false)}>Learn more</button>
+            <PreviewButton state={state} palette={p} sizeKey="default" outline={false}>Learn more</PreviewButton>
           </div>
         </div>
       </section>
