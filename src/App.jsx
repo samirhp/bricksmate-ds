@@ -360,6 +360,7 @@ const css_styles = `
     --ds-text:hsl(240,10%,3.9%); --ds-text-2:hsl(240,3.7%,46.1%); --ds-text-3:hsl(240,5%,64.9%);
     --ds-border:hsl(240,5.9%,90%); --ds-border-light:hsl(240,4.8%,95.5%);
     --ds-success:hsl(142,71%,38%); --ds-error:hsl(0,84%,55%);
+    --ds-accent:hsl(262,83%,58%); --ds-accent-hover:hsl(262,83%,50%); --ds-accent-light:hsl(262,83%,96%); --ds-accent-ring:hsla(262,83%,58%,.18);
     --ds-radius:8px; --ds-radius-lg:12px;
     --ds-shadow:0 1px 2px rgba(0,0,0,.05);
     --ds-shadow-md:0 1px 3px rgba(0,0,0,.08),0 1px 2px -1px rgba(0,0,0,.05);
@@ -371,6 +372,7 @@ const css_styles = `
     --ds-text:hsl(210,40%,98%); --ds-text-2:hsl(215,20%,75%); --ds-text-3:hsl(215,16%,58%);
     --ds-border:hsl(215,20%,32%); --ds-border-light:hsl(217,22%,22%);
     --ds-success:hsl(142,69%,52%); --ds-error:hsl(0,84%,66%);
+    --ds-accent:hsl(262,90%,72%); --ds-accent-hover:hsl(262,90%,78%); --ds-accent-light:hsl(262,40%,20%); --ds-accent-ring:hsla(262,90%,72%,.22);
     --ds-shadow:0 1px 2px rgba(0,0,0,.6);
     --ds-shadow-md:0 2px 4px rgba(0,0,0,.7),0 1px 2px rgba(0,0,0,.5);
   }
@@ -519,6 +521,78 @@ const css_styles = `
   .ds-section-chip{padding:4px 10px;font-size:11px;border:1px solid var(--ds-border);border-radius:20px;background:var(--ds-bg-card);color:var(--ds-text-2);cursor:pointer;transition:all .15s;font-family:monospace;box-shadow:var(--ds-shadow)}
   .ds-section-chip:hover{background:var(--ds-bg);border-color:var(--ds-primary);color:var(--ds-primary)} .ds-section-chip.copied{background:rgba(34,197,94,.06);border-color:var(--ds-success);color:var(--ds-success)}
   ::-webkit-scrollbar{width:5px} ::-webkit-scrollbar-track{background:transparent} ::-webkit-scrollbar-thumb{background:var(--ds-border-light);border-radius:3px}
+
+  /* ===== Accent (violeta, contenido) ===== */
+  .ds-step-item.active::before{background:var(--ds-accent)}
+  .ds-step-item.active .ds-step-num{color:var(--ds-accent)}
+  .ds-input:focus,.ds-space-input:focus,.ds-variant-input:focus{border-color:var(--ds-accent);box-shadow:0 0 0 3px var(--ds-accent-ring)}
+  [data-theme="dark"] .ds-input:focus,[data-theme="dark"] .ds-space-input:focus{box-shadow:0 0 0 3px var(--ds-accent-ring)}
+  .ds-input-error:focus{border-color:var(--ds-error)!important;box-shadow:0 0 0 3px rgba(239,68,68,.18)!important}
+  .ds-toggle-track.on{background:var(--ds-accent)}
+  .ds-tab.active{color:var(--ds-accent);border-bottom-color:var(--ds-accent)} .ds-tab:hover:not(.active){color:var(--ds-text)}
+  .ds-palette-header input[type="text"]:focus{border-bottom-color:var(--ds-accent)}
+  .ds-section-chip:hover{border-color:var(--ds-accent);color:var(--ds-accent)}
+  .ds-section-chip.copied{background:var(--ds-accent-light);border-color:var(--ds-accent);color:var(--ds-accent)}
+
+  /* ===== Tier 1: motion & micro-interacciones ===== */
+  @keyframes ds-step-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .ds-step-anim{animation:ds-step-in .3s cubic-bezier(.16,1,.3,1)}
+  @keyframes ds-check-pop{0%{transform:scale(0);opacity:0}60%{transform:scale(1.25)}100%{transform:scale(1);opacity:1}}
+  .ds-step-check{animation:ds-check-pop .32s cubic-bezier(.34,1.56,.64,1)}
+  .ds-mode-card,.ds-export-file-card,.ds-sys-card{transition:transform .18s cubic-bezier(.16,1,.3,1),box-shadow .18s,border-color .18s}
+  .ds-mode-card:hover,.ds-export-file-card:hover,.ds-sys-card:hover{transform:translateY(-3px)}
+  .ds-grid-chip{transition:transform .15s,border-color .15s,color .15s}
+  .ds-grid-chip:hover{transform:translateY(-1px);border-color:var(--ds-accent);color:var(--ds-accent)}
+  .ds-btn:active:not(:disabled),.ds-btn-primary:active:not(:disabled),.ds-download-btn:active:not(:disabled),.ds-copy-btn:active{transform:scale(.97)}
+  .ds-step-item{transition:background .15s,transform .12s} .ds-step-item:active{transform:translateX(1px)}
+
+  /* ===== Progress bar ===== */
+  .ds-progress{height:3px;background:var(--ds-border-light);flex-shrink:0;overflow:hidden}
+  .ds-progress-bar{height:100%;background:var(--ds-accent);border-radius:0 3px 3px 0;transition:width .4s cubic-bezier(.16,1,.3,1)}
+
+  /* ===== Toasts ===== */
+  .ds-toasts{position:fixed;bottom:18px;right:18px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+  @keyframes ds-toast-in{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+  .ds-toast{display:flex;align-items:center;gap:9px;background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius);padding:10px 14px;font-size:13px;font-weight:500;color:var(--ds-text);box-shadow:var(--ds-shadow-md);animation:ds-toast-in .28s cubic-bezier(.16,1,.3,1);pointer-events:auto;min-width:200px}
+  .ds-toast-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  .ds-toast.ok .ds-toast-dot{background:var(--ds-success)} .ds-toast.info .ds-toast-dot{background:var(--ds-accent)} .ds-toast.err .ds-toast-dot{background:var(--ds-error)}
+
+  /* ===== Tier 2: profundidad & pulido ===== */
+  .ds-content-body,.ds-dash{background:radial-gradient(1100px circle at 50% -8%,hsla(262,80%,62%,.05),transparent 55%)}
+  .ds-sys-swatches{position:relative}
+  .ds-sys-swatches::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(0,0,0,.14));pointer-events:none}
+  .ds-mode-card:hover,.ds-export-file-card:hover,.ds-sys-card:hover{border-color:var(--ds-accent)}
+  .ds-card,.ds-palette-card,.ds-viewport-config{transition:border-color .18s,box-shadow .18s}
+  select.ds-input{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;padding-right:30px;cursor:pointer}
+  .ds-header,.ds-content-header,.ds-footer,.ds-sidebar{position:relative;z-index:1}
+  /* Export success */
+  .ds-dl-done{background:var(--ds-success)!important;color:#fff!important;animation:ds-dl-pop .4s}
+  @keyframes ds-dl-pop{0%{transform:scale(1)}40%{transform:scale(1.05)}100%{transform:scale(1)}}
+  /* Tooltips (debajo del elemento) */
+  [data-tip]{position:relative}
+  [data-tip]:hover::after{content:attr(data-tip);position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--ds-text);color:var(--ds-bg);font-size:11px;font-weight:500;line-height:1.3;padding:5px 9px;border-radius:6px;white-space:nowrap;z-index:1000;pointer-events:none;box-shadow:var(--ds-shadow-md);animation:ds-tip .14s ease-out}
+  [data-tip]:hover::before{content:'';position:absolute;top:calc(100% + 3px);left:50%;transform:translateX(-50%);border:5px solid transparent;border-bottom-color:var(--ds-text);z-index:1000;pointer-events:none}
+  @keyframes ds-tip{from{opacity:0;transform:translateX(-50%) translateY(-3px)}to{opacity:1}}
+  /* Number steppers (+/−) */
+  .ds-stepper{display:flex;align-items:stretch;border:1px solid var(--ds-border);border-radius:var(--ds-radius);background:var(--ds-bg-card);box-shadow:var(--ds-shadow);overflow:hidden;transition:border-color .15s,box-shadow .15s}
+  .ds-stepper:focus-within{border-color:var(--ds-accent);box-shadow:0 0 0 3px var(--ds-accent-ring)}
+  .ds-stepper-btn{width:30px;flex-shrink:0;border:none;background:transparent;color:var(--ds-text-2);font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .12s,color .12s;font-family:inherit}
+  .ds-stepper-btn:hover{background:var(--ds-bg);color:var(--ds-accent)} .ds-stepper-btn:active{transform:scale(.9)}
+  .ds-stepper-input{flex:1;min-width:0;width:100%;border:none;background:transparent;text-align:center;font-size:14px;color:var(--ds-text);font-family:inherit;padding:7px 2px;outline:none;-moz-appearance:textfield}
+  .ds-stepper-input::-webkit-outer-spin-button,.ds-stepper-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  /* Color sliders (HSL visual) */
+  .ds-cslider{margin-bottom:11px} .ds-cslider:last-child{margin-bottom:0}
+  .ds-cslider-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+  .ds-cslider-head label{font-size:11px;color:var(--ds-text-2);font-weight:500}
+  .ds-cslider-val{font-size:11px;color:var(--ds-text-3);font-family:'SF Mono',Consolas,monospace}
+  .ds-cslider-track{position:relative;height:14px;border-radius:7px;border:1px solid var(--ds-border-light);box-shadow:inset 0 0 0 1px rgba(0,0,0,.04)}
+  .ds-cslider input[type=range]{position:absolute;inset:0;width:100%;height:100%;margin:0;-webkit-appearance:none;appearance:none;background:transparent;cursor:pointer}
+  .ds-cslider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid rgba(0,0,0,.3);box-shadow:0 1px 3px rgba(0,0,0,.35);cursor:grab;transition:transform .12s}
+  .ds-cslider input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15);cursor:grabbing}
+  .ds-cslider input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid rgba(0,0,0,.3);box-shadow:0 1px 3px rgba(0,0,0,.35);cursor:grab}
+  .ds-cslider input[type=range]:focus{outline:none} .ds-cslider input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px var(--ds-accent-ring),0 1px 3px rgba(0,0,0,.35)}
+
+  @media (prefers-reduced-motion:reduce){.ds-step-anim,.ds-step-check,.ds-toast{animation:none}*{transition-duration:.01ms!important}}
 `;
 
 /* ================================================================
@@ -541,20 +615,20 @@ function EditorHeader({ name, onRename, onBack, autoSave, onToggleAutoSave, dirt
   useEffect(() => { setVal(name); }, [name]);
   const commit = () => { const n = val.trim() || name; setEditing(false); if (n !== name) onRename(n); };
   return (<header className="ds-header">
-    <button className="ds-header-back" onClick={onBack} title="Back to my systems">←</button>
+    <button className="ds-header-back" onClick={onBack} data-tip="Back to my systems">←</button>
     <div className="ds-header-icon">◈</div>
     {editing
       ? <input className="ds-input ds-input-sm" style={{ maxWidth: 240 }} autoFocus value={val} onChange={(e) => setVal(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setVal(name); setEditing(false); } }} />
-      : <div><h1 onClick={() => setEditing(true)} style={{ cursor: "text" }} title="Click to rename">{name}</h1><p>Design system editor</p></div>}
+      : <div><h1 onClick={() => setEditing(true)} style={{ cursor: "text" }} data-tip="Click to rename">{name}</h1><p>Design system editor</p></div>}
     <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
-      <div className="ds-autosave" onClick={onToggleAutoSave} title="Toggle automatic saving">
+      <div className="ds-autosave" onClick={onToggleAutoSave} data-tip="Save changes automatically on every edit">
         <div className={"ds-toggle-track" + (autoSave ? " on" : "")}><div className="ds-toggle-thumb" /></div>
         <span>Auto-save</span>
       </div>
-      <button className="ds-btn ds-btn-primary ds-btn-sm" onClick={onSave} disabled={autoSave || !dirty}>
+      <button className="ds-btn ds-btn-primary ds-btn-sm" onClick={onSave} disabled={autoSave || !dirty} data-tip="Save changes (⌘/Ctrl + S)">
         {autoSave ? "✓ Auto-saved" : (dirty ? "Save changes" : "✓ Saved")}
       </button>
-      <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode"><ThemeIcon dark={darkMode} /></button>
+      <button className="ds-header-theme" onClick={toggleDark} data-tip="Toggle light / dark theme"><ThemeIcon dark={darkMode} /></button>
     </div>
   </header>);
 }
@@ -585,6 +659,19 @@ function ValidationAlert({ items }) {
   </div>);
 }
 
+// Input numérico con botones +/− (steppers)
+function NumStepper({ value, set, min, max, step = 1 }) {
+  const norm = (n) => (step < 1 ? Math.round(n * 100) / 100 : Math.round(n));
+  const clamp = (n) => { if (min != null) n = Math.max(min, n); if (max != null) n = Math.min(max, n); return n; };
+  const change = (d) => set(clamp(norm((parseFloat(value) || 0) + d)));
+  const onType = (e) => { const v = e.target.value; if (v === "") { set(min != null ? min : 0); return; } set(clamp(step < 1 ? (parseFloat(v) || 0) : (parseInt(v) || 0))); };
+  return (<div className="ds-stepper">
+    <button type="button" className="ds-stepper-btn" tabIndex={-1} onClick={() => change(-step)} aria-label="Decrease">−</button>
+    <input type="number" className="ds-stepper-input" value={value} min={min} max={max} step={step} onChange={onType} />
+    <button type="button" className="ds-stepper-btn" tabIndex={-1} onClick={() => change(step)} aria-label="Increase">+</button>
+  </div>);
+}
+
 /* ================================================================
    STEP 1: LAYOUT MODE
    ================================================================ */
@@ -604,8 +691,8 @@ function StepLayout() {
     {layoutMode && (<div className="ds-viewport-config"><h4>Viewport range</h4>
       <ValidationAlert items={warns} />
       <div className="ds-viewport-row">
-        <div className="ds-form-group"><label>Min viewport (px)</label><input type="number" className="ds-input" value={minViewport} onChange={(e) => dispatch({ type: "SET_FIELD", field: "minViewport", value: Math.max(0, parseInt(e.target.value) || 0) })} /></div>
-        <div className="ds-form-group"><label>Max viewport (px)</label><input type="number" className="ds-input" value={maxViewport} onChange={(e) => dispatch({ type: "SET_FIELD", field: "maxViewport", value: Math.max(0, parseInt(e.target.value) || 0) })} /></div>
+        <div className="ds-form-group"><label>Min viewport (px)</label><NumStepper value={minViewport} set={(n) => dispatch({ type: "SET_FIELD", field: "minViewport", value: Math.max(0, n) })} min={0} step={5} /></div>
+        <div className="ds-form-group"><label>Max viewport (px)</label><NumStepper value={maxViewport} set={(n) => dispatch({ type: "SET_FIELD", field: "maxViewport", value: Math.max(0, n) })} min={0} step={10} /></div>
       </div>
       <div className="ds-toggle-row" onClick={() => dispatch({ type: "SET_FIELD", field: "capValues", value: !capValues })}>
         <div className={"ds-toggle-track" + (capValues ? " on" : "")}><div className="ds-toggle-thumb" /></div>
@@ -629,9 +716,9 @@ function StepSpacing() {
   return (<div>
     <div className="ds-card"><h4>Base space</h4>
       <div className="ds-grid-3">
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Mobile</label><input type="number" className="ds-input" value={sp.baseMobile} onChange={(e) => recalc(parseInt(e.target.value) || 0, sp.baseDesktop)} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Desktop</label><input type="number" className="ds-input" value={sp.baseDesktop} onChange={(e) => recalc(sp.baseMobile, parseInt(e.target.value) || 0)} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale</label><input type="number" className="ds-input" value={sp.scale} step={0.1} min={1} onChange={(e) => recalc(sp.baseMobile, sp.baseDesktop, parseFloat(e.target.value) || 1)} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Mobile</label><NumStepper value={sp.baseMobile} set={(n) => recalc(n, sp.baseDesktop)} min={0} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Desktop</label><NumStepper value={sp.baseDesktop} set={(n) => recalc(sp.baseMobile, n)} min={0} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale</label><NumStepper value={sp.scale} set={(n) => recalc(sp.baseMobile, sp.baseDesktop, n)} min={1} step={0.05} /></div>
       </div>
     </div>
     <ValidationAlert items={warns} />
@@ -660,9 +747,9 @@ function StepSectionSpacing() {
   return (<div>
     <div className="ds-card"><h4>Base section space</h4>
       <div className="ds-grid-3">
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Mobile</label><input type="number" className="ds-input" value={ss.baseMobile} onChange={(e) => recalc(parseInt(e.target.value) || 0, ss.baseDesktop)} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Desktop</label><input type="number" className="ds-input" value={ss.baseDesktop} onChange={(e) => recalc(ss.baseMobile, parseInt(e.target.value) || 0)} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale</label><input type="number" className="ds-input" value={ss.scale} step={0.1} min={1} onChange={(e) => recalc(ss.baseMobile, ss.baseDesktop, parseFloat(e.target.value) || 1)} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Mobile</label><NumStepper value={ss.baseMobile} set={(n) => recalc(n, ss.baseDesktop)} min={0} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Desktop</label><NumStepper value={ss.baseDesktop} set={(n) => recalc(ss.baseMobile, n)} min={0} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale</label><NumStepper value={ss.scale} set={(n) => recalc(ss.baseMobile, ss.baseDesktop, n)} min={1} step={0.05} /></div>
       </div>
     </div>
     <ValidationAlert items={warns} />
@@ -697,8 +784,8 @@ function StepTypography() {
     {/* HEADINGS */}
     <div className="ds-card"><h4>Headings (base: h3)</h4>
       {t.useScale && (<div className="ds-grid-3" style={{ marginBottom: 16 }}>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>h3 Mobile</label><input type="number" className="ds-input" value={t.headingBaseMob} onChange={(e) => dispatch({ type: "RECALC_HEADINGS", baseMob: parseInt(e.target.value) || 0, baseDesk: t.headingBaseDesk, scale: t.headingScale })} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>h3 Desktop</label><input type="number" className="ds-input" value={t.headingBaseDesk} onChange={(e) => dispatch({ type: "RECALC_HEADINGS", baseMob: t.headingBaseMob, baseDesk: parseInt(e.target.value) || 0, scale: t.headingScale })} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>h3 Mobile</label><NumStepper value={t.headingBaseMob} set={(n) => dispatch({ type: "RECALC_HEADINGS", baseMob: n, baseDesk: t.headingBaseDesk, scale: t.headingScale })} min={0} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>h3 Desktop</label><NumStepper value={t.headingBaseDesk} set={(n) => dispatch({ type: "RECALC_HEADINGS", baseMob: t.headingBaseMob, baseDesk: n, scale: t.headingScale })} min={0} /></div>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale</label>
           <select className="ds-input" value={t.headingScale} onChange={(e) => dispatch({ type: "RECALC_HEADINGS", baseMob: t.headingBaseMob, baseDesk: t.headingBaseDesk, scale: parseFloat(e.target.value) })}>
             {SCALES.map((s) => <option key={s.value} value={s.value}>{s.name} ({s.value})</option>)}
@@ -717,8 +804,8 @@ function StepTypography() {
     {/* TEXT SIZES */}
     <div className="ds-card"><h4>Text sizes (base: text-m)</h4>
       {t.useScale && (<div className="ds-grid-3" style={{ marginBottom: 16 }}>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>text-m Mobile</label><input type="number" className="ds-input" value={t.textBaseMob} onChange={(e) => dispatch({ type: "RECALC_TEXTS", baseMob: parseInt(e.target.value) || 0, baseDesk: t.textBaseDesk, scale: t.textScale })} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>text-m Desktop</label><input type="number" className="ds-input" value={t.textBaseDesk} onChange={(e) => dispatch({ type: "RECALC_TEXTS", baseMob: t.textBaseMob, baseDesk: parseInt(e.target.value) || 0, scale: t.textScale })} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>text-m Mobile</label><NumStepper value={t.textBaseMob} set={(n) => dispatch({ type: "RECALC_TEXTS", baseMob: n, baseDesk: t.textBaseDesk, scale: t.textScale })} min={0} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>text-m Desktop</label><NumStepper value={t.textBaseDesk} set={(n) => dispatch({ type: "RECALC_TEXTS", baseMob: t.textBaseMob, baseDesk: n, scale: t.textScale })} min={0} /></div>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale</label>
           <select className="ds-input" value={t.textScale} onChange={(e) => dispatch({ type: "RECALC_TEXTS", baseMob: t.textBaseMob, baseDesk: t.textBaseDesk, scale: parseFloat(e.target.value) })}>
             {SCALES.map((s) => <option key={s.value} value={s.value}>{s.name} ({s.value})</option>)}
@@ -735,8 +822,8 @@ function StepTypography() {
       </div>))}
     </div>
     <div className="ds-card"><h4>Line heights</h4><div className="ds-grid-2">
-      <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Headings</label><input type="number" className="ds-input" value={t.lineHeightHeading} step={0.05} onChange={(e) => dispatch({ type: "SET_TYPO", payload: { lineHeightHeading: parseFloat(e.target.value) || 1 } })} /></div>
-      <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Body</label><input type="number" className="ds-input" value={t.lineHeightBody} step={0.05} onChange={(e) => dispatch({ type: "SET_TYPO", payload: { lineHeightBody: parseFloat(e.target.value) || 1 } })} /></div>
+      <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Headings</label><NumStepper value={t.lineHeightHeading} set={(n) => dispatch({ type: "SET_TYPO", payload: { lineHeightHeading: n || 1 } })} min={0.8} step={0.05} /></div>
+      <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Body</label><NumStepper value={t.lineHeightBody} set={(n) => dispatch({ type: "SET_TYPO", payload: { lineHeightBody: n || 1 } })} min={0.8} step={0.05} /></div>
     </div></div>
   </div>);
 }
@@ -753,15 +840,27 @@ function PaletteCard({ palette }) {
   const onPick = (hex) => { const { h, s, l } = hexToHsl(hex); upd("hue", h); setTimeout(() => { upd("saturation", s); upd("lightness", l); upd("variants", initVariants(h, s, l)); }, 0); };
   const recalcVariants = () => upd("variants", initVariants(hue, saturation, lightness));
 
+  const hueGrad = "linear-gradient(90deg,hsl(0,100%,50%),hsl(60,100%,50%),hsl(120,100%,50%),hsl(180,100%,50%),hsl(240,100%,50%),hsl(300,100%,50%),hsl(360,100%,50%))";
+  const satGrad = "linear-gradient(90deg,hsl(" + hue + ",0%," + lightness + "%),hsl(" + hue + ",100%," + lightness + "%))";
+  const lightGrad = "linear-gradient(90deg,hsl(" + hue + "," + saturation + "%,0%),hsl(" + hue + "," + saturation + "%,50%),hsl(" + hue + "," + saturation + "%,100%))";
+  const Slider = (label, val, max, grad, field, unit) => (
+    <div className="ds-cslider">
+      <div className="ds-cslider-head"><label>{label}</label><span className="ds-cslider-val">{val}{unit}</span></div>
+      <div className="ds-cslider-track" style={{ background: grad }}>
+        <input type="range" min={0} max={max} value={val} onChange={(e) => upd(field, parseInt(e.target.value))} />
+      </div>
+    </div>
+  );
+
   return (<div className="ds-palette-card">
     <div className="ds-palette-header"><input type="text" value={name} placeholder="Color name" onChange={(e) => upd("name", e.target.value)} />{canDel && <button className="ds-btn ds-btn-sm ds-btn-danger" onClick={() => dispatch({ type: "REMOVE_PALETTE", id })}>Remove</button>}</div>
     <div className="ds-color-picker-row">
       <div className="ds-color-swatch"><input type="color" value={hexVal} onChange={(e) => onPick(e.target.value)} /></div>
-      <div style={{ flex: 1 }}><div className="ds-grid-3">
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 11 }}>Hue</label><input type="number" className="ds-input ds-input-sm" value={hue} onChange={(e) => { upd("hue", parseInt(e.target.value) || 0); }} min={0} max={360} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 11 }}>Saturation</label><input type="number" className="ds-input ds-input-sm" value={saturation} onChange={(e) => upd("saturation", parseInt(e.target.value) || 0)} min={0} max={100} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 11 }}>Lightness</label><input type="number" className="ds-input ds-input-sm" value={lightness} onChange={(e) => upd("lightness", parseInt(e.target.value) || 0)} min={0} max={100} /></div>
-      </div></div>
+      <div style={{ flex: 1 }}>
+        {Slider("Hue", hue, 360, hueGrad, "hue", "°")}
+        {Slider("Saturation", saturation, 100, satGrad, "saturation", "%")}
+        {Slider("Lightness", lightness, 100, lightGrad, "lightness", "%")}
+      </div>
     </div>
     <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
       <div className="ds-toggle-row" style={{ flex: 1, marginBottom: 0 }} onClick={() => upd("showTransparency", !showTransparency)}>
@@ -863,7 +962,7 @@ function StepRadius() {
   return (<div>
     <div className="ds-card"><h4>Base radius</h4>
       <div className="ds-form-group"><label>Base value (px) — maps to --radius-m</label>
-        <input type="number" className="ds-input" value={r.base} min={0} onChange={(e) => dispatch({ type: "RECALC_RADIUS", base: parseInt(e.target.value) || 0 })} />
+        <NumStepper value={r.base} set={(n) => dispatch({ type: "RECALC_RADIUS", base: n })} min={0} />
       </div>
     </div>
     {RADIUS_KEYS.map((k, i) => (<div key={k} className={"ds-space-row" + (i % 2 ? " alt" : "")}>
@@ -1647,8 +1746,9 @@ function StepPreview() {
    STEP 9: EXPORT
    ================================================================ */
 function StepExport() {
-  const { state, dispatch } = useDSContext();
+  const { state, dispatch, addToast } = useDSContext();
   const [status, setStatus] = useState(null);
+  const [done, setDone] = useState(null);
   const warnings = [];
   if (!state.layoutMode) warnings.push({ msg: "Select a layout mode in Step 1", step: 1 });
   if (!state.colors.palettes.length) warnings.push({ msg: "Add at least one color palette in Step 4", step: 4 });
@@ -1663,7 +1763,9 @@ function StepExport() {
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
       setStatus({ type: "ok", file: fn }); setTimeout(() => setStatus(null), 4000);
-    } catch (e) { setStatus({ type: "error", msg: e.message }); }
+      setDone(filenameField); setTimeout(() => setDone((d) => d === filenameField ? null : d), 1600);
+      addToast?.(fn + " downloaded", "ok");
+    } catch (e) { setStatus({ type: "error", msg: e.message }); addToast?.("Export failed", "err"); }
   };
 
   const CARDS = [
@@ -1705,7 +1807,7 @@ function StepExport() {
           <p>{c.desc}</p>
           <div style={{ fontSize: 11, color: "var(--ds-text-3)", marginBottom: 14, fontFamily: "monospace" }}>{c.sub}</div>
           <div className="ds-form-group"><label style={{ fontSize: 12 }}>Filename</label><input className="ds-input ds-input-sm" value={state[c.field] || c.fallback} onChange={(e) => dispatch({ type: "SET_FIELD", field: c.field, value: e.target.value })} /></div>
-          <button className="ds-download-btn" onClick={() => dl(c.gen, c.field, c.fallback, c.mime)} disabled={warnings.length > 0 || c.disabled}>{c.label}</button>
+          <button className={"ds-download-btn" + (done === c.field ? " ds-dl-done" : "")} onClick={() => dl(c.gen, c.field, c.fallback, c.mime)} disabled={warnings.length > 0 || c.disabled}>{done === c.field ? "✓ Downloaded!" : c.label}</button>
         </div>
       ))}
     </div>
@@ -1723,7 +1825,20 @@ function StepContent() {
   const C = [null, StepLayout, StepSpacing, StepSectionSpacing, StepTypography, StepColors, StepGaps, StepRadius, StepButtons, StepPreview, StepExport][state.currentStep];
   return (<div className="ds-content">
     <div className="ds-content-header"><h2>{step.label}</h2><p>{DESCS[step.id]}</p></div>
-    <div className="ds-content-body">{C && <C />}</div>
+    <div className="ds-content-body"><div key={state.currentStep} className="ds-step-anim">{C && <C />}</div></div>
+  </div>);
+}
+
+function ProgressBar() {
+  const { state } = useDSContext();
+  const pct = Math.round((state.currentStep / STEPS.length) * 100);
+  return (<div className="ds-progress" title={"Step " + state.currentStep + " of " + STEPS.length}><div className="ds-progress-bar" style={{ width: pct + "%" }} /></div>);
+}
+
+function ToastHost({ toasts }) {
+  if (!toasts.length) return null;
+  return (<div className="ds-toasts">
+    {toasts.map((t) => <div key={t.id} className={"ds-toast " + (t.type || "info")}><span className="ds-toast-dot" />{t.msg}</div>)}
   </div>);
 }
 
@@ -1788,6 +1903,13 @@ export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [dirty, setDirty] = useState(false);
   const skipSave = useRef(false);
+  const [toasts, setToasts] = useState([]);
+  const toastId = useRef(0);
+  const addToast = (msg, type = "info") => {
+    const id = ++toastId.current;
+    setToasts((ts) => [...ts, { id, msg, type }]);
+    setTimeout(() => setToasts((ts) => ts.filter((t) => t.id !== id)), 2800);
+  };
 
   useEffect(() => { document.documentElement.setAttribute("data-theme", darkMode ? "dark" : "light"); }, [darkMode]);
 
@@ -1808,12 +1930,13 @@ export default function App() {
   }, []);
 
   // Guardado del documento activo en su entrada de la biblioteca
-  const saveDoc = () => {
+  const saveDoc = (announce) => {
     setLibrary((prev) => {
       const lib = { ...prev, systems: prev.systems.map((s) => s.id === currentId ? { ...s, doc: state, updatedAt: nowISO() } : s) };
       persistLibrary(lib); return lib;
     });
     setDirty(false);
+    if (announce) addToast("Changes saved", "ok");
   };
 
   // Reacciona a cambios del doc activo: auto-guarda o marca como "sin guardar"
@@ -1846,12 +1969,14 @@ export default function App() {
     const copy = { id: "sys_" + randId(), name: sys.name + " (copy)", createdAt: nowISO(), updatedAt: nowISO(), doc: JSON.parse(JSON.stringify(sys.doc)) };
     const lib = { ...library, systems: [...library.systems, copy] };
     setLibrary(lib); persistLibrary(lib);
+    addToast("System duplicated", "ok");
   };
   const deleteSystem = (id) => {
     const sys = library.systems.find((s) => s.id === id);
     if (!sys || !window.confirm('Delete "' + sys.name + '"? This cannot be undone.')) return;
     const lib = { ...library, systems: library.systems.filter((s) => s.id !== id) };
     setLibrary(lib); persistLibrary(lib);
+    addToast("System deleted", "info");
   };
   const renameSystem = (id, name) => {
     const lib = { ...library, systems: library.systems.map((s) => s.id === id ? { ...s, name, updatedAt: nowISO() } : s) };
@@ -1874,8 +1999,26 @@ export default function App() {
     setView("dashboard"); setCurrentId(null); setDirty(false);
   };
 
+  // Atajos de teclado: Cmd/Ctrl+S guarda · ←/→ navega entre pasos
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        if (view === "editor") saveDoc(true);
+        return;
+      }
+      if (view !== "editor") return;
+      const tag = (e.target.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "select" || tag === "textarea" || e.target.isContentEditable) return;
+      if (e.key === "ArrowRight" && state.currentStep < STEPS.length) dispatch({ type: "SET_STEP", payload: state.currentStep + 1 });
+      else if (e.key === "ArrowLeft" && state.currentStep > 1) dispatch({ type: "SET_STEP", payload: state.currentStep - 1 });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [view, state, currentId, library.autoSave]);
+
   const currentSystem = library.systems.find((s) => s.id === currentId);
-  const value = useMemo(() => ({ state, dispatch, darkMode, toggleDark }), [state, darkMode]);
+  const value = useMemo(() => ({ state, dispatch, darkMode, toggleDark, addToast }), [state, darkMode]);
 
   return (<DSContext.Provider value={value}>
     <style>{css_styles}</style>
@@ -1883,10 +2026,12 @@ export default function App() {
       {view === "dashboard"
         ? <Dashboard library={library} darkMode={darkMode} toggleDark={toggleDark} onOpen={openSystem} onNew={createSystem} onDuplicate={duplicateSystem} onDelete={deleteSystem} onRename={renameSystem} />
         : <>
-            <EditorHeader name={currentSystem?.name || "Untitled"} onRename={(n) => renameSystem(currentId, n)} onBack={backToDashboard} autoSave={library.autoSave} onToggleAutoSave={toggleAutoSave} dirty={dirty} onSave={saveDoc} darkMode={darkMode} toggleDark={toggleDark} />
+            <EditorHeader name={currentSystem?.name || "Untitled"} onRename={(n) => renameSystem(currentId, n)} onBack={backToDashboard} autoSave={library.autoSave} onToggleAutoSave={toggleAutoSave} dirty={dirty} onSave={() => saveDoc(true)} darkMode={darkMode} toggleDark={toggleDark} />
+            <ProgressBar />
             <div className="ds-main"><Sidebar /><StepContent /></div>
             <Footer />
           </>}
+      <ToastHost toasts={toasts} />
     </div>
   </DSContext.Provider>);
 }
