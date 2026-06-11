@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="8" fill="#185fa5"/>
+  <!-- 2×2 token grid: represents design tokens -->
+  <rect x="7"  y="7"  width="8" height="8" rx="2" fill="white" opacity="1.0"/>
+  <rect x="17" y="7"  width="8" height="8" rx="2" fill="white" opacity="0.65"/>
+  <rect x="7"  y="17" width="8" height="8" rx="2" fill="white" opacity="0.4"/>
+  <rect x="17" y="17" width="8" height="8" rx="2" fill="white" opacity="0.2"/>
+</svg>

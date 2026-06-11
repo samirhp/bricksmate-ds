@@ -1,0 +1,9 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# SPA redirect — necesario para que los links con hash (#...) funcionen
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200

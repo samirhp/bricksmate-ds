@@ -1,0 +1,1892 @@
+import { useState, useEffect, useContext, useReducer, createContext, useMemo, useRef } from "react";
+
+/* ================================================================
+   UTILITIES
+   ================================================================ */
+function fluidValue(min, max, minVP, maxVP, cap) {
+  const mn = Number(min), mx = Number(max), mnVP = Number(minVP), mxVP = Number(maxVP);
+  // Guard: NaN / Infinity
+  if (!isFinite(mn) || !isFinite(mx) || !isFinite(mnVP) || !isFinite(mxVP)) return (isFinite(mn) ? mn : 0) + "px";
+  // Guard: viewport range inválido → fallback valor móvil
+  if (mnVP >= mxVP) return mn + "px";
+  // Guard: valores idénticos → estático, no hace falta clamp
+  if (mn === mx) return mn + "px";
+  // Guard: rango invertido (mobile > desktop) → swap para que lo < hi
+  const lo = Math.min(mn, mx), hi = Math.max(mn, mx);
+  const slope = (hi - lo) / (mxVP - mnVP);
+  const intercept = lo - slope * mnVP;
+  // Formato limpio: elimina trailing zeros y evita "-0.xx"
+  const fmt = (n, dec) => {
+    const r = Math.round(n * Math.pow(10, dec)) / Math.pow(10, dec);
+    return String(parseFloat((Math.abs(r) < 1e-9 ? 0 : r).toFixed(dec)));
+  };
+  const pref = fmt(intercept, 2) + "px + " + fmt(slope * 100, 4) + "vw";
+  return cap ? "clamp(" + lo + "px, calc(" + pref + "), " + hi + "px)" : "max(" + lo + "px, calc(" + pref + "))";
+}
+function fl(min, max, s) { return fluidValue(min, max, s.minViewport, s.maxViewport, s.capValues); }
+function flRem(min, max, s) {
+  const clampPx = fl(min, max, s);
+  return clampPx.replace(/(\d+(?:\.\d+)?)px/g, (_, p) => pxToRem(parseFloat(p)));
+}
+function slugify(str) { return str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "color"; }
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => { const k = (n + h / 30) % 12; return Math.round(255 * (l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1))).toString(16).padStart(2, "0"); };
+  return "#" + f(0) + f(8) + f(4);
+}
+function hexToHsl(hex) {
+  let r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let h = 0, s = 0, l = (mx + mn) / 2;
+  if (mx !== mn) { const d = mx - mn; s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+    if (mx === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60; else if (mx === g) h = ((b - r) / d + 2) * 60; else h = ((r - g) / d + 4) * 60; }
+  return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) };
+}
+function clampL(v) { return Math.max(0, Math.min(100, Math.round(v))); }
+function randId() { return Math.random().toString(36).slice(2, 8).padEnd(6, '0'); }
+function hslStrToHex(str) {
+  const m = (str || '').match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+  return m ? hslToHex(+m[1], +m[2], +m[3]) : '#000000';
+}
+function pxToRem(px) { return (px / 16).toFixed(3).replace(/\.?0+$/, '') + 'rem'; }
+
+const SCALES = [
+  { name: "Minor Second", value: 1.067 }, { name: "Major Second", value: 1.125 },
+  { name: "Minor Third", value: 1.2 }, { name: "Major Third", value: 1.25 },
+  { name: "Perfect Fourth", value: 1.333 }, { name: "Augmented Fourth", value: 1.414 },
+  { name: "Perfect Fifth", value: 1.5 }, { name: "Golden Ratio", value: 1.618 },
+];
+
+const VARIANT_LIGHTNESS = [
+  { key: "ultra-dark", l: 12 }, { key: "dark", l: 25 }, { key: "semi-dark", l: 37 },
+  { key: "medium", l: null }, { key: "semi-light", l: 72 }, { key: "light", l: 87 }, { key: "ultra-light", l: 95 },
+];
+
+const SPACE_KEYS = ["xs", "s", "m", "l", "xl", "xxl"];
+// Step exponents for modular scale (section is outside the scale)
+const SPACE_STEPS = { xs: -2, s: -1, m: 0, l: 1, xl: 2, xxl: 3 };
+
+/* ================================================================
+   STATE
+   ================================================================ */
+const initSpaceVals = (baseMob, baseDesk, scale) => {
+  const r = {};
+  Object.entries(SPACE_STEPS).forEach(([k, step]) => {
+    const mult = Math.pow(scale, step);
+    r[k] = { mobile: Math.round(baseMob * mult), desktop: Math.round(baseDesk * mult) };
+  });
+  // Section spacing: outside the modular scale, ~5× base
+  r.section = { mobile: Math.round(baseMob * 5), desktop: Math.round(baseDesk * 5) };
+  return r;
+};
+
+const initHeadings = (baseMob, baseDesk, scale) => {
+  const hs = {};
+  const steps = { h1: 2, h2: 1, h3: 0, h4: -1, h5: -2, h6: -3 };
+  Object.entries(steps).forEach(([k, exp]) => {
+    hs[k] = { mobile: Math.round(baseMob * Math.pow(scale, exp)), desktop: Math.round(baseDesk * Math.pow(scale, exp)) };
+  });
+  return hs;
+};
+
+const TEXT_KEYS = ["xs", "s", "m", "mm", "l", "xl", "xxl"];
+const TEXT_STEPS = { xs: -2, s: -1, m: 0, mm: 0.5, l: 1, xl: 2, xxl: 3 };
+
+const initTexts = (baseMob, baseDesk, scale) => {
+  const ts = {};
+  TEXT_KEYS.forEach((k) => {
+    const exp = TEXT_STEPS[k];
+    ts[k] = { mobile: Math.round(baseMob * Math.pow(scale, exp)), desktop: Math.round(baseDesk * Math.pow(scale, exp)) };
+  });
+  return ts;
+};
+
+const RADIUS_KEYS = ["xs", "s", "m", "l", "xl"];
+const RADIUS_MULTS = { xs: 0.25, s: 0.5, m: 1, l: 1.5, xl: 2.5 };
+
+// Grids — valores estáticos por defecto: columnas (1–12) y ratios asimétricos.
+// minmax(0, Nfr) evita el overflow por min-width:auto (las columnas pueden encogerse).
+const GRID_COLS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+const GRID_RATIOS = [
+  ["1-2", "minmax(0, 1fr) minmax(0, 2fr)"], ["1-3", "minmax(0, 1fr) minmax(0, 3fr)"],
+  ["2-3", "minmax(0, 2fr) minmax(0, 3fr)"], ["3-2", "minmax(0, 3fr) minmax(0, 2fr)"],
+  ["2-1", "minmax(0, 2fr) minmax(0, 1fr)"], ["3-1", "minmax(0, 3fr) minmax(0, 1fr)"],
+];
+const gridValue = (n) => "repeat(" + n + ", minmax(0, 1fr))";
+
+// Buttons — 5 tamaños. "default" es la base (.btn); el resto son modificadores BEM.
+// Padding en em (escala con el font-size del botón) expuesto como variables --pad-btn-*.
+const BTN_SIZES = [
+  { key: "sm", label: "Small", cls: "btn--sm" },
+  { key: "default", label: "Default", cls: "" },
+  { key: "md", label: "Medium", cls: "btn--md" },
+  { key: "lg", label: "Large", cls: "btn--lg" },
+  { key: "xl", label: "Extra Large", cls: "btn--xl" },
+];
+const BTN_SIZE_DEFAULTS = {
+  sm:      { py: 0.45, px: 0.9, font: "s" },
+  default: { py: 0.6,  px: 1.2, font: "m" },
+  md:      { py: 0.75, px: 1.5, font: "m" },
+  lg:      { py: 0.9,  px: 1.8, font: "l" },
+  xl:      { py: 1.1,  px: 2.2, font: "xl" },
+};
+const btnEnabled = (state, id) => state.buttons?.enabled?.[id] !== false; // por defecto activado
+const btnContrast = (l) => (l > 60 ? "#18181b" : "#ffffff");
+// Estilo inline de botón compartido (paso Buttons + Landing) → ambos previews idénticos
+function buttonInlineStyle(state, p, sizeKey, outline) {
+  const b = state.buttons || { sizes: BTN_SIZE_DEFAULTS, radiusKey: "m" };
+  const sz = (b.sizes && b.sizes[sizeKey]) || BTN_SIZE_DEFAULTS[sizeKey];
+  const fontPx = state.typography.texts[sz.font]?.desktop || 16;
+  const radiusPx = b.radiusKey === "circle" ? state.radius.circle : (state.radius.values[b.radiusKey] || 0);
+  const col = "hsl(" + p.hue + "," + p.saturation + "%," + p.lightness + "%)";
+  const base = { fontSize: fontPx, padding: sz.py + "em " + sz.px + "em", borderRadius: radiusPx, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", lineHeight: 1.2, border: "1.5px solid " + col, whiteSpace: "nowrap", transition: "all .15s" };
+  return outline ? { ...base, background: "transparent", color: col } : { ...base, background: col, color: btnContrast(p.lightness) };
+}
+
+const initVariants = (h, s, l) => {
+  const v = {};
+  VARIANT_LIGHTNESS.forEach(({ key, l: vl }) => {
+    v[key] = "hsl(" + h + ", " + s + "%, " + (vl === null ? l : vl) + "%)";
+  });
+  return v;
+};
+
+const initialState = {
+  currentStep: 1,
+  layoutMode: "", minViewport: 375, maxViewport: 1920, capValues: true,
+  spacing: {
+    baseMobile: 20, baseDesktop: 24, scale: 1.5,
+    values: initSpaceVals(20, 24, 1.5),
+  },
+  sectionSpacing: {
+    baseMobile: 100, baseDesktop: 120, scale: 1.5,
+    values: initSpaceVals(100, 120, 1.5),
+  },
+  typography: {
+    useScale: true,
+    headingScale: 1.25, headingBaseMob: 28, headingBaseDesk: 35,
+    headings: initHeadings(28, 35, 1.25),
+    textScale: 1.25, textBaseMob: 16, textBaseDesk: 18,
+    texts: initTexts(16, 18, 1.25),
+    lineHeightHeading: 1.2, lineHeightBody: 1.6,
+  },
+  colors: {
+    palettes: [
+      { id: 1, name: "Primary", hue: 210, saturation: 75, lightness: 50, showVariants: false, variants: initVariants(210, 75, 50), showTransparency: false },
+    ],
+    whiteTransparency: true, blackTransparency: true,
+  },
+  gaps: { gridGap: "var(--space-m)", contentGap: "var(--space-s)", containerGap: "var(--space-l)" },
+  buttons: {
+    outline: true,
+    radiusKey: "m",
+    enabled: {},
+    sizes: JSON.parse(JSON.stringify(BTN_SIZE_DEFAULTS)),
+  },
+  radius: { base: 8, values: {}, circle: 999 },
+  exportVariablesFilename: "bricksmate-variables.json", exportPaletteFilename: "bricksmate-palette.json", exportFrameworkFilename: "bricksmate-framework.css", varPrefix: "",
+};
+
+// Init radius
+RADIUS_KEYS.forEach((k) => { initialState.radius.values[k] = Math.round(8 * RADIUS_MULTS[k]); });
+
+// Restore from URL hash (shared link) → localStorage → initialState
+function loadState() {
+  try {
+    const fromHash = hashToState(window.location.hash);
+    if (fromHash) {
+      // Limpia el hash de la URL sin crear entrada en el historial
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      return { ...initialState, ...fromHash };
+    }
+    const saved = localStorage.getItem("bricksmate-dsg");
+    if (!saved) return initialState;
+    return { ...initialState, ...JSON.parse(saved) };
+  } catch { return initialState; }
+}
+
+/* ================================================================
+   LIBRARY — múltiples sistemas de diseño guardados
+   ================================================================ */
+const LIB_KEY = "bricksmate-dsg-library";
+const OLD_KEY = "bricksmate-dsg";
+const nowISO = () => new Date().toISOString();
+function fmtDate(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) + " · " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  } catch { return ""; }
+}
+function loadLibrary() {
+  try {
+    const raw = localStorage.getItem(LIB_KEY);
+    if (raw) {
+      const lib = JSON.parse(raw);
+      if (lib && Array.isArray(lib.systems)) return { autoSave: lib.autoSave !== false, systems: lib.systems };
+    }
+    // Migración desde la versión de documento único
+    const old = localStorage.getItem(OLD_KEY);
+    if (old) {
+      const doc = { ...initialState, ...JSON.parse(old) };
+      const lib = { autoSave: true, systems: [{ id: "sys_" + randId(), name: "My first system", createdAt: nowISO(), updatedAt: nowISO(), doc }] };
+      localStorage.setItem(LIB_KEY, JSON.stringify(lib));
+      return lib;
+    }
+  } catch {}
+  return { autoSave: true, systems: [] };
+}
+function persistLibrary(lib) { try { localStorage.setItem(LIB_KEY, JSON.stringify(lib)); } catch {} }
+
+function reducer(state, action) {
+  switch (action.type) {
+    case "LOAD_DOC": return action.payload;
+    case "SET_STEP": return { ...state, currentStep: action.payload };
+    case "SET_LAYOUT_MODE": return { ...state, layoutMode: action.payload, maxViewport: action.payload === "fixed" ? 1280 : 1920 };
+    case "SET_FIELD": return { ...state, [action.field]: action.value };
+    case "SET_SPACING": return { ...state, spacing: { ...state.spacing, ...action.payload } };
+    case "SET_SPACE_VALUE": {
+      const nv = { ...state.spacing.values, [action.key]: { ...state.spacing.values[action.key], [action.side]: action.value } };
+      return { ...state, spacing: { ...state.spacing, values: nv } };
+    }
+    case "RECALC_SPACING": {
+      const { baseMobile: bm, baseDesktop: bd } = action;
+      const sc = action.scale ?? state.spacing.scale;
+      const nv = initSpaceVals(bm, bd, sc);
+      return { ...state, spacing: { ...state.spacing, baseMobile: bm, baseDesktop: bd, scale: sc, values: nv } };
+    }
+    case "SET_SECTION_SPACING": return { ...state, sectionSpacing: { ...state.sectionSpacing, ...action.payload } };
+    case "SET_SECTION_SPACE_VALUE": {
+      const nv = { ...state.sectionSpacing.values, [action.key]: { ...state.sectionSpacing.values[action.key], [action.side]: action.value } };
+      return { ...state, sectionSpacing: { ...state.sectionSpacing, values: nv } };
+    }
+    case "RECALC_SECTION_SPACING": {
+      const { baseMobile: bm, baseDesktop: bd } = action;
+      const sc = action.scale ?? state.sectionSpacing.scale;
+      const nv = initSpaceVals(bm, bd, sc);
+      return { ...state, sectionSpacing: { ...state.sectionSpacing, baseMobile: bm, baseDesktop: bd, scale: sc, values: nv } };
+    }
+    case "SET_TYPO": return { ...state, typography: { ...state.typography, ...action.payload } };
+    case "SET_HEADING_VAL": {
+      const nh = { ...state.typography.headings, [action.key]: { ...state.typography.headings[action.key], [action.side]: action.value } };
+      return { ...state, typography: { ...state.typography, headings: nh } };
+    }
+    case "SET_TEXT_VAL": {
+      const nt = { ...state.typography.texts, [action.key]: { ...state.typography.texts[action.key], [action.side]: action.value } };
+      return { ...state, typography: { ...state.typography, texts: nt } };
+    }
+    case "RECALC_HEADINGS": {
+      const { baseMob, baseDesk, scale } = action;
+      return { ...state, typography: { ...state.typography, headingBaseMob: baseMob, headingBaseDesk: baseDesk, headingScale: scale, headings: initHeadings(baseMob, baseDesk, scale) } };
+    }
+    case "RECALC_TEXTS": {
+      const { baseMob, baseDesk, scale } = action;
+      return { ...state, typography: { ...state.typography, textBaseMob: baseMob, textBaseDesk: baseDesk, textScale: scale, texts: initTexts(baseMob, baseDesk, scale) } };
+    }
+    case "UPDATE_PALETTE": {
+      const ps = state.colors.palettes.map((p) => p.id === action.id ? { ...p, [action.field]: action.value } : p);
+      return { ...state, colors: { ...state.colors, palettes: ps } };
+    }
+    case "UPDATE_PALETTE_VARIANT": {
+      const ps = state.colors.palettes.map((p) => p.id === action.id ? { ...p, variants: { ...p.variants, [action.key]: action.value } } : p);
+      return { ...state, colors: { ...state.colors, palettes: ps } };
+    }
+    case "ADD_PALETTE": {
+      const nid = Math.max(...state.colors.palettes.map((p) => p.id), 0) + 1;
+      return { ...state, colors: { ...state.colors, palettes: [...state.colors.palettes, { id: nid, name: "Color " + nid, hue: 210, saturation: 75, lightness: 50, showVariants: false, variants: initVariants(210, 75, 50), showTransparency: false }] } };
+    }
+    case "REMOVE_PALETTE": return { ...state, colors: { ...state.colors, palettes: state.colors.palettes.filter((p) => p.id !== action.id) } };
+    case "SET_COLORS": return { ...state, colors: { ...state.colors, ...action.payload } };
+    case "SET_GAPS": return { ...state, gaps: { ...state.gaps, [action.field]: action.value } };
+    case "SET_RADIUS": return { ...state, radius: { ...state.radius, ...action.payload } };
+    case "SET_RADIUS_VAL": return { ...state, radius: { ...state.radius, values: { ...state.radius.values, [action.key]: action.value } } };
+    case "RECALC_RADIUS": {
+      const b = action.base;
+      const nv = {}; RADIUS_KEYS.forEach((k) => { nv[k] = Math.round(b * RADIUS_MULTS[k]); });
+      return { ...state, radius: { ...state.radius, base: b, values: nv } };
+    }
+    case "SET_BTN": return { ...state, buttons: { ...state.buttons, ...action.payload } };
+    case "SET_BTN_SIZE": {
+      const sizes = { ...state.buttons.sizes, [action.key]: { ...state.buttons.sizes[action.key], [action.field]: action.value } };
+      return { ...state, buttons: { ...state.buttons, sizes } };
+    }
+    case "TOGGLE_BTN_COLOR": {
+      const cur = state.buttons.enabled?.[action.id] !== false;
+      return { ...state, buttons: { ...state.buttons, enabled: { ...state.buttons.enabled, [action.id]: !cur } } };
+    }
+    case "RESET": return { ...initialState, currentStep: 1 };
+    default: return state;
+  }
+}
+
+const DSContext = createContext();
+function useDSContext() { return useContext(DSContext); }
+
+/* ================================================================
+   STEPS CONFIG
+   ================================================================ */
+const STEPS = [
+  { id: 1, label: "Layout Mode", check: (s) => s.layoutMode !== "" },
+  { id: 2, label: "Spacing", check: (s) => s.spacing.baseMobile > 0 },
+  { id: 3, label: "Section Spacing", check: (s) => s.sectionSpacing.baseMobile > 0 },
+  { id: 4, label: "Typography", check: (s) => s.typography.headingBaseMob > 0 },
+  { id: 5, label: "Colors", check: (s) => s.colors.palettes.length > 0 },
+  { id: 6, label: "Gaps & Grid", check: (s) => s.gaps.gridGap !== "" },
+  { id: 7, label: "Border Radius", check: (s) => s.radius.base >= 0 },
+  { id: 8, label: "Buttons", check: (s) => !!s.buttons },
+  { id: 9, label: "Preview", check: () => false },
+  { id: 10, label: "Export", check: () => false },
+];
+const DESCS = {
+  1: "Choose layout approach and viewport range",
+  2: "Define spacing scale (xs–xxl) with mobile and desktop values",
+  3: "Define section spacing scale (xs–xxl) for large containers",
+  4: "Configure typography scale for headings and text sizes",
+  5: "Build color palettes with variants and transparencies",
+  6: "Define gap variables and ready-to-use grid layouts",
+  7: "Set border radius scale from a base value",
+  8: "Generate button styles per color, size and outline variant",
+  9: "Preview your complete design system",
+  10: "Download your design system as CSS custom properties",
+};
+
+/* ================================================================
+   STYLES
+   ================================================================ */
+const css_styles = `
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+  :root {
+    --ds-primary:hsl(240,5.9%,10%); --ds-primary-hover:hsl(240,5.9%,18%); --ds-primary-light:hsl(240,4.8%,95.9%);
+    --ds-bg:hsl(0,0%,98%); --ds-bg-card:hsl(0,0%,100%);
+    --ds-text:hsl(240,10%,3.9%); --ds-text-2:hsl(240,3.7%,46.1%); --ds-text-3:hsl(240,5%,64.9%);
+    --ds-border:hsl(240,5.9%,90%); --ds-border-light:hsl(240,4.8%,95.5%);
+    --ds-success:hsl(142,71%,38%); --ds-error:hsl(0,84%,55%);
+    --ds-radius:8px; --ds-radius-lg:12px;
+    --ds-shadow:0 1px 2px rgba(0,0,0,.05);
+    --ds-shadow-md:0 1px 3px rgba(0,0,0,.08),0 1px 2px -1px rgba(0,0,0,.05);
+  }
+  [data-theme="dark"] {
+    /* Slate — dark azulado/frío */
+    --ds-primary:hsl(210,40%,98%); --ds-primary-hover:hsl(210,30%,88%); --ds-primary-light:hsl(217,33%,20%);
+    --ds-bg:hsl(222,24%,7%); --ds-bg-card:hsl(217,28%,14%);
+    --ds-text:hsl(210,40%,98%); --ds-text-2:hsl(215,20%,75%); --ds-text-3:hsl(215,16%,58%);
+    --ds-border:hsl(215,20%,32%); --ds-border-light:hsl(217,22%,22%);
+    --ds-success:hsl(142,69%,52%); --ds-error:hsl(0,84%,66%);
+    --ds-shadow:0 1px 2px rgba(0,0,0,.6);
+    --ds-shadow-md:0 2px 4px rgba(0,0,0,.7),0 1px 2px rgba(0,0,0,.5);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--ds-bg);color:var(--ds-text);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .ds-app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+  .ds-header{background:var(--ds-bg-card);border-bottom:1px solid var(--ds-border-light);padding:0 24px;height:54px;display:flex;align-items:center;gap:12px;box-shadow:var(--ds-shadow)}
+  .ds-header-icon{width:30px;height:30px;background:var(--ds-primary);border-radius:var(--ds-radius);display:flex;align-items:center;justify-content:center;color:var(--ds-bg);font-size:14px;flex-shrink:0}
+  .ds-header h1{font-size:14px;font-weight:600;letter-spacing:-.01em} .ds-header p{font-size:11px;color:var(--ds-text-2);margin-top:1px}
+  .ds-main{display:flex;flex:1;overflow:hidden}
+  .ds-sidebar{width:200px;background:var(--ds-bg-card);border-right:1px solid var(--ds-border-light);padding:12px 8px;overflow-y:auto;flex-shrink:0}
+  .ds-sidebar-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:var(--ds-text-3);padding:0 10px;margin-bottom:6px}
+  .ds-step-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:var(--ds-radius);cursor:pointer;transition:all .15s;margin-bottom:1px;position:relative}
+  .ds-step-item::before{content:'';position:absolute;left:0;top:18%;bottom:18%;width:2px;border-radius:2px;background:transparent;transition:background .15s}
+  .ds-step-item:hover{background:var(--ds-bg)}
+  .ds-step-item.active{background:var(--ds-bg)} .ds-step-item.active::before{background:var(--ds-primary)}
+  .ds-step-num{font-size:12px;font-weight:500;color:var(--ds-text-3);width:16px;flex-shrink:0;text-align:center}
+  .ds-step-item.active .ds-step-num{color:var(--ds-primary)}
+  .ds-step-label{font-size:13px;font-weight:400;flex:1;color:var(--ds-text-2)} .ds-step-item.active .ds-step-label{color:var(--ds-text);font-weight:500}
+  .ds-step-check{width:14px;height:14px;border-radius:50%;background:var(--ds-success);color:var(--ds-bg);font-size:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .ds-content{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  .ds-content-header{background:var(--ds-bg-card);padding:14px 24px;border-bottom:1px solid var(--ds-border-light)}
+  .ds-content-header h2{font-size:17px;font-weight:600;letter-spacing:-.02em} .ds-content-header p{font-size:13px;color:var(--ds-text-2);margin-top:3px}
+  .ds-content-body{flex:1;padding:24px;overflow-y:auto}
+  .ds-footer{background:var(--ds-bg-card);border-top:1px solid var(--ds-border-light);padding:10px 24px;display:flex;justify-content:space-between;align-items:center}
+  .ds-footer-info{font-size:12px;color:var(--ds-text-3)} .ds-footer-actions{display:flex;gap:8px}
+  .ds-btn{padding:7px 14px;border:1px solid var(--ds-border);background:var(--ds-bg-card);color:var(--ds-text);border-radius:var(--ds-radius);font-size:13px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;font-family:inherit;box-shadow:var(--ds-shadow)}
+  .ds-btn:hover:not(:disabled){background:var(--ds-bg)} .ds-btn:active:not(:disabled){transform:scale(.99)} .ds-btn:disabled{opacity:.45;cursor:not-allowed}
+  .ds-btn-primary{background:var(--ds-primary);color:hsl(0,0%,98%);border-color:var(--ds-primary);box-shadow:0 1px 2px rgba(0,0,0,.1)} .ds-btn-primary:hover:not(:disabled){background:var(--ds-primary-hover);border-color:var(--ds-primary-hover)}
+  [data-theme="dark"] .ds-btn-primary,[data-theme="dark"] .ds-download-btn{color:hsl(240,10%,3.9%)}
+  [data-theme="dark"] .ds-input:focus{box-shadow:0 0 0 3px rgba(255,255,255,.1)}
+  [data-theme="dark"] .ds-space-input:focus{box-shadow:0 0 0 3px rgba(255,255,255,.1)}
+  [data-theme="dark"] .ds-input-error{box-shadow:0 0 0 3px rgba(239,68,68,.2)!important}
+  [data-theme="dark"] .ds-space-row.alt{background:hsl(217,24%,18%)}
+  .ds-btn-sm{padding:5px 10px;font-size:12px} .ds-btn-danger{color:var(--ds-error);border-color:var(--ds-error)} .ds-btn-danger:hover:not(:disabled){background:rgba(239,68,68,.06)}
+  .ds-input{width:100%;padding:7px 11px;border:1px solid var(--ds-border);border-radius:var(--ds-radius);font-size:14px;font-family:inherit;color:var(--ds-text);background:var(--ds-bg-card);transition:all .15s;box-shadow:var(--ds-shadow)}
+  .ds-input:hover{border-color:var(--ds-border)}
+  .ds-input:focus{outline:none;border-color:var(--ds-primary);box-shadow:0 0 0 3px rgba(0,0,0,.08)}
+  .ds-input::placeholder{color:var(--ds-text-3);opacity:1}
+  .ds-input-sm{padding:6px 10px;font-size:13px}
+  .ds-input-error{border-color:var(--ds-error)!important;box-shadow:0 0 0 3px rgba(239,68,68,.1)!important}
+  .ds-helper{font-size:12px;color:var(--ds-text-3);margin-top:5px}
+  .ds-form-group{margin-bottom:18px} .ds-form-group label{display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--ds-text)}
+  .ds-card{background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:18px;margin-bottom:16px;box-shadow:var(--ds-shadow)} .ds-card h4{font-size:13px;font-weight:600;margin-bottom:12px}
+  .ds-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px} .ds-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .ds-mode-cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px}
+  .ds-mode-card{background:var(--ds-bg-card);border:1.5px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:20px;cursor:pointer;transition:all .2s;text-align:center;box-shadow:var(--ds-shadow)}
+  .ds-mode-card:hover{border-color:var(--ds-border);box-shadow:var(--ds-shadow-md)} .ds-mode-card.selected{border-color:var(--ds-primary);background:var(--ds-primary-light);box-shadow:0 0 0 1px var(--ds-primary)}
+  .ds-mode-icon{font-size:24px;margin-bottom:10px;display:block;color:var(--ds-text-3)} .ds-mode-card.selected .ds-mode-icon{color:var(--ds-primary)}
+  .ds-mode-card h3{font-size:14px;font-weight:600;margin-bottom:4px} .ds-mode-card p{font-size:12px;color:var(--ds-text-2);line-height:1.5}
+  .ds-viewport-config{background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:18px;margin-bottom:16px;box-shadow:var(--ds-shadow)} .ds-viewport-config h4{font-size:13px;font-weight:600;margin-bottom:14px}
+  .ds-viewport-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+  .ds-toggle-row{display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--ds-bg);border-radius:var(--ds-radius);border:1px solid var(--ds-border-light);cursor:pointer;user-select:none;margin-bottom:10px;transition:border-color .15s}
+  .ds-toggle-row:hover{border-color:var(--ds-border)}
+  .ds-toggle-track{width:32px;height:18px;border-radius:9px;background:var(--ds-border);position:relative;transition:background .2s;flex-shrink:0}
+  .ds-toggle-track.on{background:var(--ds-primary)} .ds-toggle-thumb{width:14px;height:14px;border-radius:50%;background:var(--ds-bg-card);position:absolute;top:2px;left:2px;transition:transform .2s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+  .ds-toggle-track.on .ds-toggle-thumb{transform:translateX(14px)} .ds-toggle-text{flex:1} .ds-toggle-text strong{font-size:13px;font-weight:500;display:block} .ds-toggle-text span{font-size:12px;color:var(--ds-text-2)}
+  .ds-space-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:var(--ds-radius);margin-bottom:4px;background:var(--ds-bg-card);border:1px solid var(--ds-border-light)}
+  .ds-space-row.alt{background:var(--ds-bg)}
+  .ds-space-name{min-width:160px;font-size:12px;font-weight:500;color:var(--ds-text-2);font-family:'SF Mono',Consolas,monospace}
+  .ds-space-inputs{display:flex;gap:8px;flex:1}
+  .ds-space-input{width:68px;padding:5px 8px;border:1px solid var(--ds-border);border-radius:var(--ds-radius);font-size:13px;text-align:center;background:var(--ds-bg-card);font-family:inherit;color:var(--ds-text);transition:all .15s;box-shadow:var(--ds-shadow)}
+  .ds-space-input:hover{border-color:var(--ds-border)} .ds-space-input:focus{outline:none;border-color:var(--ds-primary);box-shadow:0 0 0 3px rgba(0,0,0,.08)}
+  .ds-space-bar{height:16px;border-radius:4px;background:var(--ds-text-3);border:1px solid var(--ds-border);transition:width .3s;min-width:4px}
+  .ds-space-label{font-size:10px;color:var(--ds-text-3);text-align:center;margin-top:2px}
+  .ds-palette-card{background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:18px;margin-bottom:14px;box-shadow:var(--ds-shadow)}
+  .ds-palette-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+  .ds-palette-header input[type="text"]{flex:1;border:none;border-bottom:1.5px solid var(--ds-border-light);font-size:14px;font-weight:600;padding:0 0 4px;background:transparent;color:var(--ds-text);outline:none;transition:border-color .15s;cursor:text;min-width:0;font-family:inherit}
+  .ds-palette-header input[type="text"]:hover{border-bottom-color:var(--ds-border)}
+  .ds-palette-header input[type="text"]:focus{border-bottom-color:var(--ds-primary)}
+  .ds-color-picker-row{display:flex;align-items:flex-start;gap:14px;margin-bottom:14px}
+  .ds-color-swatch{width:60px;height:60px;border-radius:var(--ds-radius);border:1px solid var(--ds-border);overflow:hidden;flex-shrink:0;position:relative;cursor:pointer;box-shadow:var(--ds-shadow-md)}
+  .ds-color-swatch input[type="color"]{position:absolute;inset:-8px;width:calc(100% + 16px);height:calc(100% + 16px);border:none;cursor:pointer}
+  .ds-variants-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:12px}
+  .ds-variant-item{text-align:center}
+  .ds-variant-box{height:44px;border-radius:5px;border:1px solid var(--ds-border-light)}
+  .ds-variant-label{font-size:10px;color:var(--ds-text-3);margin-top:3px;font-family:monospace}
+  .ds-variant-input{width:100%;padding:4px 6px;border:1px solid var(--ds-border);border-radius:4px;font-size:11px;text-align:center;font-family:monospace;margin-top:3px;background:var(--ds-bg-card);color:var(--ds-text);transition:border-color .15s}
+  .ds-variant-input:focus{outline:none;border-color:var(--ds-primary)}
+  .ds-transparency-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(60px,1fr));gap:5px;margin-top:8px}
+  .ds-trans-box{height:40px;border-radius:5px;background-image:linear-gradient(45deg,#ccc 25%,transparent 25%),linear-gradient(-45deg,#ccc 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#ccc 75%),linear-gradient(-45deg,transparent 75%,#ccc 75%);background-size:10px 10px;background-position:0 0,0 5px,5px -5px,-5px 0;position:relative;overflow:hidden}
+  [data-theme="dark"] .ds-trans-box{background-image:linear-gradient(45deg,#555 25%,transparent 25%),linear-gradient(-45deg,#555 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#555 75%),linear-gradient(-45deg,transparent 75%,#555 75%)}
+  .ds-trans-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--ds-text);text-shadow:0 1px 2px rgba(0,0,0,.3)}
+  .ds-code-block{background:var(--ds-bg-card);color:var(--ds-text-2);padding:18px;border-radius:var(--ds-radius-lg);font-family:'SF Mono',Consolas,'Courier New',monospace;font-size:12px;line-height:1.7;overflow:auto;max-height:380px;white-space:pre;tab-size:2;border:1px solid var(--ds-border-light)}
+  .ds-code-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .ds-copy-btn{padding:5px 12px;background:var(--ds-bg-card);border:1px solid var(--ds-border);border-radius:var(--ds-radius);font-size:12px;cursor:pointer;transition:all .15s;color:var(--ds-text);font-family:inherit;box-shadow:var(--ds-shadow)} .ds-copy-btn:hover{background:var(--ds-bg)}
+  .ds-preview-section{margin-bottom:24px} .ds-preview-section-title{font-size:14px;font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--ds-border-light)}
+  .ds-export-card{background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:22px;box-shadow:var(--ds-shadow)}
+  .ds-download-btn{width:100%;padding:11px 24px;background:var(--ds-primary);color:hsl(0,0%,98%);border:none;border-radius:var(--ds-radius);font-size:14px;font-weight:500;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px;font-family:inherit;box-shadow:0 1px 2px rgba(0,0,0,.1)}
+  .ds-download-btn:hover:not(:disabled){background:var(--ds-primary-hover)} .ds-download-btn:disabled{opacity:.45;cursor:not-allowed}
+  .ds-warning{padding:10px 14px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.25);border-radius:var(--ds-radius);font-size:13px;color:var(--ds-error);margin-bottom:14px;cursor:pointer}
+  .ds-status{padding:10px 14px;border-radius:var(--ds-radius);font-size:13px;margin-top:14px} .ds-status.ok{background:rgba(34,197,94,.07);color:var(--ds-success);border:1px solid rgba(34,197,94,.2)}
+  .ds-export-grid{display:grid;grid-template-columns:repeat(2,minmax(180px,1fr));gap:14px;margin-bottom:18px}
+  .ds-export-file-card{background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:18px;display:flex;flex-direction:column;box-shadow:var(--ds-shadow)}
+  .ds-export-file-card h4{font-size:14px;font-weight:600;margin-bottom:4px}
+  .ds-export-file-card>p{font-size:12px;color:var(--ds-text-2);margin-bottom:14px;line-height:1.5}
+  .ds-export-file-card .ds-download-btn{font-size:13px;padding:9px 14px;margin-top:auto}
+  .ds-tab-bar{display:flex;gap:0;flex:1;border-bottom:1px solid var(--ds-border-light)}
+  .ds-tab{padding:6px 14px;font-size:12px;font-weight:500;border:none;background:transparent;cursor:pointer;color:var(--ds-text-2);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;font-family:inherit}
+  .ds-tab.active{color:var(--ds-primary);border-bottom-color:var(--ds-primary)} .ds-tab:hover:not(.active){color:var(--ds-text)}
+  .ds-resize-handle{position:absolute;top:0;bottom:0;right:-18px;width:18px;display:flex;align-items:center;justify-content:center;cursor:ew-resize;touch-action:none}
+  .ds-resize-handle::before{content:'';width:5px;height:46px;border-radius:3px;background:var(--ds-border);transition:background .15s}
+  .ds-resize-handle:hover::before{background:var(--ds-primary)}
+  .ds-btn-sizes{display:flex;flex-direction:column;gap:8px}
+  .ds-btn-sizes-head,.ds-btn-sizes-row{display:grid;grid-template-columns:1.3fr 1fr 1fr 1.1fr;gap:10px;align-items:center}
+  .ds-btn-sizes-head{font-size:11px;color:var(--ds-text-3);font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:0 2px 2px}
+  .ds-btn-size-label{font-size:13px;font-weight:500}
+  .ds-btn-size-label em{font-style:normal;color:var(--ds-text-3);font-family:'SF Mono',Consolas,monospace;font-size:11px}
+  .ds-grid-chip{padding:11px 10px;text-align:center;font-size:13px;font-weight:500;color:var(--ds-text);background:var(--ds-bg);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius);font-family:'SF Mono',Consolas,monospace;cursor:default;transition:border-color .15s}
+  .ds-grid-chip:hover{border-color:var(--ds-border)}
+  .ds-view-toggle{display:inline-flex;gap:2px;padding:3px;background:var(--ds-border-light);border-radius:var(--ds-radius);margin-bottom:20px}
+  .ds-view-btn{padding:6px 16px;font-size:13px;font-weight:500;border:none;background:transparent;color:var(--ds-text-2);border-radius:6px;cursor:pointer;transition:all .15s;font-family:inherit}
+  .ds-view-btn.active{background:var(--ds-bg-card);color:var(--ds-text);box-shadow:var(--ds-shadow)} .ds-view-btn:hover:not(.active){color:var(--ds-text)}
+  .ds-header-reset{padding:5px 11px;border:1px solid var(--ds-border);border-radius:var(--ds-radius);font-size:12px;background:var(--ds-bg-card);color:var(--ds-text-2);cursor:pointer;transition:all .15s;white-space:nowrap;font-family:inherit;box-shadow:var(--ds-shadow)}
+  .ds-header-reset:hover{background:var(--ds-bg);color:var(--ds-text)}
+  .ds-header-theme{width:30px;height:30px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;border:1px solid var(--ds-border);border-radius:var(--ds-radius);background:var(--ds-bg-card);color:var(--ds-text-2);cursor:pointer;transition:all .15s;box-shadow:var(--ds-shadow)}
+  .ds-header-theme:hover{background:var(--ds-bg);color:var(--ds-text)}
+  .ds-header-theme svg{display:block}
+  .ds-header-back{width:30px;height:30px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border:1px solid var(--ds-border);border-radius:var(--ds-radius);font-size:16px;background:var(--ds-bg-card);color:var(--ds-text);cursor:pointer;transition:all .15s;box-shadow:var(--ds-shadow)}
+  .ds-header-back:hover{background:var(--ds-bg)}
+  .ds-autosave{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;font-size:12px;color:var(--ds-text-2);white-space:nowrap}
+  /* Dashboard */
+  .ds-dash{flex:1;overflow-y:auto;padding:28px 32px}
+  .ds-dash-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:24px;max-width:1100px;margin-left:auto;margin-right:auto}
+  .ds-dash-title{font-size:20px;font-weight:700;letter-spacing:-.02em}
+  .ds-dash-sub{font-size:13px;color:var(--ds-text-2);margin-top:3px}
+  .ds-dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr));gap:16px;max-width:1100px;margin:0 auto}
+  .ds-dash-empty{text-align:center;padding:64px 20px;max-width:420px;margin:40px auto;border:1px dashed var(--ds-border);border-radius:var(--ds-radius-lg)}
+  .ds-sys-card{background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);overflow:hidden;box-shadow:var(--ds-shadow);transition:box-shadow .15s,border-color .15s;display:flex;flex-direction:column}
+  .ds-sys-card:hover{box-shadow:var(--ds-shadow-md);border-color:var(--ds-border)}
+  .ds-sys-swatches{display:flex;height:56px;cursor:pointer}
+  .ds-sys-swatches>div{flex:1}
+  .ds-sys-body{padding:14px 16px 10px}
+  .ds-sys-name{font-size:15px;font-weight:600;letter-spacing:-.01em;cursor:text;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ds-sys-meta{font-size:11.5px;color:var(--ds-text-3);margin-top:4px}
+  .ds-sys-actions{display:flex;gap:6px;padding:10px 16px 14px;margin-top:auto}
+  .ds-sys-actions .ds-btn-primary{flex:1}
+  .ds-validation-block{margin-bottom:14px;display:flex;flex-direction:column;gap:5px}
+  .ds-val-item{padding:8px 11px;border-radius:var(--ds-radius);font-size:12px;display:flex;align-items:flex-start;gap:8px;line-height:1.4}
+  .ds-val-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;margin-top:4px}
+  .ds-val-warn{background:rgba(234,179,8,.07);color:hsl(38,92%,28%);border:1px solid rgba(234,179,8,.25)} .ds-val-warn .ds-val-dot{background:hsl(38,92%,48%)}
+  [data-theme="dark"] .ds-val-warn{background:rgba(234,179,8,.1);color:hsl(38,92%,68%)}
+  .ds-val-error{background:rgba(239,68,68,.06);color:var(--ds-error);border:1px solid rgba(239,68,68,.2)} .ds-val-error .ds-val-dot{background:var(--ds-error)}
+  .ds-val-info{background:var(--ds-border-light);color:var(--ds-text);border:1px solid var(--ds-border)} .ds-val-info .ds-val-dot{background:var(--ds-text-2)}
+  .ds-section-chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+  .ds-section-chip{padding:4px 10px;font-size:11px;border:1px solid var(--ds-border);border-radius:20px;background:var(--ds-bg-card);color:var(--ds-text-2);cursor:pointer;transition:all .15s;font-family:monospace;box-shadow:var(--ds-shadow)}
+  .ds-section-chip:hover{background:var(--ds-bg);border-color:var(--ds-primary);color:var(--ds-primary)} .ds-section-chip.copied{background:rgba(34,197,94,.06);border-color:var(--ds-success);color:var(--ds-success)}
+  ::-webkit-scrollbar{width:5px} ::-webkit-scrollbar-track{background:transparent} ::-webkit-scrollbar-thumb{background:var(--ds-border-light);border-radius:3px}
+`;
+
+/* ================================================================
+   SHELL COMPONENTS
+   ================================================================ */
+// Icono del toggle de tema (SVG con currentColor → se adapta al tema)
+function ThemeIcon({ dark }) {
+  return dark
+    ? (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+      </svg>)
+    : (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+      </svg>);
+}
+function EditorHeader({ name, onRename, onBack, autoSave, onToggleAutoSave, dirty, onSave, darkMode, toggleDark }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(name);
+  useEffect(() => { setVal(name); }, [name]);
+  const commit = () => { const n = val.trim() || name; setEditing(false); if (n !== name) onRename(n); };
+  return (<header className="ds-header">
+    <button className="ds-header-back" onClick={onBack} title="Back to my systems">←</button>
+    <div className="ds-header-icon">◈</div>
+    {editing
+      ? <input className="ds-input ds-input-sm" style={{ maxWidth: 240 }} autoFocus value={val} onChange={(e) => setVal(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setVal(name); setEditing(false); } }} />
+      : <div><h1 onClick={() => setEditing(true)} style={{ cursor: "text" }} title="Click to rename">{name}</h1><p>Design system editor</p></div>}
+    <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+      <div className="ds-autosave" onClick={onToggleAutoSave} title="Toggle automatic saving">
+        <div className={"ds-toggle-track" + (autoSave ? " on" : "")}><div className="ds-toggle-thumb" /></div>
+        <span>Auto-save</span>
+      </div>
+      <button className="ds-btn ds-btn-primary ds-btn-sm" onClick={onSave} disabled={autoSave || !dirty}>
+        {autoSave ? "✓ Auto-saved" : (dirty ? "Save changes" : "✓ Saved")}
+      </button>
+      <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode"><ThemeIcon dark={darkMode} /></button>
+    </div>
+  </header>);
+}
+function Sidebar() {
+  const { state, dispatch } = useDSContext();
+  return (<nav className="ds-sidebar"><div className="ds-sidebar-title">Steps</div>{STEPS.map((s) => (
+    <div key={s.id} className={"ds-step-item" + (state.currentStep === s.id ? " active" : "")} onClick={() => dispatch({ type: "SET_STEP", payload: s.id })}>
+      <div className="ds-step-num">{s.id}</div><span className="ds-step-label">{s.label}</span>{s.check(state) && <div className="ds-step-check">✓</div>}
+    </div>))}</nav>);
+}
+function Footer() {
+  const { state, dispatch } = useDSContext();
+  return (<footer className="ds-footer"><div className="ds-footer-info">Step {state.currentStep} of 10</div><div className="ds-footer-actions">
+    <button className="ds-btn" disabled={state.currentStep === 1} onClick={() => dispatch({ type: "SET_STEP", payload: state.currentStep - 1 })}>← Previous</button>
+    <button className="ds-btn ds-btn-primary" disabled={state.currentStep === 10} onClick={() => dispatch({ type: "SET_STEP", payload: state.currentStep + 1 })}>Next →</button>
+  </div></footer>);
+}
+
+function ValidationAlert({ items }) {
+  if (!items || !items.length) return null;
+  return (<div className="ds-validation-block">
+    {items.map((item, i) => (
+      <div key={i} className={"ds-val-item ds-val-" + item.type}>
+        <span className="ds-val-dot" />
+        {item.msg}
+      </div>
+    ))}
+  </div>);
+}
+
+/* ================================================================
+   STEP 1: LAYOUT MODE
+   ================================================================ */
+function StepLayout() {
+  const { state, dispatch } = useDSContext();
+  const { layoutMode, minViewport, maxViewport, capValues } = state;
+  const warns = [];
+  if (layoutMode) {
+    if (minViewport >= maxViewport) warns.push({ type: "error", msg: "Min viewport ≥ max viewport — clamp() fallback to static values, fluid scaling won't work" });
+    else if ((maxViewport - minViewport) < 300) warns.push({ type: "warn", msg: "Viewport range below 300px — fluid values will barely scale" });
+  }
+  return (<div>
+    <div className="ds-mode-cards">
+      <div className={"ds-mode-card" + (layoutMode === "fullwidth" ? " selected" : "")} onClick={() => dispatch({ type: "SET_LAYOUT_MODE", payload: "fullwidth" })}><span className="ds-mode-icon">⬛</span><h3>Full-width (100%)</h3><p>Content spans entire viewport</p></div>
+      <div className={"ds-mode-card" + (layoutMode === "fixed" ? " selected" : "")} onClick={() => dispatch({ type: "SET_LAYOUT_MODE", payload: "fixed" })}><span className="ds-mode-icon">▣</span><h3>Fixed-width</h3><p>Content constrained to max-width</p></div>
+    </div>
+    {layoutMode && (<div className="ds-viewport-config"><h4>Viewport range</h4>
+      <ValidationAlert items={warns} />
+      <div className="ds-viewport-row">
+        <div className="ds-form-group"><label>Min viewport (px)</label><input type="number" className="ds-input" value={minViewport} onChange={(e) => dispatch({ type: "SET_FIELD", field: "minViewport", value: Math.max(0, parseInt(e.target.value) || 0) })} /></div>
+        <div className="ds-form-group"><label>Max viewport (px)</label><input type="number" className="ds-input" value={maxViewport} onChange={(e) => dispatch({ type: "SET_FIELD", field: "maxViewport", value: Math.max(0, parseInt(e.target.value) || 0) })} /></div>
+      </div>
+      <div className="ds-toggle-row" onClick={() => dispatch({ type: "SET_FIELD", field: "capValues", value: !capValues })}>
+        <div className={"ds-toggle-track" + (capValues ? " on" : "")}><div className="ds-toggle-thumb" /></div>
+        <div className="ds-toggle-text"><strong>Cap values at max viewport</strong><span>{capValues ? "clamp() — stops at " + maxViewport + "px" : "max() — scales beyond " + maxViewport + "px"}</span></div>
+      </div>
+    </div>)}
+  </div>);
+}
+
+/* ================================================================
+   STEP 2: SPACING (component values: xs–xxl)
+   ================================================================ */
+function StepSpacing() {
+  const { state, dispatch } = useDSContext();
+  const sp = state.spacing;
+  const recalc = (bm, bd, sc) => dispatch({ type: "RECALC_SPACING", baseMobile: bm, baseDesktop: bd, scale: sc ?? sp.scale });
+  const warns = [];
+  if (sp.baseMobile > sp.baseDesktop) warns.push({ type: "warn", msg: "Mobile base larger than desktop — spacing scale decreases on larger screens" });
+  const invKeys = SPACE_KEYS.filter(k => k !== "section" && (sp.values[k]?.mobile || 0) > (sp.values[k]?.desktop || 0));
+  if (invKeys.length) warns.push({ type: "warn", msg: (invKeys.length === 1 ? "1 value is" : invKeys.length + " values are") + " larger on mobile than desktop: " + invKeys.map(k => "--space-" + k).join(", ") });
+  return (<div>
+    <div className="ds-card"><h4>Base space</h4>
+      <div className="ds-grid-3">
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Mobile</label><input type="number" className="ds-input" value={sp.baseMobile} onChange={(e) => recalc(parseInt(e.target.value) || 0, sp.baseDesktop)} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Desktop</label><input type="number" className="ds-input" value={sp.baseDesktop} onChange={(e) => recalc(sp.baseMobile, parseInt(e.target.value) || 0)} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale</label><input type="number" className="ds-input" value={sp.scale} step={0.1} min={1} onChange={(e) => recalc(sp.baseMobile, sp.baseDesktop, parseFloat(e.target.value) || 1)} /></div>
+      </div>
+    </div>
+    <ValidationAlert items={warns} />
+    {SPACE_KEYS.filter(k => k !== "section").map((k, i) => (<div key={k} className={"ds-space-row" + (i % 2 ? " alt" : "")}>
+      <div className="ds-space-name">--space-{k}</div>
+      <div className="ds-space-inputs">
+        <div><input className="ds-space-input" type="number" value={sp.values[k]?.mobile || 0} onChange={(e) => dispatch({ type: "SET_SPACE_VALUE", key: k, side: "mobile", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Mobile</div></div>
+        <div><input className="ds-space-input" type="number" value={sp.values[k]?.desktop || 0} onChange={(e) => dispatch({ type: "SET_SPACE_VALUE", key: k, side: "desktop", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Desktop</div></div>
+      </div>
+      <div className="ds-space-bar" style={{ width: Math.min(120, (sp.values[k]?.desktop || 0) * 1.2) }} />
+    </div>))}
+  </div>);
+}
+
+/* ================================================================
+   STEP 3: SECTION SPACING (scalable: xs–xxl)
+   ================================================================ */
+function StepSectionSpacing() {
+  const { state, dispatch } = useDSContext();
+  const ss = state.sectionSpacing;
+  const recalc = (bm, bd, sc) => dispatch({ type: "RECALC_SECTION_SPACING", baseMobile: bm, baseDesktop: bd, scale: sc ?? ss.scale });
+  const warns = [];
+  if (ss.baseMobile > ss.baseDesktop) warns.push({ type: "warn", msg: "Mobile base larger than desktop — section spacing scale decreases on larger screens" });
+  const invKeys = SPACE_KEYS.filter(k => (ss.values[k]?.mobile || 0) > (ss.values[k]?.desktop || 0));
+  if (invKeys.length) warns.push({ type: "warn", msg: (invKeys.length === 1 ? "1 value is" : invKeys.length + " values are") + " larger on mobile than desktop: " + invKeys.map(k => "--section-space-" + k).join(", ") });
+  return (<div>
+    <div className="ds-card"><h4>Base section space</h4>
+      <div className="ds-grid-3">
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Mobile</label><input type="number" className="ds-input" value={ss.baseMobile} onChange={(e) => recalc(parseInt(e.target.value) || 0, ss.baseDesktop)} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Desktop</label><input type="number" className="ds-input" value={ss.baseDesktop} onChange={(e) => recalc(ss.baseMobile, parseInt(e.target.value) || 0)} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale</label><input type="number" className="ds-input" value={ss.scale} step={0.1} min={1} onChange={(e) => recalc(ss.baseMobile, ss.baseDesktop, parseFloat(e.target.value) || 1)} /></div>
+      </div>
+    </div>
+    <ValidationAlert items={warns} />
+    {SPACE_KEYS.map((k, i) => (<div key={k} className={"ds-space-row" + (i % 2 ? " alt" : "")}>
+      <div className="ds-space-name">--section-space-{k}</div>
+      <div className="ds-space-inputs">
+        <div><input className="ds-space-input" type="number" value={ss.values[k]?.mobile || 0} onChange={(e) => dispatch({ type: "SET_SECTION_SPACE_VALUE", key: k, side: "mobile", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Mobile</div></div>
+        <div><input className="ds-space-input" type="number" value={ss.values[k]?.desktop || 0} onChange={(e) => dispatch({ type: "SET_SECTION_SPACE_VALUE", key: k, side: "desktop", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Desktop</div></div>
+      </div>
+      <div className="ds-space-bar" style={{ width: Math.min(120, (ss.values[k]?.desktop || 0) * 1.2) }} />
+    </div>))}
+  </div>);
+}
+
+/* ================================================================
+   STEP 4: TYPOGRAPHY
+   ================================================================ */
+function StepTypography() {
+  const { state, dispatch } = useDSContext();
+  const t = state.typography;
+  const hDesk = ["h1","h2","h3","h4","h5","h6"].map(h => t.headings[h]?.desktop || 0);
+  const warns = [];
+  if (hDesk.some(v => v > 0 && v < 12)) warns.push({ type: "error", msg: "Heading below 12px on desktop — WCAG accessibility minimum" });
+  if (hDesk.every(v => v > 0) && !hDesk.every((v, i) => i === 0 || v <= hDesk[i - 1])) warns.push({ type: "warn", msg: "Headings not in descending order — h1 should be the largest" });
+  if ((t.texts?.m?.desktop || 0) > 0 && t.texts.m.desktop < 14) warns.push({ type: "warn", msg: "text-m below 14px on desktop — consider 14–18px for readable body text" });
+  return (<div>
+    <div className="ds-toggle-row" onClick={() => dispatch({ type: "SET_TYPO", payload: { useScale: !t.useScale } })}>
+      <div className={"ds-toggle-track" + (t.useScale ? " on" : "")}><div className="ds-toggle-thumb" /></div>
+      <div className="ds-toggle-text"><strong>Use typographic scale</strong><span>{t.useScale ? "Values auto-calculated from base + scale" : "Enter all values manually"}</span></div>
+    </div>
+    <ValidationAlert items={warns} />
+    {/* HEADINGS */}
+    <div className="ds-card"><h4>Headings (base: h3)</h4>
+      {t.useScale && (<div className="ds-grid-3" style={{ marginBottom: 16 }}>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>h3 Mobile</label><input type="number" className="ds-input" value={t.headingBaseMob} onChange={(e) => dispatch({ type: "RECALC_HEADINGS", baseMob: parseInt(e.target.value) || 0, baseDesk: t.headingBaseDesk, scale: t.headingScale })} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>h3 Desktop</label><input type="number" className="ds-input" value={t.headingBaseDesk} onChange={(e) => dispatch({ type: "RECALC_HEADINGS", baseMob: t.headingBaseMob, baseDesk: parseInt(e.target.value) || 0, scale: t.headingScale })} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale</label>
+          <select className="ds-input" value={t.headingScale} onChange={(e) => dispatch({ type: "RECALC_HEADINGS", baseMob: t.headingBaseMob, baseDesk: t.headingBaseDesk, scale: parseFloat(e.target.value) })}>
+            {SCALES.map((s) => <option key={s.value} value={s.value}>{s.name} ({s.value})</option>)}
+          </select>
+        </div>
+      </div>)}
+      {["h1","h2","h3","h4","h5","h6"].map((h) => (<div key={h} className="ds-space-row" style={{ marginBottom: 6 }}>
+        <div className="ds-space-name">--{h}</div>
+        <div className="ds-space-inputs">
+          <div><input className="ds-space-input" type="number" value={t.headings[h]?.mobile || 0} onChange={(e) => dispatch({ type: "SET_HEADING_VAL", key: h, side: "mobile", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Mobile</div></div>
+          <div><input className="ds-space-input" type="number" value={t.headings[h]?.desktop || 0} onChange={(e) => dispatch({ type: "SET_HEADING_VAL", key: h, side: "desktop", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Desktop</div></div>
+        </div>
+        <div style={{ fontSize: t.headings[h]?.desktop || 16, fontWeight: 700, lineHeight: t.lineHeightHeading, minWidth: 100 }}>Heading</div>
+      </div>))}
+    </div>
+    {/* TEXT SIZES */}
+    <div className="ds-card"><h4>Text sizes (base: text-m)</h4>
+      {t.useScale && (<div className="ds-grid-3" style={{ marginBottom: 16 }}>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>text-m Mobile</label><input type="number" className="ds-input" value={t.textBaseMob} onChange={(e) => dispatch({ type: "RECALC_TEXTS", baseMob: parseInt(e.target.value) || 0, baseDesk: t.textBaseDesk, scale: t.textScale })} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>text-m Desktop</label><input type="number" className="ds-input" value={t.textBaseDesk} onChange={(e) => dispatch({ type: "RECALC_TEXTS", baseMob: t.textBaseMob, baseDesk: parseInt(e.target.value) || 0, scale: t.textScale })} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale</label>
+          <select className="ds-input" value={t.textScale} onChange={(e) => dispatch({ type: "RECALC_TEXTS", baseMob: t.textBaseMob, baseDesk: t.textBaseDesk, scale: parseFloat(e.target.value) })}>
+            {SCALES.map((s) => <option key={s.value} value={s.value}>{s.name} ({s.value})</option>)}
+          </select>
+        </div>
+      </div>)}
+      {TEXT_KEYS.map((k) => (<div key={k} className="ds-space-row" style={{ marginBottom: 6 }}>
+        <div className="ds-space-name">--text-{k}</div>
+        <div className="ds-space-inputs">
+          <div><input className="ds-space-input" type="number" value={t.texts[k]?.mobile || 0} onChange={(e) => dispatch({ type: "SET_TEXT_VAL", key: k, side: "mobile", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Mobile</div></div>
+          <div><input className="ds-space-input" type="number" value={t.texts[k]?.desktop || 0} onChange={(e) => dispatch({ type: "SET_TEXT_VAL", key: k, side: "desktop", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Desktop</div></div>
+        </div>
+        <div style={{ fontSize: t.texts[k]?.desktop || 14, lineHeight: t.lineHeightBody, minWidth: 100 }}>Sample</div>
+      </div>))}
+    </div>
+    <div className="ds-card"><h4>Line heights</h4><div className="ds-grid-2">
+      <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Headings</label><input type="number" className="ds-input" value={t.lineHeightHeading} step={0.05} onChange={(e) => dispatch({ type: "SET_TYPO", payload: { lineHeightHeading: parseFloat(e.target.value) || 1 } })} /></div>
+      <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Body</label><input type="number" className="ds-input" value={t.lineHeightBody} step={0.05} onChange={(e) => dispatch({ type: "SET_TYPO", payload: { lineHeightBody: parseFloat(e.target.value) || 1 } })} /></div>
+    </div></div>
+  </div>);
+}
+
+/* ================================================================
+   STEP 5: COLORS
+   ================================================================ */
+function PaletteCard({ palette }) {
+  const { state, dispatch } = useDSContext();
+  const { id, name, hue, saturation, lightness, showVariants, variants, showTransparency } = palette;
+  const canDel = state.colors.palettes.length > 1;
+  const hexVal = hslToHex(hue, saturation, lightness);
+  const upd = (f, v) => dispatch({ type: "UPDATE_PALETTE", id, field: f, value: v });
+  const onPick = (hex) => { const { h, s, l } = hexToHsl(hex); upd("hue", h); setTimeout(() => { upd("saturation", s); upd("lightness", l); upd("variants", initVariants(h, s, l)); }, 0); };
+  const recalcVariants = () => upd("variants", initVariants(hue, saturation, lightness));
+
+  return (<div className="ds-palette-card">
+    <div className="ds-palette-header"><input type="text" value={name} placeholder="Color name" onChange={(e) => upd("name", e.target.value)} />{canDel && <button className="ds-btn ds-btn-sm ds-btn-danger" onClick={() => dispatch({ type: "REMOVE_PALETTE", id })}>Remove</button>}</div>
+    <div className="ds-color-picker-row">
+      <div className="ds-color-swatch"><input type="color" value={hexVal} onChange={(e) => onPick(e.target.value)} /></div>
+      <div style={{ flex: 1 }}><div className="ds-grid-3">
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 11 }}>Hue</label><input type="number" className="ds-input ds-input-sm" value={hue} onChange={(e) => { upd("hue", parseInt(e.target.value) || 0); }} min={0} max={360} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 11 }}>Saturation</label><input type="number" className="ds-input ds-input-sm" value={saturation} onChange={(e) => upd("saturation", parseInt(e.target.value) || 0)} min={0} max={100} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 11 }}>Lightness</label><input type="number" className="ds-input ds-input-sm" value={lightness} onChange={(e) => upd("lightness", parseInt(e.target.value) || 0)} min={0} max={100} /></div>
+      </div></div>
+    </div>
+    <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+      <div className="ds-toggle-row" style={{ flex: 1, marginBottom: 0 }} onClick={() => upd("showTransparency", !showTransparency)}>
+        <div className={"ds-toggle-track" + (showTransparency ? " on" : "")}><div className="ds-toggle-thumb" /></div>
+        <div className="ds-toggle-text"><strong>Transparencies</strong></div>
+      </div>
+      <div className="ds-toggle-row" style={{ flex: 1, marginBottom: 0 }} onClick={() => { if (!showVariants) recalcVariants(); upd("showVariants", !showVariants); }}>
+        <div className={"ds-toggle-track" + (showVariants ? " on" : "")}><div className="ds-toggle-thumb" /></div>
+        <div className="ds-toggle-text"><strong>Expand Palette</strong></div>
+      </div>
+    </div>
+    {showVariants && (<div className="ds-variants-grid">
+      {VARIANT_LIGHTNESS.map(({ key }) => (<div key={key} className="ds-variant-item">
+        <div className="ds-variant-box" style={{ backgroundColor: variants[key] || hexVal }} />
+        <div className="ds-variant-label">--{slugify(name)}-{key}</div>
+        <input className="ds-variant-input" value={variants[key] || ""} onChange={(e) => dispatch({ type: "UPDATE_PALETTE_VARIANT", id, key, value: e.target.value })} />
+      </div>))}
+    </div>)}
+    {showTransparency && (<div className="ds-transparency-grid">
+      {[90,80,70,60,50,40,30,20,10].map((o) => (<div key={o} className="ds-trans-box"><div className="ds-trans-overlay" style={{ backgroundColor: "hsla(" + hue + "," + saturation + "%," + lightness + "%," + (o / 100) + ")" }}>{o}%</div></div>))}
+    </div>)}
+  </div>);
+}
+
+function TransparencySection({ label, color, bgColor, field }) {
+  const { state, dispatch } = useDSContext();
+  const show = state.colors[field];
+  return (<div className="ds-card">
+    <div className="ds-toggle-row" style={{ marginBottom: show ? 12 : 0 }} onClick={() => dispatch({ type: "SET_COLORS", payload: { [field]: !show } })}>
+      <div className={"ds-toggle-track" + (show ? " on" : "")}><div className="ds-toggle-thumb" /></div>
+      <div className="ds-toggle-text"><strong>{label} Transparencies</strong></div>
+    </div>
+    {show && (<>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 6, backgroundColor: bgColor, border: "0.5px solid var(--ds-border)" }} />
+        <span style={{ fontFamily: "monospace", fontSize: 13 }}>{color}</span>
+        <span style={{ fontSize: 12, color: "var(--ds-text-3)" }}>--{label.toLowerCase()}</span>
+      </div>
+      <div className="ds-transparency-grid">
+        {[90,80,70,60,50,40,30,20,10].map((o) => (<div key={o} className="ds-trans-box"><div className="ds-trans-overlay" style={{ backgroundColor: label === "White" ? "rgba(255,255,255," + (o / 100) + ")" : "rgba(0,0,0," + (o / 100) + ")", color: label === "White" ? "#18181b" : "#fafafa", textShadow: "none" }}>{o}%</div></div>))}
+      </div>
+    </>)}
+  </div>);
+}
+
+function StepColors() {
+  const { state, dispatch } = useDSContext();
+  return (<div>
+    <div style={{ marginBottom: 16 }}><button className="ds-btn ds-btn-primary" onClick={() => dispatch({ type: "ADD_PALETTE" })}>+ Add palette</button></div>
+    {state.colors.palettes.map((p) => <PaletteCard key={p.id} palette={p} />)}
+    <TransparencySection label="White" color="#ffffff" bgColor="#ffffff" field="whiteTransparency" />
+    <TransparencySection label="Black" color="#000000" bgColor="#000000" field="blackTransparency" />
+  </div>);
+}
+
+/* ================================================================
+   STEP 6: GAPS
+   ================================================================ */
+function StepGaps() {
+  const { state, dispatch } = useDSContext();
+  const g = state.gaps;
+  const isValidGap = (v) => !v || /^\d+(\.\d+)?$/.test(v.trim()) || /^var\(--[\w-]+\)$/.test(v.trim());
+  const fields = [
+    { key: "gridGap",      label: "--grid-gap",      helper: "Gap between grid items" },
+    { key: "contentGap",   label: "--content-gap",   helper: "Gap between content blocks" },
+    { key: "containerGap", label: "--container-gap", helper: "Padding inside containers" },
+  ];
+  const warns = [];
+  const bad = fields.filter(f => !isValidGap(g[f.key]));
+  if (bad.length) warns.push({ type: "warn", msg: "Invalid format for " + bad.map(f => f.label).join(", ") + ". Use a number (e.g. 16) or var(--name)" });
+  return (<div>
+    <div className="ds-card">
+      <h4>Gaps</h4>
+      <div className="ds-helper" style={{ marginBottom: 16 }}>Enter a pixel value (e.g. 16) or a variable reference (e.g. var(--space-m))</div>
+      <ValidationAlert items={warns} />
+      {fields.map((f) => (<div key={f.key} className="ds-form-group" style={{ marginBottom: 12 }}>
+        <label>{f.label}</label>
+        <input className={"ds-input" + (!isValidGap(g[f.key]) ? " ds-input-error" : "")} value={g[f.key]} onChange={(e) => dispatch({ type: "SET_GAPS", field: f.key, value: e.target.value })} placeholder="var(--space-m) or 16" />
+        <div className="ds-helper">{f.helper}</div>
+      </div>))}
+    </div>
+    <div className="ds-card">
+      <h4>Grid <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— default variables (not editable)</span></h4>
+      <div className="ds-helper" style={{ marginBottom: 12 }}>Ready-to-use column and ratio grids, e.g. <code>grid-template-columns: var(--grid-3)</code>. Hover to see each value.</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
+        {GRID_COLS.map((n) => <div key={n} className="ds-grid-chip" title={"--grid-" + n + ": " + gridValue(n)}>{n}</div>)}
+        {GRID_RATIOS.map(([name, value]) => <div key={name} className="ds-grid-chip" title={"--grid-" + name + ": " + value}>{name}</div>)}
+      </div>
+    </div>
+  </div>);
+}
+
+/* ================================================================
+   STEP 7: BORDER RADIUS
+   ================================================================ */
+function StepRadius() {
+  const { state, dispatch } = useDSContext();
+  const r = state.radius;
+  return (<div>
+    <div className="ds-card"><h4>Base radius</h4>
+      <div className="ds-form-group"><label>Base value (px) — maps to --radius-m</label>
+        <input type="number" className="ds-input" value={r.base} min={0} onChange={(e) => dispatch({ type: "RECALC_RADIUS", base: parseInt(e.target.value) || 0 })} />
+      </div>
+    </div>
+    {RADIUS_KEYS.map((k, i) => (<div key={k} className={"ds-space-row" + (i % 2 ? " alt" : "")}>
+      <div className="ds-space-name">--radius-{k}</div>
+      <div><input className="ds-space-input" type="number" value={r.values[k] || 0} onChange={(e) => dispatch({ type: "SET_RADIUS_VAL", key: k, value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">px</div></div>
+      <div style={{ width: 60, height: 40, background: "var(--ds-border-light)", border: "0.5px solid var(--ds-text-3)", borderRadius: r.values[k] || 0 }} />
+    </div>))}
+    <div className="ds-space-row alt" style={{ marginTop: 6 }}>
+      <div className="ds-space-name">--radius-circle</div>
+      <div><input className="ds-space-input" type="number" value={r.circle} onChange={(e) => dispatch({ type: "SET_RADIUS", payload: { circle: parseInt(e.target.value) || 0 } })} /><div className="ds-space-label">px</div></div>
+      <div style={{ width: 40, height: 40, background: "var(--ds-border-light)", border: "0.5px solid var(--ds-text-3)", borderRadius: r.circle }} />
+    </div>
+  </div>);
+}
+
+/* ================================================================
+   STEP 8: BUTTONS
+   ================================================================ */
+function StepButtons() {
+  const { state, dispatch } = useDSContext();
+  const b = state.buttons;
+  const palettes = state.colors.palettes;
+  const enabledPalettes = palettes.filter((p) => btnEnabled(state, p.id));
+  const btnStyle = (p, sizeKey, outline) => buttonInlineStyle(state, p, sizeKey, outline);
+
+  return (<div>
+    {/* SIZES */}
+    <div className="ds-card">
+      <h4>Sizes <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— padding in em (scales with font-size), font from your type scale</span></h4>
+      <div className="ds-btn-sizes">
+        <div className="ds-btn-sizes-head"><span>Size</span><span>Padding Y</span><span>Padding X</span><span>Font</span></div>
+        {BTN_SIZES.map((s) => { const sz = b.sizes[s.key]; return (
+          <div key={s.key} className="ds-btn-sizes-row">
+            <span className="ds-btn-size-label">{s.label} <em>{s.cls ? "." + s.cls : ".btn"}</em></span>
+            <input className="ds-input ds-input-sm" type="number" step="0.05" min="0" value={sz.py} onChange={(e) => dispatch({ type: "SET_BTN_SIZE", key: s.key, field: "py", value: parseFloat(e.target.value) || 0 })} />
+            <input className="ds-input ds-input-sm" type="number" step="0.05" min="0" value={sz.px} onChange={(e) => dispatch({ type: "SET_BTN_SIZE", key: s.key, field: "px", value: parseFloat(e.target.value) || 0 })} />
+            <select className="ds-input ds-input-sm" value={sz.font} onChange={(e) => dispatch({ type: "SET_BTN_SIZE", key: s.key, field: "font", value: e.target.value })}>
+              {TEXT_KEYS.map((k) => <option key={k} value={k}>text-{k}</option>)}
+            </select>
+          </div>
+        ); })}
+      </div>
+    </div>
+
+    {/* OPTIONS */}
+    <div className="ds-card">
+      <h4>Options</h4>
+      <div className="ds-toggle-row" onClick={() => dispatch({ type: "SET_BTN", payload: { outline: !b.outline } })}>
+        <div className={"ds-toggle-track" + (b.outline ? " on" : "")}><div className="ds-toggle-thumb" /></div>
+        <div className="ds-toggle-text"><strong>Include outline variants</strong><span>Adds a .btn--outline modifier for each enabled color</span></div>
+      </div>
+      <div className="ds-form-group" style={{ marginTop: 12, marginBottom: 0 }}>
+        <label style={{ fontSize: 12 }}>Border radius</label>
+        <select className="ds-input" style={{ maxWidth: 220 }} value={b.radiusKey} onChange={(e) => dispatch({ type: "SET_BTN", payload: { radiusKey: e.target.value } })}>
+          {RADIUS_KEYS.map((k) => <option key={k} value={k}>--radius-{k}</option>)}
+          <option value="circle">--radius-circle</option>
+        </select>
+      </div>
+    </div>
+
+    {/* COLORS */}
+    <div className="ds-card">
+      <h4>Colors <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— choose which palette colors generate button styles</span></h4>
+      {palettes.map((p) => { const on = btnEnabled(state, p.id); const slug = slugify(p.name); return (
+        <div key={p.id} className="ds-toggle-row" onClick={() => dispatch({ type: "TOGGLE_BTN_COLOR", id: p.id })}>
+          <div className={"ds-toggle-track" + (on ? " on" : "")}><div className="ds-toggle-thumb" /></div>
+          <div style={{ width: 18, height: 18, borderRadius: 4, flexShrink: 0, background: "hsl(" + p.hue + "," + p.saturation + "%," + p.lightness + "%)", border: "1px solid var(--ds-border)" }} />
+          <div className="ds-toggle-text"><strong>{p.name}</strong><span style={{ fontFamily: "monospace" }}>.btn--{slug}{b.outline ? " · .btn--" + slug + ".btn--outline" : ""}</span></div>
+        </div>
+      ); })}
+    </div>
+
+    {/* PREVIEW */}
+    <div className="ds-card">
+      <h4>Preview</h4>
+      {enabledPalettes.length === 0
+        ? <div className="ds-helper">No colors enabled. Toggle a color above to preview its buttons.</div>
+        : enabledPalettes.map((p) => (
+          <div key={p.id} style={{ marginBottom: 18 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ds-text-2)", marginBottom: 8 }}>{p.name}</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: b.outline ? 10 : 0 }}>
+              {BTN_SIZES.map((s) => <button key={s.key} style={btnStyle(p, s.key, false)}>Button</button>)}
+            </div>
+            {b.outline && <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+              {BTN_SIZES.map((s) => <button key={s.key} style={btnStyle(p, s.key, true)}>Button</button>)}
+            </div>}
+          </div>
+        ))}
+    </div>
+  </div>);
+}
+
+/* ================================================================
+   URL HASH / PREFIX / SECTION UTILS
+   ================================================================ */
+// Serializa el state al hash de la URL (excluye currentStep)
+function stateToHash(state) {
+  try { const { currentStep, ...rest } = state; return '#' + btoa(JSON.stringify(rest)); } catch { return ''; }
+}
+function hashToState(hash) {
+  try { if (!hash || hash.length < 2) return null; return JSON.parse(atob(hash.slice(1))); } catch { return null; }
+}
+
+// Aplica un prefijo a todas las custom properties del CSS generado
+function applyPrefix(css, prefix) {
+  if (!prefix) return css;
+  // Declaraciones en :root: "  --varname:" → "  --PREFIX-varname:"
+  css = css.replace(/^([ \t]+)(--)([\w-]+)(\s*:)/gm, (_, sp, __, name, colon) => sp + '--' + prefix + '-' + name + colon);
+  // Referencias: "var(--varname" → "var(--PREFIX-varname" (cubre fallbacks también)
+  css = css.replace(/var\(--([\w-]+)/g, (_, name) => 'var(--' + prefix + '-' + name);
+  return css;
+}
+
+// Extrae una sección del CSS generado (entre /* — Name — */ markers) envuelta en :root {}
+function extractSection(css, sectionName) {
+  const lines = css.split('\n');
+  let capturing = false;
+  const result = [':root {'];
+  for (const line of lines) {
+    if (line.includes('/* \u2014') && line.toLowerCase().includes(sectionName.toLowerCase())) { capturing = true; }
+    else if (capturing && line.includes('/* \u2014')) { break; }
+    if (capturing) result.push(line);
+  }
+  result.push('}');
+  return result.length > 2 ? result.join('\n') : '';
+}
+
+/* ================================================================
+   CSS GENERATORS
+   ================================================================ */
+const gapVal = (v) => /^\d+$/.test(v) ? v + "px" : v;
+
+function generateImporterCSS(state) {
+  const { typography, colors, gaps, radius, includeUtilities } = state;
+  const prefix = state.varPrefix || "";
+  const ts = new Date().toLocaleString();
+  let css = "/* ================================================\n * BRICKSMATE FRAMEWORK IMPORTER\n * Static tokens: colors, line-heights, gaps, radius\n * Paste into: Bricks → Framework Importer\n * Generated: " + ts + "\n * ================================================ */\n\n:root {\n\n";
+  css += "  /* — Colors ——————————————————————————————— */\n";
+  colors.palettes.forEach((p) => {
+    const slug = slugify(p.name);
+    css += "  --" + slug + ": hsl(" + p.hue + ", " + p.saturation + "%, " + p.lightness + "%);\n";
+    if (p.showVariants) { VARIANT_LIGHTNESS.forEach(({ key }) => { if (p.variants[key]) css += "  --" + slug + "-" + key + ": " + p.variants[key] + ";\n"; }); }
+    if (p.showTransparency) { for (let i = 90; i >= 10; i -= 10) css += "  --" + slug + "-" + i + ": hsla(" + p.hue + ", " + p.saturation + "%, " + p.lightness + "%, " + (i / 100) + ");\n"; }
+  });
+  if (colors.whiteTransparency) { for (let i = 90; i >= 10; i -= 10) css += "  --white-" + i + ": rgba(255, 255, 255, " + (i / 100) + ");\n"; }
+  if (colors.blackTransparency) { for (let i = 90; i >= 10; i -= 10) css += "  --black-" + i + ": rgba(0, 0, 0, " + (i / 100) + ");\n"; }
+  css += "\n  /* — Typography (static) ————————————————————— */\n";
+  css += "  --line-height-heading: " + typography.lineHeightHeading + ";\n";
+  css += "  --line-height-body: " + typography.lineHeightBody + ";\n";
+  css += "\n  /* — Gaps ———————————————————————————————— */\n";
+  css += "  --grid-gap: " + gapVal(gaps.gridGap) + ";\n";
+  css += "  --content-gap: " + gapVal(gaps.contentGap) + ";\n";
+  css += "  --container-gap: " + gapVal(gaps.containerGap) + ";\n";
+  css += "\n  /* — Grid (columns + ratios) ————————————————— */\n";
+  GRID_COLS.forEach((n) => { css += "  --grid-" + n + ": " + gridValue(n) + ";\n"; });
+  GRID_RATIOS.forEach(([name, value]) => { css += "  --grid-" + name + ": " + value + ";\n"; });
+  css += "\n  /* — Border Radius —————————————————————————— */\n";
+  RADIUS_KEYS.forEach((k) => { css += "  --radius-" + k + ": " + (radius.values[k] || 0) + "px;\n"; });
+  css += "  --radius-circle: " + radius.circle + "px;\n";
+  css += "}\n\n/* — Base styles ———————————————————————————— */\n";
+  ["h1","h2","h3","h4","h5","h6"].forEach((h) => { css += h + " { font-size: var(--" + h + "); line-height: var(--line-height-heading); }\n"; });
+  if (includeUtilities) {
+    css += "\n/* — Utilities ————————————————————————————— */\n";
+    SPACE_KEYS.filter((k) => k !== "section").forEach((k) => { css += ".gap-" + k + " { gap: var(--space-" + k + "); }\n"; });
+    RADIUS_KEYS.forEach((k) => { css += ".rounded-" + k + " { border-radius: var(--radius-" + k + "); }\n"; });
+    css += ".rounded-full { border-radius: var(--radius-circle); }\n";
+  }
+  return applyPrefix(css, prefix);
+}
+
+function generateCustomCodeCSS(state) {
+  const { layoutMode, minViewport, maxViewport, spacing, sectionSpacing, typography } = state;
+  const prefix = state.varPrefix || "";
+  const ts = new Date().toLocaleString();
+  let css = "/* ================================================\n * BRICKSMATE CUSTOM CODE\n * Fluid tokens: spacing + typography (clamp)\n * Paste into: Bricks → Settings → Custom Code → CSS\n * Layout: " + (layoutMode === "fixed" ? "Fixed " + maxViewport + "px" : "Full-width") + " | Range: " + minViewport + "→" + maxViewport + "px\n * Generated: " + ts + "\n * ================================================ */\n\n:root {\n\n";
+  css += "  /* — Spacing (fluid, rem) ——————————————————— */\n";
+  SPACE_KEYS.forEach((k) => {
+    const v = spacing.values[k]; if (!v) return;
+    css += "  --space-" + k + ": " + flRem(v.mobile, v.desktop, state) + ";\n";
+  });
+  css += "\n  /* — Section spacing (fluid, rem) —————————— */\n";
+  SPACE_KEYS.forEach((k) => {
+    const v = sectionSpacing.values[k]; if (!v) return;
+    css += "  --section-space-" + k + ": " + flRem(v.mobile, v.desktop, state) + ";\n";
+  });
+  css += "\n  /* — Typography (fluid, rem) ————————————————— */\n";
+  ["h1","h2","h3","h4","h5","h6"].forEach((h) => { const v = typography.headings[h]; if (!v) return; css += "  --" + h + ": " + flRem(v.mobile, v.desktop, state) + ";\n"; });
+  TEXT_KEYS.forEach((k) => { const v = typography.texts[k]; if (!v) return; css += "  --text-" + k + ": " + flRem(v.mobile, v.desktop, state) + ";\n"; });
+  css += "\n  /* — Line heights ——————————————————————— */\n";
+  css += "  --line-height-heading: " + typography.lineHeightHeading + ";\n";
+  css += "  --line-height-body: " + typography.lineHeightBody + ";\n";
+  css += "}\n";
+  return applyPrefix(css, prefix);
+}
+
+function generateVariablesJSON(state) {
+  const prefix = state.varPrefix ? state.varPrefix + '-' : '';
+  const pn = (n) => prefix + n;
+  const pv = (val) => prefix ? val.replace(/var\(--([\w-]+)/g, (_, n) => 'var(--' + prefix + n) : val;
+  const catIds = {};
+  ['Spacing','SectionSpacing','Texts','Headings','Gaps','Grid','Buttons','Radius','Styles'].forEach(n => { catIds[n] = randId(); });
+  const mk = (name, value, cat) => ({ name: pn(name), value: pv(value), id: randId(), category: catIds[cat] });
+  const vars = [];
+
+  // Spacing (fluid clamp, rem)
+  SPACE_KEYS.forEach(k => {
+    const sv = state.spacing.values[k]; if (!sv) return;
+    vars.push(mk('space-' + k, flRem(sv.mobile, sv.desktop, state), 'Spacing'));
+  });
+  // Section Spacing (fluid clamp, rem)
+  SPACE_KEYS.forEach(k => {
+    const sv = state.sectionSpacing.values[k]; if (!sv) return;
+    vars.push(mk('section-space-' + k, flRem(sv.mobile, sv.desktop, state), 'SectionSpacing'));
+  });
+  // Texts (fluid clamp, rem)
+  TEXT_KEYS.forEach(k => { const tv = state.typography.texts[k]; if (!tv) return; vars.push(mk('text-' + k, flRem(tv.mobile, tv.desktop, state), 'Texts')); });
+  // Headings (fluid clamp, rem)
+  ['h1','h2','h3','h4','h5','h6'].forEach(h => { const hv = state.typography.headings[h]; if (!hv) return; vars.push(mk(h, flRem(hv.mobile, hv.desktop, state), 'Headings')); });
+  // Gaps
+  vars.push(mk('grid-gap', gapVal(state.gaps.gridGap), 'Gaps'));
+  vars.push(mk('content-gap', gapVal(state.gaps.contentGap), 'Gaps'));
+  vars.push(mk('container-gap', gapVal(state.gaps.containerGap), 'Gaps'));
+  // Grid (columnas 1–12 + ratios asimétricos) — valores estáticos, sin prefijo en el value
+  GRID_COLS.forEach(n => { vars.push({ name: pn('grid-' + n), value: gridValue(n), id: randId(), category: catIds['Grid'] }); });
+  GRID_RATIOS.forEach(([name, value]) => { vars.push({ name: pn('grid-' + name), value, id: randId(), category: catIds['Grid'] }); });
+  // Buttons — padding en em por tamaño
+  if (state.buttons) {
+    BTN_SIZES.forEach(s => {
+      const sz = state.buttons.sizes[s.key]; if (!sz) return;
+      vars.push({ name: pn('pad-btn-y-' + s.key), value: sz.py + 'em', id: randId(), category: catIds['Buttons'] });
+      vars.push({ name: pn('pad-btn-x-' + s.key), value: sz.px + 'em', id: randId(), category: catIds['Buttons'] });
+    });
+  }
+  // Radius
+  RADIUS_KEYS.forEach(k => { vars.push(mk('radius-' + k, (state.radius.values[k] || 0) + 'px', 'Radius')); });
+  vars.push(mk('radius-circle', state.radius.circle + 'px', 'Radius'));
+  // Styles
+  vars.push(mk('line-height-heading', String(state.typography.lineHeightHeading), 'Styles'));
+  vars.push(mk('line-height-body', String(state.typography.lineHeightBody), 'Styles'));
+
+  // Categorías con metadata de escala para que Bricks muestre el escalado visual
+  const sp = state.spacing;
+  const ss = state.sectionSpacing;
+  const ty = state.typography;
+  const categories = [
+    {
+      id: catIds['Spacing'], name: 'Spacing',
+      scale: {
+        scaleScope: 'spacing', scaleType: 'custom',
+        scaleNames: ['xs','s','m','l','xl','xxl'],
+        prefix: pn('space-'),
+        minFontSize: sp.baseMobile, minScaleRatio: sp.scale, minScaleRatioSelect: sp.scale,
+        maxFontSize: sp.baseDesktop, maxScaleRatio: sp.scale, maxScaleRatioSelect: sp.scale,
+        baseline: 'm',
+        manualValues: ['xs','s','m','l','xl','xxl'].map(k => ({
+          name: pn('space-' + k),
+          min: (sp.values[k]?.mobile || 0) + 'px',
+          max: (sp.values[k]?.desktop || 0) + 'px',
+        })),
+        isManual: true,
+      }
+    },
+    {
+      id: catIds['SectionSpacing'], name: 'SectionSpacing',
+      scale: {
+        scaleScope: 'spacing', scaleType: 'custom',
+        scaleNames: ['xs','s','m','l','xl','xxl'],
+        prefix: pn('section-space-'),
+        minFontSize: ss.baseMobile, minScaleRatio: ss.scale, minScaleRatioSelect: ss.scale,
+        maxFontSize: ss.baseDesktop, maxScaleRatio: ss.scale, maxScaleRatioSelect: ss.scale,
+        baseline: 'm',
+        manualValues: ['xs','s','m','l','xl','xxl'].map(k => ({
+          name: pn('section-space-' + k),
+          min: (ss.values[k]?.mobile || 0) + 'px',
+          max: (ss.values[k]?.desktop || 0) + 'px',
+        })),
+        isManual: true,
+      }
+    },
+    {
+      id: catIds['Texts'], name: 'Texts',
+      scale: {
+        scaleScope: 'typography', scaleType: 'custom',
+        scaleNames: ['xs','s','m','mm','l','xl','xxl'],
+        prefix: pn('text-'),
+        minFontSize: ty.textBaseMob, minScaleRatio: ty.textScale, minScaleRatioSelect: ty.textScale,
+        maxFontSize: ty.textBaseDesk, maxScaleRatio: ty.textScale, maxScaleRatioSelect: ty.textScale,
+        baseline: 'm',
+        manualValues: TEXT_KEYS.map(k => ({
+          name: pn('text-' + k),
+          min: (ty.texts[k]?.mobile || 0) + 'px',
+          max: (ty.texts[k]?.desktop || 0) + 'px',
+        })),
+        isManual: true,
+      }
+    },
+    {
+      id: catIds['Headings'], name: 'Headings',
+      scale: {
+        scaleScope: 'typography', scaleType: 'custom',
+        scaleNames: ['1','2','3','4','5','6'],
+        prefix: pn('h'),
+        minFontSize: ty.headingBaseMob, minScaleRatio: ty.headingScale, minScaleRatioSelect: ty.headingScale,
+        maxFontSize: ty.headingBaseDesk, maxScaleRatio: ty.headingScale, maxScaleRatioSelect: ty.headingScale,
+        baseline: '3',
+        manualValues: ['h1','h2','h3','h4','h5','h6'].map(h => ({
+          name: pn(h),
+          min: (ty.headings[h]?.mobile || 0) + 'px',
+          max: (ty.headings[h]?.desktop || 0) + 'px',
+        })),
+        isManual: true,
+      }
+    },
+    { id: catIds['Gaps'], name: 'Gaps' },
+    { id: catIds['Grid'], name: 'Grid' },
+    { id: catIds['Buttons'], name: 'Buttons' },
+    { id: catIds['Radius'], name: 'Radius' },
+    { id: catIds['Styles'], name: 'Styles' },
+  ];
+  return JSON.stringify({ variables: vars, categories }, null, 2);
+}
+
+function generateColorPaletteJSON(state) {
+  const prefix = state.varPrefix ? state.varPrefix + '-' : '';
+  const vr = (n) => 'var(--' + prefix + n + ')';
+  const colors = [];
+  state.colors.palettes.forEach(p => {
+    const slug = slugify(p.name);
+    const hex = hslToHex(p.hue, p.saturation, p.lightness);
+    const rootId = randId();
+    colors.push({ raw: vr(slug), id: rootId, name: p.name, light: hex });
+    if (p.showVariants) {
+      ['ultra-dark','dark','semi-dark'].forEach((key, idx) => { if (p.variants[key]) colors.push({ id: randId(), type: 'dark', raw: vr(slug + '-' + key), index: idx, parent: rootId, light: hslStrToHex(p.variants[key]) }); });
+      ['semi-light','light','ultra-light'].forEach((key, idx) => { if (p.variants[key]) colors.push({ id: randId(), type: 'light', raw: vr(slug + '-' + key), index: idx, parent: rootId, light: hslStrToHex(p.variants[key]) }); });
+    }
+    if (p.showTransparency) { [90,80,70,60,50,40,30,20,10].forEach((o, idx) => { colors.push({ id: randId(), type: 'transparent', raw: vr(slug + '-trans-' + o), index: idx, parent: rootId, light: 'hsla(' + p.hue + ', ' + p.saturation + '%, ' + p.lightness + '%, ' + (o/100) + ')' }); }); }
+  });
+  if (state.colors.whiteTransparency) { const wId = randId(); colors.push({ raw: vr('white'), id: wId, name: 'White', light: '#ffffff' }); [90,80,70,60,50,40,30,20,10].forEach((o, idx) => colors.push({ id: randId(), type: 'transparent', raw: vr('white-trans-' + o), index: idx, parent: wId, light: 'rgba(255, 255, 255, ' + (o/100) + ')' })); }
+  if (state.colors.blackTransparency) { const bId = randId(); colors.push({ raw: vr('black'), id: bId, name: 'Black', light: '#000000' }); [90,80,70,60,50,40,30,20,10].forEach((o, idx) => colors.push({ id: randId(), type: 'transparent', raw: vr('black-trans-' + o), index: idx, parent: bId, light: 'rgba(0, 0, 0, ' + (o/100) + ')' })); }
+  return JSON.stringify({ id: randId(), name: 'BricksMate', colors, default: true }, null, 2);
+}
+
+// Botones en BEM. Compose: <a class="btn btn--primary btn--lg">
+function generateButtonsCSS(state, v) {
+  const b = state.buttons;
+  if (!b) return "";
+  const palettes = state.colors.palettes.filter((pl) => btnEnabled(state, pl.id));
+  const rad = b.radiusKey === "circle" ? v("radius-circle") : v("radius-" + b.radiusKey);
+  const d = b.sizes.default;
+  let css = "\n/* ================================================\n * BUTTONS (BEM) — compose: class=\"btn btn--primary btn--lg\"\n * ================================================ */\n";
+  css += ".btn {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  gap: 0.5em;\n";
+  css += "  padding: " + v("pad-btn-y-default") + " " + v("pad-btn-x-default") + ";\n";
+  css += "  font-size: " + v("text-" + d.font) + ";\n  font-weight: 600;\n  line-height: 1.2;\n  text-decoration: none;\n  cursor: pointer;\n  border: 1.5px solid transparent;\n";
+  css += "  border-radius: " + rad + ";\n  transition: background-color .15s, color .15s, border-color .15s;\n}\n";
+  BTN_SIZES.filter((s) => s.cls).forEach((s) => {
+    const sz = b.sizes[s.key];
+    css += "." + s.cls + " {\n  padding: " + v("pad-btn-y-" + s.key) + " " + v("pad-btn-x-" + s.key) + ";\n  font-size: " + v("text-" + sz.font) + ";\n}\n";
+  });
+  palettes.forEach((pl) => {
+    const slug = slugify(pl.name);
+    const col = v(slug);
+    const dark = "hsl(" + pl.hue + ", " + pl.saturation + "%, " + Math.max(0, pl.lightness - 10) + "%)";
+    const onCol = btnContrast(pl.lightness);
+    css += "\n.btn--" + slug + " {\n  background-color: " + col + ";\n  border-color: " + col + ";\n  color: " + onCol + ";\n}\n";
+    css += ".btn--" + slug + ":hover {\n  background-color: " + dark + ";\n  border-color: " + dark + ";\n}\n";
+    if (b.outline) {
+      css += ".btn--" + slug + ".btn--outline {\n  background-color: transparent;\n  border-color: " + col + ";\n  color: " + col + ";\n}\n";
+      css += ".btn--" + slug + ".btn--outline:hover {\n  background-color: " + col + ";\n  color: " + onCol + ";\n}\n";
+    }
+  });
+  return css;
+}
+
+function generateFrameworkCSS(state) {
+  const p = state.varPrefix ? '--' + state.varPrefix + '-' : '--';
+  const v = (n) => 'var(' + p + n + ')';
+  const ts = new Date().toLocaleString();
+  let css = "/* ================================================\n * BRICKSMATE FRAMEWORK BASE CSS\n * Apply tokens to HTML elements globally\n * Paste into: Bricks → Settings → Custom Code → CSS\n * Generated: " + ts + "\n * ================================================ */\n\n";
+  css += "/* Text */\nbody {\n  font-size: " + v('text-m') + ";\n  line-height: " + v('line-height-body') + ";\n}\n\n";
+  css += "/* Headings */\nh1, h2, h3, h4, h5, h6 {\n  line-height: " + v('line-height-heading') + ";\n}\n";
+  ['h1','h2','h3','h4','h5','h6'].forEach(h => { css += h + " { font-size: " + v(h) + "; }\n"; });
+  css += "\n/* Sections */\n:where(section:not(section section)) {\n  padding: " + v('section-space-m') + " " + v('space-m') + ";\n}\nsection:where(:not(.bricks-shape-divider)) {\n  gap: " + v('container-gap') + ";\n}\n:where(.brxe-container) > .brxe-block,\n:where(.brxe-container) {\n  gap: " + v('content-gap') + ";\n}\n\n/* Overflow fix */\nbody.bricks-is-frontend {\n  overflow-x: clip;\n}\n";
+  css += generateButtonsCSS(state, v);
+  return css;
+}
+
+/* ================================================================
+   STEP 8: PREVIEW
+   ================================================================ */
+/* Landing de muestra: aplica los tokens reales (clamp/rem) a una web ficticia.
+   Lienzo neutro fijo (independiente del dark mode de la app) para ver los colores como en una web real. */
+function LandingPreview({ state }) {
+  const wrapRef = useRef(null);
+  const [width, setWidth] = useState(null); // px arrastrado, o null = ancho completo
+  const startDrag = (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = wrapRef.current.offsetWidth;
+    const maxW = (wrapRef.current.parentElement?.clientWidth || 9999) - 18;
+    const onMove = (ev) => setWidth(Math.max(300, Math.min(maxW, startW + (ev.clientX - startX))));
+    const onUp = () => { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); document.body.style.userSelect = ""; };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    document.body.style.userSelect = "none";
+  };
+  const t = state.typography, sp = state.spacing, ss = state.sectionSpacing, r = state.radius;
+  const p = state.colors.palettes[0] || { hue: 210, saturation: 75, lightness: 50 };
+  const primary = "hsl(" + p.hue + "," + p.saturation + "%," + p.lightness + "%)";
+  const primaryTint = "hsl(" + p.hue + "," + Math.min(90, p.saturation) + "%,96%)";
+  const onPrimary = p.lightness > 60 ? "#18181b" : "#ffffff";
+  // cqw en vez de vw → el clamp() responde al ancho del CONTENEDOR (resizer), no a la ventana
+  const fr = (m, d) => flRem(m || 0, d || 0, state).replace(/vw/g, "cqw");
+  const h = (k) => fr(t.headings[k]?.mobile, t.headings[k]?.desktop);
+  const tx = (k) => fr(t.texts[k]?.mobile, t.texts[k]?.desktop);
+  const spc = (k) => fr(sp.values[k]?.mobile, sp.values[k]?.desktop);
+
+  const vars = {
+    "--h1": h("h1"), "--h2": h("h2"), "--h3": h("h3"), "--h4": h("h4"),
+    "--tl": tx("l"), "--tm": tx("m"), "--ts": tx("s"),
+    "--secM": fr(ss.values.m?.mobile || 80, ss.values.m?.desktop || 100),
+    "--secL": fr(ss.values.l?.mobile || 120, ss.values.l?.desktop || 150),
+    "--spS": spc("s"), "--spM": spc("m"), "--spL": spc("l"), "--spXL": spc("xl"),
+    "--rm": (r.values.m || 8) + "px", "--rl": (r.values.l || 12) + "px", "--rc": (r.circle || 999) + "px",
+    "--lhh": t.lineHeightHeading, "--lhb": t.lineHeightBody,
+    "--cp": primary, "--cpt": primaryTint, "--cop": onPrimary,
+    "--cbg": "#ffffff", "--ctext": "#1a1a1a", "--cmut": "#5f6b7a", "--cbd": "#e5e7eb", "--cfoot": "#f3f4f6",
+  };
+
+  // Layout mode → contenedor de las secciones
+  const isFixed = state.layoutMode === "fixed";
+  const maxVp = state.maxViewport;
+  // Fixed: contenido centrado con ancho máximo (boxed). Full-width: 100%.
+  const container = isFixed ? "min(" + maxVp + "px, 92%)" : "100%";
+
+  // Botones reales del sistema (mismo helper que el paso Buttons) → tamaño, padding em, radius y color configurados
+  const btn = (sizeKey, outline) => buttonInlineStyle(state, p, sizeKey, outline);
+  const linkBtn = { background: "transparent", color: "var(--ctext)", border: "none", fontSize: "var(--ts)", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" };
+
+  const logoMark = (
+    <svg width="26" height="26" viewBox="0 0 26 26" fill="none" style={{ flexShrink: 0 }}>
+      <path d="M4 7a3 3 0 0 1 3-3h8l7 7v8a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" fill="var(--cp)" />
+      <path d="M15 4v6h6" stroke="var(--cbg)" strokeWidth="1.6" fill="none" strokeLinejoin="round" />
+    </svg>
+  );
+
+  const heroArt = (
+    <svg viewBox="0 0 360 320" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: "100%", height: "auto", maxWidth: 360 }}>
+      <ellipse cx="190" cy="165" rx="150" ry="120" strokeDasharray="3 9" opacity="0.35" />
+      <path d="M70 282 h188 l20 20 H50 z" />
+      <rect x="88" y="184" width="166" height="98" rx="6" />
+      <line x1="122" y1="260" x2="122" y2="234" />
+      <line x1="150" y1="260" x2="150" y2="216" />
+      <line x1="178" y1="260" x2="178" y2="242" />
+      <line x1="206" y1="260" x2="206" y2="224" />
+      <path d="M196 152 q26 -14 44 6 l10 60 -64 0 z" fill="currentColor" stroke="none" />
+      <circle cx="222" cy="130" r="18" />
+      <path d="M236 152 l36 -36" />
+      <circle cx="280" cy="110" r="12" />
+      <path d="M275 122 h10" />
+      <path d="M268 254 h36 l-5 40 h-26 z" />
+      <path d="M304 262 q14 6 0 20" />
+    </svg>
+  );
+
+  const supportArt = (
+    <svg viewBox="0 0 340 300" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: "100%", height: "auto", maxWidth: 320 }}>
+      <circle cx="170" cy="150" r="78" strokeDasharray="5 11" />
+      <circle cx="170" cy="150" r="54" />
+      <circle cx="90" cy="82" r="34" />
+      <circle cx="250" cy="98" r="28" />
+      <circle cx="232" cy="226" r="32" />
+      <circle cx="90" cy="72" r="11" fill="currentColor" stroke="none" />
+      <path d="M70 102 q20 -18 40 0 z" fill="currentColor" stroke="none" />
+      <circle cx="170" cy="138" r="14" fill="currentColor" stroke="none" />
+      <path d="M146 178 q24 -22 48 0 z" fill="currentColor" stroke="none" />
+      <circle cx="232" cy="218" r="11" fill="currentColor" stroke="none" />
+      <path d="M212 248 q20 -16 40 0 z" fill="currentColor" stroke="none" />
+    </svg>
+  );
+
+  const features = [
+    { t: "Seamless integration", d: "Integrate seamlessly with your existing systems and processes, ensuring a smooth transition to our software." },
+    { t: "User-friendly interface", d: "Our intuitive user interface ensures your team can hit the ground running with minimal training." },
+    { t: "Real-time analytics", d: "Gain access to real-time data and analytics, enabling you to make informed decisions and stay ahead." },
+    { t: "Mobile accessibility", d: "Access your data and tools from anywhere with mobile compatibility, keeping your team connected." },
+    { t: "Customization options", d: "Tailor the platform to your unique business needs with extensive customization options." },
+    { t: "Scalability", d: "Whether you're a small startup or a large enterprise, our solutions scale with your business as it grows." },
+    { t: "Robust security", d: "Your data is our top priority. Benefit from state-of-the-art security measures to keep it safe." },
+    { t: "Ongoing support", d: "Count on our dedicated support team for training, troubleshooting, and continuous improvement." },
+  ];
+  const footerCols = [
+    { h: "Quick Links", links: ["Home", "Features", "Pricing", "About Us", "Contact Us"] },
+    { h: "Legal", links: ["Privacy policy", "Terms of service", "Cookie policy"] },
+    { h: "Stay Connected", links: ["LinkedIn", "Facebook", "Twitter"] },
+  ];
+
+  return (<div className="ds-landing">
+    {/* Toolbar: layout badge + ancho actual + reset */}
+    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+      <span style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: "var(--ds-radius)", background: "var(--ds-primary)", color: "var(--ds-bg)" }}>
+        {isFixed ? "Fixed-width · max " + maxVp + "px" : "Full-width · 100%"}
+      </span>
+      <span style={{ fontSize: 11.5, color: "var(--ds-text-3)" }}>↔ Drag the right edge to resize — {width ? Math.round(width) + "px" : "full width"}</span>
+      {width && <button className="ds-btn ds-btn-sm" onClick={() => setWidth(null)} style={{ marginLeft: "auto" }}>Reset width</button>}
+    </div>
+    {/* Área redimensionable (cqw responde a este contenedor) */}
+    <div style={{ position: "relative", paddingRight: 18 }}>
+      <div ref={wrapRef} style={{ ...vars, position: "relative", width: width ? width + "px" : "100%", maxWidth: "100%", containerType: "inline-size" }}>
+        <div style={{ background: "var(--cbg)", color: "var(--ctext)", fontFamily: "'Inter',system-ui,sans-serif", borderRadius: "var(--ds-radius-lg)", overflow: "hidden", border: "1px solid var(--ds-border-light)" }}>
+
+      {/* NAV */}
+      <header style={{ borderBottom: "1px solid var(--cbd)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--spM)", padding: "var(--spM) var(--spL)", maxWidth: container, margin: "0 auto" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {logoMark}
+            <span style={{ fontWeight: 700, fontSize: "var(--tl)", color: "var(--ctext)" }}>Zephtor</span>
+          </div>
+          <nav style={{ display: "flex", gap: "var(--spM)", alignItems: "center" }}>
+            {["Home", "Features", "Pricing", "About Us", "Contact"].map((x) => <span key={x} style={{ fontSize: "var(--ts)", color: "var(--ctext)", cursor: "pointer", whiteSpace: "nowrap" }}>{x}</span>)}
+          </nav>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spM)" }}>
+            <button style={btn("sm", false)}>Sign up</button>
+            <button style={linkBtn}>Login</button>
+          </div>
+        </div>
+      </header>
+
+      {/* HERO */}
+      <section style={{ padding: "var(--secL) var(--spL)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.05fr 0.95fr", gap: "var(--spXL)", alignItems: "center", maxWidth: container, margin: "0 auto" }}>
+          <div>
+            <h1 style={{ fontSize: "var(--h1)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 800, letterSpacing: "-0.02em", margin: "0 0 var(--spM)" }}>Your digital transformation begins here</h1>
+            <p style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)", maxWidth: 420 }}>Unlock the full potential of your business. Start your journey today and watch your operations transform to fit your needs like a glove.</p>
+            <div style={{ display: "flex", gap: "var(--spS)", flexWrap: "wrap" }}>
+              <button style={btn("lg", false)}>Learn more</button>
+              <button style={btn("lg", true)}>Watch demo</button>
+            </div>
+          </div>
+          <div style={{ color: "var(--ctext)", display: "flex", justifyContent: "center" }}>{heroArt}</div>
+        </div>
+      </section>
+
+      {/* SUPPORT — sección alterna (imagen izquierda / texto derecha) */}
+      <section style={{ padding: "var(--secM) var(--spL)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "0.95fr 1.05fr", gap: "var(--spXL)", alignItems: "center", maxWidth: container, margin: "0 auto" }}>
+          <div style={{ color: "var(--ctext)", display: "flex", justifyContent: "center" }}>{supportArt}</div>
+          <div>
+            <h2 style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 var(--spM)" }}>Dedicated support</h2>
+            <p style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)" }}>Zephtor provides ongoing support and training to ensure you maximize the value of our software. Our experts are here to assist you at every step of your digital transformation journey.</p>
+            <button style={btn("default", false)}>Learn more</button>
+          </div>
+        </div>
+      </section>
+
+      {/* FEATURES */}
+      <section style={{ padding: "var(--secM) var(--spL)" }}>
+        <div style={{ textAlign: "center", maxWidth: 640, margin: "0 auto var(--spXL)" }}>
+          <h2 style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 var(--spS)" }}>Discover what sets Zephtor apart</h2>
+          <p style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>Our suite of SaaS solutions is packed with powerful features.</p>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "var(--spL)", maxWidth: container, margin: "0 auto" }}>
+          {features.map((f) => (
+            <div key={f.t}>
+              <h3 style={{ fontSize: "var(--tl)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, margin: "0 0 var(--spS)" }}>{f.t}</h3>
+              <p style={{ fontSize: "var(--ts)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>{f.d}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer style={{ background: "var(--cfoot)", padding: "var(--spXL) var(--spL)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr 1fr", gap: "var(--spL)", maxWidth: container, margin: "0 auto" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "var(--spS)" }}>
+              {logoMark}
+              <span style={{ fontWeight: 700, fontSize: "var(--tl)", color: "var(--ctext)" }}>Zephtor</span>
+            </div>
+            <p style={{ fontSize: "var(--ts)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>Your digital transformation partner.</p>
+          </div>
+          {footerCols.map((col) => (
+            <div key={col.h}>
+              <div style={{ fontSize: "var(--ts)", fontWeight: 700, color: "var(--ctext)", marginBottom: "var(--spM)" }}>{col.h}</div>
+              {col.links.map((l) => (
+                <div key={l} style={{ fontSize: "var(--ts)", lineHeight: 1.4, color: "var(--cmut)", marginBottom: "var(--spS)", textDecoration: "underline", cursor: "pointer" }}>{l}</div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </footer>
+        </div>
+        <div className="ds-resize-handle" onMouseDown={startDrag} title="Drag to resize" />
+      </div>
+    </div>
+  </div>);
+}
+
+function StepPreview() {
+  const { state } = useDSContext();
+  const [view, setView] = useState("tokens");
+  const [tab, setTab] = useState("importer");
+  const [copied, setCopied] = useState(null);
+  const [chipCopied, setChipCopied] = useState(null);
+  const [shared, setShared] = useState(false);
+
+  // CSS computed directly — sin useMemo para garantizar reactividad total
+  let importerCSS, customCSS;
+  try { importerCSS = generateImporterCSS(state); } catch(e) { importerCSS = "/* Error: " + e.message + " */"; }
+  try { customCSS = generateCustomCodeCSS(state); } catch(e) { customCSS = "/* Error: " + e.message + " */"; }
+
+  const active = tab === "importer" ? importerCSS : customCSS;
+  const copy  = () => { navigator.clipboard.writeText(active).then(() => { setCopied(tab); setTimeout(() => setCopied(null), 2000); }); };
+  const share = () => {
+    const url = window.location.href.split('#')[0] + stateToHash(state);
+    navigator.clipboard.writeText(url).then(() => { setShared(true); setTimeout(() => setShared(false), 2000); });
+  };
+  const CHIPS = { importer: ["Colors", "Typography", "Gaps", "Radius"], custom: ["Spacing", "Typography"] };
+  const copyChip = (name) => {
+    const s = extractSection(active, name);
+    if (s) navigator.clipboard.writeText(s).then(() => { setChipCopied(name); setTimeout(() => setChipCopied(null), 2000); });
+  };
+  const t = state.typography;
+  const sp = state.spacing;
+  const r = state.radius;
+
+  return (<div>
+    <div className="ds-view-toggle">
+      <button className={"ds-view-btn" + (view === "tokens" ? " active" : "")} onClick={() => setView("tokens")}>Tokens</button>
+      <button className={"ds-view-btn" + (view === "landing" ? " active" : "")} onClick={() => setView("landing")}>Landing</button>
+    </div>
+    {view === "landing" ? <LandingPreview state={state} /> : <>
+
+    {/* COLORS — todas las paletas + variantes + transparencias */}
+    <div className="ds-preview-section">
+      <div className="ds-preview-section-title">Colors</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: 12 }}>
+        {state.colors.palettes.map((p) => (
+          <div key={p.id} style={{ background: "var(--ds-bg-card)", border: "0.5px solid var(--ds-border-light)", borderRadius: "var(--ds-radius-lg)", padding: 14 }}>
+            <div style={{ fontFamily: "monospace", fontSize: 11, color: "var(--ds-text-3)", marginBottom: 6 }}>--{slugify(p.name)}</div>
+            <div style={{ height: 44, borderRadius: 6, backgroundColor: "hsl(" + p.hue + "," + p.saturation + "%," + p.lightness + "%)", marginBottom: (p.showVariants || p.showTransparency) ? 8 : 0, display: "flex", alignItems: "center", justifyContent: "center", color: p.lightness > 55 ? "var(--ds-bg)" : "var(--ds-text)", fontSize: 12, fontWeight: 500 }}>{p.name}</div>
+            {p.showVariants && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 3, marginBottom: p.showTransparency ? 8 : 0 }}>
+                {VARIANT_LIGHTNESS.map(({ key }) => (
+                  <div key={key} title={key} style={{ height: 22, borderRadius: 3, backgroundColor: p.variants[key], border: "0.5px solid var(--ds-border)" }} />
+                ))}
+              </div>
+            )}
+            {p.showTransparency && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(9,1fr)", gap: 2 }}>
+                {[90,80,70,60,50,40,30,20,10].map(o => (
+                  <div key={o} title={o + "%"} style={{ height: 18, borderRadius: 3, backgroundImage: "linear-gradient(45deg,#ccc 25%,transparent 25%),linear-gradient(-45deg,#ccc 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#ccc 75%),linear-gradient(-45deg,transparent 75%,#ccc 75%)", backgroundSize: "8px 8px", backgroundPosition: "0 0,0 4px,4px -4px,-4px 0", position: "relative" }}>
+                    <div style={{ position: "absolute", inset: 0, borderRadius: 3, backgroundColor: "hsla(" + p.hue + "," + p.saturation + "%," + p.lightness + "%," + (o / 100) + ")" }} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+        {(state.colors.whiteTransparency || state.colors.blackTransparency) && (
+          <div style={{ background: "var(--ds-bg-card)", border: "0.5px solid var(--ds-border-light)", borderRadius: "var(--ds-radius-lg)", padding: 14 }}>
+            <div style={{ fontSize: 11, color: "var(--ds-text-3)", marginBottom: 6 }}>B&W transparencies</div>
+            {state.colors.whiteTransparency && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(9,1fr)", gap: 2, marginBottom: state.colors.blackTransparency ? 6 : 0 }}>
+                {[90,80,70,60,50,40,30,20,10].map(o => (
+                  <div key={o} title={"white " + o + "%"} style={{ height: 18, borderRadius: 3, background: "#9ca3af", position: "relative" }}>
+                    <div style={{ position: "absolute", inset: 0, borderRadius: 3, backgroundColor: "rgba(255,255,255," + (o / 100) + ")" }} />
+                  </div>
+                ))}
+              </div>
+            )}
+            {state.colors.blackTransparency && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(9,1fr)", gap: 2 }}>
+                {[90,80,70,60,50,40,30,20,10].map(o => (
+                  <div key={o} title={"black " + o + "%"} style={{ height: 18, borderRadius: 3, background: "#9ca3af", position: "relative" }}>
+                    <div style={{ position: "absolute", inset: 0, borderRadius: 3, backgroundColor: "rgba(0,0,0," + (o / 100) + ")" }} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+
+    {/* TYPOGRAPHY — headings + text sizes */}
+    <div className="ds-preview-section">
+      <div className="ds-preview-section-title">Typography</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div style={{ background: "var(--ds-bg-card)", padding: 20, borderRadius: "var(--ds-radius-lg)", border: "0.5px solid var(--ds-border-light)" }}>
+          <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".5px", color: "var(--ds-text-3)", marginBottom: 12 }}>Headings</div>
+          {["h1","h2","h3","h4","h5","h6"].map((h) => (
+            <div key={h} style={{ fontSize: Math.min(t.headings[h]?.desktop || 16, 52), fontWeight: 700, lineHeight: t.lineHeightHeading, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {h.toUpperCase()} — {t.headings[h]?.desktop}px
+            </div>
+          ))}
+        </div>
+        <div style={{ background: "var(--ds-bg-card)", padding: 20, borderRadius: "var(--ds-radius-lg)", border: "0.5px solid var(--ds-border-light)" }}>
+          <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".5px", color: "var(--ds-text-3)", marginBottom: 12 }}>Text sizes</div>
+          {TEXT_KEYS.map((k) => (
+            <div key={k} style={{ fontSize: Math.min(t.texts[k]?.desktop || 14, 22), lineHeight: t.lineHeightBody, marginBottom: 3, color: k === "m" ? "var(--ds-text)" : "var(--ds-text-2)" }}>
+              text-{k}: {t.texts[k]?.desktop}px
+            </div>
+          ))}
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: "0.5px solid var(--ds-border-light)", fontSize: 11, color: "var(--ds-text-3)" }}>
+            LH heading: {t.lineHeightHeading} · body: {t.lineHeightBody}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* SPACING */}
+    <div className="ds-preview-section">
+      <div className="ds-preview-section-title">Spacing</div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 10, flexWrap: "wrap", background: "var(--ds-bg-card)", padding: 20, borderRadius: "var(--ds-radius-lg)", border: "0.5px solid var(--ds-border-light)" }}>
+        {SPACE_KEYS.map((k) => (<div key={k} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+          <div style={{ width: 40, height: Math.max(6, (sp.values[k]?.desktop || 0) * 1.4), background: "var(--ds-border)", border: "0.5px dashed var(--ds-text-3)", borderRadius: 4 }} />
+          <div style={{ fontSize: 10, color: "var(--ds-text-3)" }}>{k === "section" ? "sect." : k}</div>
+          <div style={{ fontSize: 10, fontWeight: 600, color: "var(--ds-primary)" }}>{sp.values[k]?.desktop}px</div>
+        </div>))}
+      </div>
+    </div>
+
+    {/* GAPS */}
+    <div className="ds-preview-section">
+      <div className="ds-preview-section-title">Gaps</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
+        {[["--grid-gap", state.gaps.gridGap], ["--content-gap", state.gaps.contentGap], ["--container-gap", state.gaps.containerGap]].map(([vn, val]) => (
+          <div key={vn} style={{ background: "var(--ds-bg-card)", border: "0.5px solid var(--ds-border-light)", borderRadius: "var(--ds-radius)", padding: "12px 14px" }}>
+            <div style={{ fontFamily: "monospace", fontSize: 11, color: "var(--ds-primary)", marginBottom: 4 }}>{vn}</div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: "var(--ds-text)" }}>{val || "—"}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    {/* BORDER RADIUS */}
+    <div className="ds-preview-section">
+      <div className="ds-preview-section-title">Border Radius</div>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", background: "var(--ds-bg-card)", padding: 20, borderRadius: "var(--ds-radius-lg)", border: "0.5px solid var(--ds-border-light)" }}>
+        {RADIUS_KEYS.map((k) => (
+          <div key={k} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+            <div style={{ width: 60, height: 40, background: "var(--ds-border-light)", border: "0.5px solid var(--ds-text-3)", borderRadius: r.values[k] || 0 }} />
+            <div style={{ fontSize: 10, color: "var(--ds-text-3)" }}>{k}</div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: "var(--ds-primary)" }}>{r.values[k]}px</div>
+          </div>
+        ))}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+          <div style={{ width: 40, height: 40, background: "var(--ds-border-light)", border: "0.5px solid var(--ds-text-3)", borderRadius: r.circle }} />
+          <div style={{ fontSize: 10, color: "var(--ds-text-3)" }}>circle</div>
+          <div style={{ fontSize: 10, fontWeight: 600, color: "var(--ds-primary)" }}>{r.circle}px</div>
+        </div>
+      </div>
+    </div>
+
+    {/* CSS OUTPUT */}
+    <div className="ds-preview-section">
+      <div className="ds-code-header">
+        <div className="ds-tab-bar">
+          <button className={"ds-tab" + (tab === "importer" ? " active" : "")} onClick={() => setTab("importer")}>Framework Importer</button>
+          <button className={"ds-tab" + (tab === "custom" ? " active" : "")} onClick={() => setTab("custom")}>Custom Code</button>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button className="ds-copy-btn" onClick={share}>{shared ? "✓ URL copied!" : "Share ↗"}</button>
+          <button className="ds-copy-btn" onClick={copy}>{copied === tab ? "✓ Copied!" : "Copy all"}</button>
+        </div>
+      </div>
+      <div className="ds-code-block">{active}</div>
+      <div className="ds-section-chips">
+        {CHIPS[tab].map(name => (
+          <button key={name} className={"ds-section-chip" + (chipCopied === name ? " copied" : "")} onClick={() => copyChip(name)}>
+            {chipCopied === name ? "✓ " + name : name}
+          </button>
+        ))}
+      </div>
+    </div>
+    </>}
+  </div>);
+}
+
+/* ================================================================
+   STEP 9: EXPORT
+   ================================================================ */
+function StepExport() {
+  const { state, dispatch } = useDSContext();
+  const [status, setStatus] = useState(null);
+  const warnings = [];
+  if (!state.layoutMode) warnings.push({ msg: "Select a layout mode in Step 1", step: 1 });
+  if (!state.colors.palettes.length) warnings.push({ msg: "Add at least one color palette in Step 4", step: 4 });
+
+  const dl = (generator, filenameField, fallback, mime) => {
+    try {
+      const content = generator(state);
+      const fn = state[filenameField] || fallback;
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = fn;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setStatus({ type: "ok", file: fn }); setTimeout(() => setStatus(null), 4000);
+    } catch (e) { setStatus({ type: "error", msg: e.message }); }
+  };
+
+  const CARDS = [
+    {
+      title: "Variables JSON",
+      desc: "Todos los tokens: spacing, tipografía, gaps y radius.",
+      sub: "Bricks → Style Manager → Variables → Import",
+      field: "exportVariablesFilename", fallback: "bricksmate-variables.json",
+      gen: generateVariablesJSON, mime: "application/json", label: "↓ Variables JSON",
+    },
+    {
+      title: "Color Palette JSON",
+      desc: "Swatches de color para el selector de colores del editor.",
+      sub: "Bricks → Style Manager → Color Palettes → Import",
+      field: "exportPaletteFilename", fallback: "bricksmate-palette.json",
+      gen: generateColorPaletteJSON, mime: "application/json", label: "↓ Palette JSON",
+      disabled: !state.colors.palettes.length,
+    },
+    {
+      title: "Framework CSS",
+      desc: "CSS base: aplica variables a body, headings y sections.",
+      sub: "Bricks → Settings → Custom Code → CSS (head)",
+      field: "exportFrameworkFilename", fallback: "bricksmate-framework.css",
+      gen: generateFrameworkCSS, mime: "text/css", label: "↓ Framework CSS",
+    },
+  ];
+
+  return (<div>
+    {warnings.map((w, i) => <div key={i} className="ds-warning" onClick={() => dispatch({ type: "SET_STEP", payload: w.step })}>⚠ {w.msg}</div>)}
+    <div className="ds-form-group" style={{ marginBottom: 20 }}>
+      <label>Variable prefix <span style={{ fontWeight: 400, color: "var(--ds-text-3)" }}>(optional)</span></label>
+      <input className={"ds-input" + (state.varPrefix && !/^[a-z][a-z0-9-]*$/.test(state.varPrefix) ? " ds-input-error" : "")} value={state.varPrefix} placeholder="e.g. ds, brand, acme" onChange={(e) => dispatch({ type: "SET_FIELD", field: "varPrefix", value: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} />
+      <div className="ds-helper">{state.varPrefix ? "--" + state.varPrefix + "-space-m, --" + state.varPrefix + "-primary, ..." : "Leave empty for default naming: --space-m, --primary, ..."}</div>
+    </div>
+    <div className="ds-export-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+      {CARDS.map(c => (
+        <div key={c.field} className="ds-export-file-card">
+          <h4>{c.title}</h4>
+          <p>{c.desc}</p>
+          <div style={{ fontSize: 11, color: "var(--ds-text-3)", marginBottom: 14, fontFamily: "monospace" }}>{c.sub}</div>
+          <div className="ds-form-group"><label style={{ fontSize: 12 }}>Filename</label><input className="ds-input ds-input-sm" value={state[c.field] || c.fallback} onChange={(e) => dispatch({ type: "SET_FIELD", field: c.field, value: e.target.value })} /></div>
+          <button className="ds-download-btn" onClick={() => dl(c.gen, c.field, c.fallback, c.mime)} disabled={warnings.length > 0 || c.disabled}>{c.label}</button>
+        </div>
+      ))}
+    </div>
+    {status?.type === "ok"    && <div className="ds-status ok">✓ {status.file} descargado correctamente</div>}
+    {status?.type === "error" && <div className="ds-status" style={{ background: "rgba(220,53,69,.08)", color: "var(--ds-error)", border: "1px solid var(--ds-error)" }}>⚠ Error: {status.msg}</div>}
+  </div>);
+}
+
+/* ================================================================
+   ROUTER + APP
+   ================================================================ */
+function StepContent() {
+  const { state } = useDSContext();
+  const step = STEPS.find((s) => s.id === state.currentStep);
+  const C = [null, StepLayout, StepSpacing, StepSectionSpacing, StepTypography, StepColors, StepGaps, StepRadius, StepButtons, StepPreview, StepExport][state.currentStep];
+  return (<div className="ds-content">
+    <div className="ds-content-header"><h2>{step.label}</h2><p>{DESCS[step.id]}</p></div>
+    <div className="ds-content-body">{C && <C />}</div>
+  </div>);
+}
+
+function SystemCard({ sys, onOpen, onDuplicate, onDelete, onRename }) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(sys.name);
+  useEffect(() => { setName(sys.name); }, [sys.name]);
+  const doc = sys.doc || {};
+  const palettes = doc.colors?.palettes || [];
+  const commit = () => { const n = name.trim() || sys.name; setName(n); setEditing(false); if (n !== sys.name) onRename(sys.id, n); };
+  return (<div className="ds-sys-card">
+    <div className="ds-sys-swatches" onClick={() => onOpen(sys.id)}>
+      {palettes.length ? palettes.slice(0, 8).map((p, i) => <div key={i} style={{ background: "hsl(" + p.hue + "," + p.saturation + "%," + p.lightness + "%)" }} />) : <div style={{ background: "var(--ds-border)" }} />}
+    </div>
+    <div className="ds-sys-body">
+      {editing
+        ? <input className="ds-input ds-input-sm" autoFocus value={name} onChange={(e) => setName(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setName(sys.name); setEditing(false); } }} />
+        : <h3 className="ds-sys-name" onClick={() => setEditing(true)} title="Click to rename">{sys.name}</h3>}
+      <div className="ds-sys-meta">{palettes.length} color{palettes.length === 1 ? "" : "s"} · scale {doc.typography?.headingScale ?? "—"} · {fmtDate(sys.updatedAt)}</div>
+    </div>
+    <div className="ds-sys-actions">
+      <button className="ds-btn ds-btn-primary ds-btn-sm" onClick={() => onOpen(sys.id)}>Open</button>
+      <button className="ds-btn ds-btn-sm" onClick={() => onDuplicate(sys.id)}>Duplicate</button>
+      <button className="ds-btn ds-btn-sm ds-btn-danger" onClick={() => onDelete(sys.id)} title="Delete">✕</button>
+    </div>
+  </div>);
+}
+
+function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, onDelete, onRename }) {
+  const systems = library.systems;
+  return (<>
+    <header className="ds-header">
+      <div className="ds-header-icon">◈</div>
+      <div><h1>Design System Generator</h1><p>Your saved design systems</p></div>
+      <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode" style={{ marginLeft: "auto" }}><ThemeIcon dark={darkMode} /></button>
+    </header>
+    <div className="ds-dash">
+      <div className="ds-dash-head">
+        <div><h2 className="ds-dash-title">My design systems</h2><p className="ds-dash-sub">{systems.length} saved system{systems.length === 1 ? "" : "s"}</p></div>
+        <button className="ds-btn ds-btn-primary" onClick={onNew}>+ New system</button>
+      </div>
+      {systems.length === 0
+        ? <div className="ds-dash-empty">
+            <div style={{ fontSize: 34, marginBottom: 10, color: "var(--ds-text-3)" }}>✦</div>
+            <h3 style={{ fontSize: 16, marginBottom: 4 }}>No systems yet</h3>
+            <p style={{ fontSize: 13, color: "var(--ds-text-2)", marginBottom: 16 }}>Create your first design system to get started.</p>
+            <button className="ds-btn ds-btn-primary" onClick={onNew}>+ New system</button>
+          </div>
+        : <div className="ds-dash-grid">
+            {systems.map((s) => <SystemCard key={s.id} sys={s} onOpen={onOpen} onDuplicate={onDuplicate} onDelete={onDelete} onRename={onRename} />)}
+          </div>}
+    </div>
+  </>);
+}
+
+export default function App() {
+  const [darkMode, setDarkMode] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches);
+  const toggleDark = () => setDarkMode((d) => !d);
+  const [library, setLibrary] = useState(loadLibrary);
+  const [view, setView] = useState("dashboard");
+  const [currentId, setCurrentId] = useState(null);
+  const [state, dispatch] = useReducer(reducer, initialState);
+  const [dirty, setDirty] = useState(false);
+  const skipSave = useRef(false);
+
+  useEffect(() => { document.documentElement.setAttribute("data-theme", darkMode ? "dark" : "light"); }, [darkMode]);
+
+  // Shared link (URL hash) → crea un sistema y lo abre
+  useEffect(() => {
+    try {
+      const fromHash = hashToState(window.location.hash);
+      if (fromHash) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        const doc = { ...initialState, ...fromHash };
+        const sys = { id: "sys_" + randId(), name: "Shared system", createdAt: nowISO(), updatedAt: nowISO(), doc };
+        setLibrary((prev) => { const lib = { ...prev, systems: [...prev.systems, sys] }; persistLibrary(lib); return lib; });
+        skipSave.current = true;
+        dispatch({ type: "LOAD_DOC", payload: doc });
+        setCurrentId(sys.id); setView("editor"); setDirty(false);
+      }
+    } catch {}
+  }, []);
+
+  // Guardado del documento activo en su entrada de la biblioteca
+  const saveDoc = () => {
+    setLibrary((prev) => {
+      const lib = { ...prev, systems: prev.systems.map((s) => s.id === currentId ? { ...s, doc: state, updatedAt: nowISO() } : s) };
+      persistLibrary(lib); return lib;
+    });
+    setDirty(false);
+  };
+
+  // Reacciona a cambios del doc activo: auto-guarda o marca como "sin guardar"
+  useEffect(() => {
+    if (view !== "editor" || currentId == null) return;
+    if (skipSave.current) { skipSave.current = false; return; }
+    if (library.autoSave) saveDoc(); else setDirty(true);
+  }, [state]);
+
+  const openSystem = (id) => {
+    const sys = library.systems.find((s) => s.id === id);
+    if (!sys) return;
+    skipSave.current = true;
+    // Merge con initialState → rellena campos nuevos (buttons, etc.) en docs antiguos
+    dispatch({ type: "LOAD_DOC", payload: { ...initialState, ...sys.doc } });
+    setCurrentId(id); setView("editor"); setDirty(false);
+  };
+  const createSystem = () => {
+    const doc = JSON.parse(JSON.stringify(initialState));
+    const sys = { id: "sys_" + randId(), name: "Design system " + (library.systems.length + 1), createdAt: nowISO(), updatedAt: nowISO(), doc };
+    const lib = { ...library, systems: [...library.systems, sys] };
+    setLibrary(lib); persistLibrary(lib);
+    skipSave.current = true;
+    dispatch({ type: "LOAD_DOC", payload: doc });
+    setCurrentId(sys.id); setView("editor"); setDirty(false);
+  };
+  const duplicateSystem = (id) => {
+    const sys = library.systems.find((s) => s.id === id);
+    if (!sys) return;
+    const copy = { id: "sys_" + randId(), name: sys.name + " (copy)", createdAt: nowISO(), updatedAt: nowISO(), doc: JSON.parse(JSON.stringify(sys.doc)) };
+    const lib = { ...library, systems: [...library.systems, copy] };
+    setLibrary(lib); persistLibrary(lib);
+  };
+  const deleteSystem = (id) => {
+    const sys = library.systems.find((s) => s.id === id);
+    if (!sys || !window.confirm('Delete "' + sys.name + '"? This cannot be undone.')) return;
+    const lib = { ...library, systems: library.systems.filter((s) => s.id !== id) };
+    setLibrary(lib); persistLibrary(lib);
+  };
+  const renameSystem = (id, name) => {
+    const lib = { ...library, systems: library.systems.map((s) => s.id === id ? { ...s, name, updatedAt: nowISO() } : s) };
+    setLibrary(lib); persistLibrary(lib);
+  };
+  const toggleAutoSave = () => {
+    const next = !library.autoSave;
+    const lib = { ...library, autoSave: next };
+    setLibrary(lib); persistLibrary(lib);
+    if (next && dirty) { // al activar, guarda lo pendiente
+      setLibrary((prev) => { const l = { ...prev, systems: prev.systems.map((s) => s.id === currentId ? { ...s, doc: state, updatedAt: nowISO() } : s) }; persistLibrary(l); return l; });
+      setDirty(false);
+    }
+  };
+  const backToDashboard = () => {
+    if (!library.autoSave && dirty) {
+      const r = window.confirm("You have unsaved changes. Save before leaving?");
+      if (r) saveDoc();
+    }
+    setView("dashboard"); setCurrentId(null); setDirty(false);
+  };
+
+  const currentSystem = library.systems.find((s) => s.id === currentId);
+  const value = useMemo(() => ({ state, dispatch, darkMode, toggleDark }), [state, darkMode]);
+
+  return (<DSContext.Provider value={value}>
+    <style>{css_styles}</style>
+    <div className="ds-app" data-theme={darkMode ? "dark" : "light"}>
+      {view === "dashboard"
+        ? <Dashboard library={library} darkMode={darkMode} toggleDark={toggleDark} onOpen={openSystem} onNew={createSystem} onDuplicate={duplicateSystem} onDelete={deleteSystem} onRename={renameSystem} />
+        : <>
+            <EditorHeader name={currentSystem?.name || "Untitled"} onRename={(n) => renameSystem(currentId, n)} onBack={backToDashboard} autoSave={library.autoSave} onToggleAutoSave={toggleAutoSave} dirty={dirty} onSave={saveDoc} darkMode={darkMode} toggleDark={toggleDark} />
+            <div className="ds-main"><Sidebar /><StepContent /></div>
+            <Footer />
+          </>}
+    </div>
+  </DSContext.Provider>);
+}
