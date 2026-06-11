@@ -213,6 +213,7 @@ function loadState() {
    ================================================================ */
 const LIB_KEY = "bricksmate-dsg-library";
 const OLD_KEY = "bricksmate-dsg";
+const SESSION_KEY = "bricksmate-dsg-session"; // id del sistema abierto → vuelve al editor tras refrescar
 const nowISO = () => new Date().toISOString();
 function fmtDate(iso) {
   try {
@@ -1998,7 +1999,7 @@ export default function App() {
 
   useEffect(() => { document.documentElement.setAttribute("data-theme", darkMode ? "dark" : "light"); }, [darkMode]);
 
-  // Shared link (URL hash) → crea un sistema y lo abre
+  // Al montar: shared link (hash) tiene prioridad; si no, restaura la sesión (sistema que estaba abierto)
   useEffect(() => {
     try {
       const fromHash = hashToState(window.location.hash);
@@ -2010,6 +2011,18 @@ export default function App() {
         skipSave.current = true;
         dispatch({ type: "LOAD_DOC", payload: doc });
         setCurrentId(sys.id); setView("editor"); setDirty(false);
+        return;
+      }
+      const sid = localStorage.getItem(SESSION_KEY);
+      if (sid) {
+        const sys = library.systems.find((s) => s.id === sid);
+        if (sys) {
+          skipSave.current = true;
+          dispatch({ type: "LOAD_DOC", payload: { ...initialState, ...sys.doc } });
+          setCurrentId(sid); setView("editor"); setDirty(false);
+        } else {
+          localStorage.removeItem(SESSION_KEY);
+        }
       }
     } catch {}
   }, []);
@@ -2038,6 +2051,7 @@ export default function App() {
     // Merge con initialState → rellena campos nuevos (buttons, etc.) en docs antiguos
     dispatch({ type: "LOAD_DOC", payload: { ...initialState, ...sys.doc } });
     setCurrentId(id); setView("editor"); setDirty(false);
+    try { localStorage.setItem(SESSION_KEY, id); } catch {}
   };
   const createSystem = () => {
     const doc = JSON.parse(JSON.stringify(initialState));
@@ -2047,6 +2061,7 @@ export default function App() {
     skipSave.current = true;
     dispatch({ type: "LOAD_DOC", payload: doc });
     setCurrentId(sys.id); setView("editor"); setDirty(false);
+    try { localStorage.setItem(SESSION_KEY, sys.id); } catch {}
   };
   const duplicateSystem = (id) => {
     const sys = library.systems.find((s) => s.id === id);
@@ -2082,6 +2097,7 @@ export default function App() {
       if (r) saveDoc();
     }
     setView("dashboard"); setCurrentId(null); setDirty(false);
+    try { localStorage.removeItem(SESSION_KEY); } catch {}
   };
 
   // Atajos de teclado: Cmd/Ctrl+S guarda · ←/→ navega entre pasos
