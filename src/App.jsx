@@ -193,20 +193,6 @@ const initialState = {
 // Init radius
 RADIUS_KEYS.forEach((k) => { initialState.radius.values[k] = Math.round(8 * RADIUS_MULTS[k]); });
 
-// Restore from URL hash (shared link) → localStorage → initialState
-function loadState() {
-  try {
-    const fromHash = hashToState(window.location.hash);
-    if (fromHash) {
-      // Limpia el hash de la URL sin crear entrada en el historial
-      window.history.replaceState(null, '', window.location.pathname + window.location.search);
-      return { ...initialState, ...fromHash };
-    }
-    const saved = localStorage.getItem("bricksmate-dsg");
-    if (!saved) return initialState;
-    return { ...initialState, ...JSON.parse(saved) };
-  } catch { return initialState; }
-}
 
 /* ================================================================
    LIBRARY — múltiples sistemas de diseño guardados
@@ -463,9 +449,6 @@ const css_styles = `
   .ds-trans-box{height:40px;border-radius:5px;background-image:linear-gradient(45deg,#ccc 25%,transparent 25%),linear-gradient(-45deg,#ccc 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#ccc 75%),linear-gradient(-45deg,transparent 75%,#ccc 75%);background-size:10px 10px;background-position:0 0,0 5px,5px -5px,-5px 0;position:relative;overflow:hidden}
   [data-theme="dark"] .ds-trans-box{background-image:linear-gradient(45deg,#555 25%,transparent 25%),linear-gradient(-45deg,#555 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#555 75%),linear-gradient(-45deg,transparent 75%,#555 75%)}
   .ds-trans-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--ds-text);text-shadow:0 1px 2px rgba(0,0,0,.3)}
-  .ds-code-block{background:var(--ds-bg-card);color:var(--ds-text-2);padding:18px;border-radius:var(--ds-radius-lg);font-family:'SF Mono',Consolas,'Courier New',monospace;font-size:12px;line-height:1.7;overflow:auto;max-height:380px;white-space:pre;tab-size:2;border:1px solid var(--ds-border-light)}
-  .ds-code-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-  .ds-copy-btn{padding:5px 12px;background:var(--ds-bg-card);border:1px solid var(--ds-border);border-radius:var(--ds-radius);font-size:12px;cursor:pointer;transition:all .15s;color:var(--ds-text);font-family:inherit;box-shadow:var(--ds-shadow)} .ds-copy-btn:hover{background:var(--ds-bg)}
   .ds-preview-section{margin-bottom:24px} .ds-preview-section-title{font-size:14px;font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--ds-border-light)}
   .ds-export-card{background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:22px;box-shadow:var(--ds-shadow)}
   .ds-download-btn{width:100%;padding:11px 24px;background:var(--ds-primary);color:hsl(0,0%,98%);border:none;border-radius:var(--ds-radius);font-size:14px;font-weight:500;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px;font-family:inherit;box-shadow:0 1px 2px rgba(0,0,0,.1)}
@@ -477,9 +460,6 @@ const css_styles = `
   .ds-export-file-card h4{font-size:14px;font-weight:600;margin-bottom:4px}
   .ds-export-file-card>p{font-size:12px;color:var(--ds-text-2);margin-bottom:14px;line-height:1.5}
   .ds-export-file-card .ds-download-btn{font-size:13px;padding:9px 14px;margin-top:auto}
-  .ds-tab-bar{display:flex;gap:0;flex:1;border-bottom:1px solid var(--ds-border-light)}
-  .ds-tab{padding:6px 14px;font-size:12px;font-weight:500;border:none;background:transparent;cursor:pointer;color:var(--ds-text-2);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;font-family:inherit}
-  .ds-tab.active{color:var(--ds-primary);border-bottom-color:var(--ds-primary)} .ds-tab:hover:not(.active){color:var(--ds-text)}
   .ds-resize-handle{position:absolute;top:0;bottom:0;right:-18px;width:18px;display:flex;align-items:center;justify-content:center;cursor:ew-resize;touch-action:none}
   .ds-resize-handle::before{content:'';width:5px;height:46px;border-radius:3px;background:var(--ds-border);transition:background .15s}
   .ds-resize-handle:hover::before{background:var(--ds-primary)}
@@ -524,9 +504,6 @@ const css_styles = `
   [data-theme="dark"] .ds-val-warn{background:rgba(234,179,8,.1);color:hsl(38,92%,68%)}
   .ds-val-error{background:rgba(239,68,68,.06);color:var(--ds-error);border:1px solid rgba(239,68,68,.2)} .ds-val-error .ds-val-dot{background:var(--ds-error)}
   .ds-val-info{background:var(--ds-border-light);color:var(--ds-text);border:1px solid var(--ds-border)} .ds-val-info .ds-val-dot{background:var(--ds-text-2)}
-  .ds-section-chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
-  .ds-section-chip{padding:4px 10px;font-size:11px;border:1px solid var(--ds-border);border-radius:20px;background:var(--ds-bg-card);color:var(--ds-text-2);cursor:pointer;transition:all .15s;font-family:monospace;box-shadow:var(--ds-shadow)}
-  .ds-section-chip:hover{background:var(--ds-bg);border-color:var(--ds-primary);color:var(--ds-primary)} .ds-section-chip.copied{background:rgba(34,197,94,.06);border-color:var(--ds-success);color:var(--ds-success)}
   ::-webkit-scrollbar{width:5px} ::-webkit-scrollbar-track{background:transparent} ::-webkit-scrollbar-thumb{background:var(--ds-border-light);border-radius:3px}
 
   /* ===== Accent (violeta, contenido) ===== */
@@ -536,10 +513,7 @@ const css_styles = `
   [data-theme="dark"] .ds-input:focus,[data-theme="dark"] .ds-space-input:focus{box-shadow:0 0 0 3px var(--ds-accent-ring)}
   .ds-input-error:focus{border-color:var(--ds-error)!important;box-shadow:0 0 0 3px rgba(239,68,68,.18)!important}
   .ds-toggle-track.on{background:var(--ds-accent)}
-  .ds-tab.active{color:var(--ds-accent);border-bottom-color:var(--ds-accent)} .ds-tab:hover:not(.active){color:var(--ds-text)}
   .ds-palette-header input[type="text"]:focus{border-bottom-color:var(--ds-accent)}
-  .ds-section-chip:hover{border-color:var(--ds-accent);color:var(--ds-accent)}
-  .ds-section-chip.copied{background:var(--ds-accent-light);border-color:var(--ds-accent);color:var(--ds-accent)}
 
   /* ===== Tier 1: motion & micro-interacciones ===== */
   @keyframes ds-step-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
@@ -550,7 +524,7 @@ const css_styles = `
   .ds-mode-card:hover,.ds-export-file-card:hover,.ds-sys-card:hover{transform:translateY(-3px)}
   .ds-grid-chip{transition:transform .15s,border-color .15s,color .15s}
   .ds-grid-chip:hover{transform:translateY(-1px);border-color:var(--ds-accent);color:var(--ds-accent)}
-  .ds-btn:active:not(:disabled),.ds-btn-primary:active:not(:disabled),.ds-download-btn:active:not(:disabled),.ds-copy-btn:active{transform:scale(.97)}
+  .ds-btn:active:not(:disabled),.ds-btn-primary:active:not(:disabled),.ds-download-btn:active:not(:disabled){transform:scale(.97)}
   .ds-step-item{transition:background .15s,transform .12s} .ds-step-item:active{transform:translateX(1px)}
 
   /* ===== Progress bar ===== */
@@ -1101,116 +1075,9 @@ function StepButtons() {
 }
 
 /* ================================================================
-   URL HASH / PREFIX / SECTION UTILS
-   ================================================================ */
-// Serializa el state al hash de la URL (excluye currentStep)
-function stateToHash(state) {
-  try { const { currentStep, ...rest } = state; return '#' + btoa(JSON.stringify(rest)); } catch { return ''; }
-}
-function hashToState(hash) {
-  try { if (!hash || hash.length < 2) return null; return JSON.parse(atob(hash.slice(1))); } catch { return null; }
-}
-
-// Aplica un prefijo a todas las custom properties del CSS generado
-function applyPrefix(css, prefix) {
-  if (!prefix) return css;
-  // Declaraciones en :root: "  --varname:" → "  --PREFIX-varname:"
-  css = css.replace(/^([ \t]+)(--)([\w-]+)(\s*:)/gm, (_, sp, __, name, colon) => sp + '--' + prefix + '-' + name + colon);
-  // Referencias: "var(--varname" → "var(--PREFIX-varname" (cubre fallbacks también)
-  css = css.replace(/var\(--([\w-]+)/g, (_, name) => 'var(--' + prefix + '-' + name);
-  return css;
-}
-
-// Extrae una sección del CSS generado (entre /* — Name — */ markers) envuelta en :root {}
-function extractSection(css, sectionName) {
-  const lines = css.split('\n');
-  let capturing = false;
-  const result = [':root {'];
-  for (const line of lines) {
-    if (line.includes('/* \u2014') && line.toLowerCase().includes(sectionName.toLowerCase())) { capturing = true; }
-    else if (capturing && line.includes('/* \u2014')) { break; }
-    if (capturing) result.push(line);
-  }
-  result.push('}');
-  return result.length > 2 ? result.join('\n') : '';
-}
-
-/* ================================================================
    CSS GENERATORS
    ================================================================ */
 const gapVal = (v) => /^\d+$/.test(v) ? v + "px" : v;
-
-function generateImporterCSS(state) {
-  const { typography, colors, gaps, radius, includeUtilities } = state;
-  const prefix = state.varPrefix || "";
-  const ts = new Date().toLocaleString();
-  let css = "/* ================================================\n * BRICKSMATE FRAMEWORK IMPORTER\n * Static tokens: colors, line-heights, gaps, radius\n * Paste into: Bricks → Framework Importer\n * Generated: " + ts + "\n * ================================================ */\n\n:root {\n\n";
-  css += "  /* — Colors ——————————————————————————————— */\n";
-  colors.palettes.forEach((p) => {
-    const slug = slugify(p.name);
-    css += "  --" + slug + ": hsl(" + p.hue + ", " + p.saturation + "%, " + p.lightness + "%);\n";
-    if (p.showVariants) { VARIANT_LIGHTNESS.forEach(({ key }) => { if (p.variants[key]) css += "  --" + slug + "-" + key + ": " + p.variants[key] + ";\n"; }); }
-    if (p.showTransparency) { for (let i = 90; i >= 10; i -= 10) css += "  --" + slug + "-" + i + ": hsla(" + p.hue + ", " + p.saturation + "%, " + p.lightness + "%, " + (i / 100) + ");\n"; }
-  });
-  if (colors.whiteTransparency) { for (let i = 90; i >= 10; i -= 10) css += "  --white-" + i + ": rgba(255, 255, 255, " + (i / 100) + ");\n"; }
-  if (colors.blackTransparency) { for (let i = 90; i >= 10; i -= 10) css += "  --black-" + i + ": rgba(0, 0, 0, " + (i / 100) + ");\n"; }
-  css += "\n  /* — Typography (static) ————————————————————— */\n";
-  css += "  --line-height-heading: " + typography.lineHeightHeading + ";\n";
-  css += "  --line-height-body: " + typography.lineHeightBody + ";\n";
-  { const st = state.styles || {};
-    css += "  --text-color: " + (st.textColor || '#1f2937') + ";\n";
-    css += "  --heading-color: " + (st.headingColor || '#111827') + ";\n";
-    css += "  --text-weight: " + (st.textWeight || 400) + ";\n";
-    css += "  --heading-weight: " + (st.headingWeight || 700) + ";\n";
-    css += "  --offset: " + (state.offset ?? 80) + "px;\n";
-  }
-  css += "\n  /* — Gaps ———————————————————————————————— */\n";
-  css += "  --grid-gap: " + gapVal(gaps.gridGap) + ";\n";
-  css += "  --content-gap: " + gapVal(gaps.contentGap) + ";\n";
-  css += "  --container-gap: " + gapVal(gaps.containerGap) + ";\n";
-  css += "\n  /* — Grid (columns + ratios) ————————————————— */\n";
-  GRID_COLS.forEach((n) => { css += "  --grid-" + n + ": " + gridValue(n) + ";\n"; });
-  GRID_RATIOS.forEach(([name, value]) => { css += "  --grid-" + name + ": " + value + ";\n"; });
-  css += "\n  /* — Border Radius —————————————————————————— */\n";
-  RADIUS_KEYS.forEach((k) => { css += "  --radius-" + k + ": " + (radius.values[k] || 0) + "px;\n"; });
-  css += "  --radius-circle: " + radius.circle + "px;\n";
-  css += "}\n\n/* — Base styles ———————————————————————————— */\n";
-  ["h1","h2","h3","h4","h5","h6"].forEach((h) => { css += h + " { font-size: var(--" + h + "); line-height: var(--line-height-heading); }\n"; });
-  if (includeUtilities) {
-    css += "\n/* — Utilities ————————————————————————————— */\n";
-    SPACE_KEYS.filter((k) => k !== "section").forEach((k) => { css += ".gap-" + k + " { gap: var(--space-" + k + "); }\n"; });
-    RADIUS_KEYS.forEach((k) => { css += ".rounded-" + k + " { border-radius: var(--radius-" + k + "); }\n"; });
-    css += ".rounded-full { border-radius: var(--radius-circle); }\n";
-  }
-  return applyPrefix(css, prefix);
-}
-
-function generateCustomCodeCSS(state) {
-  const { layoutMode, minViewport, maxViewport, spacing, sectionSpacing, typography } = state;
-  const prefix = state.varPrefix || "";
-  const ts = new Date().toLocaleString();
-  let css = "/* ================================================\n * BRICKSMATE CUSTOM CODE\n * Fluid tokens: spacing + typography (clamp)\n * Paste into: Bricks → Settings → Custom Code → CSS\n * Layout: " + (layoutMode === "fixed" ? "Fixed " + maxViewport + "px" : "Full-width") + " | Range: " + minViewport + "→" + maxViewport + "px\n * Generated: " + ts + "\n * ================================================ */\n\n:root {\n\n";
-  css += "  /* — Spacing (fluid, rem) ——————————————————— */\n";
-  SPACE_KEYS.forEach((k) => {
-    const v = spacing.values[k]; if (!v) return;
-    css += "  --space-" + k + ": " + flRem(v.mobile, v.desktop, state) + ";\n";
-  });
-  css += "\n  /* — Section spacing (fluid, rem) —————————— */\n";
-  SPACE_KEYS.forEach((k) => {
-    const v = sectionSpacing.values[k]; if (!v) return;
-    css += "  --section-space-" + k + ": " + flRem(v.mobile, v.desktop, state) + ";\n";
-  });
-  css += "\n  /* — Gutter (fluid, rem) ———————————————————— */\n";
-  { const g = state.gutter || { mobile: 16, desktop: 64 }; css += "  --gutter: " + flRem(g.mobile, g.desktop, state) + ";\n"; }
-  css += "\n  /* — Typography (fluid, rem) ————————————————— */\n";
-  ["h1","h2","h3","h4","h5","h6"].forEach((h) => { const v = typography.headings[h]; if (!v) return; css += "  --" + h + ": " + flRem(v.mobile, v.desktop, state) + ";\n"; });
-  TEXT_KEYS.forEach((k) => { const v = typography.texts[k]; if (!v) return; css += "  --text-" + k + ": " + flRem(v.mobile, v.desktop, state) + ";\n"; });
-  css += "\n  /* — Line heights ——————————————————————— */\n";
-  css += "  --line-height-heading: " + typography.lineHeightHeading + ";\n";
-  css += "  --line-height-body: " + typography.lineHeightBody + ";\n";
-  css += "}\n";
-  return applyPrefix(css, prefix);
-}
 
 function generateVariablesJSON(state) {
   const prefix = state.varPrefix ? state.varPrefix + '-' : '';
@@ -1674,27 +1541,6 @@ function LandingPreview({ state }) {
 function StepPreview() {
   const { state } = useDSContext();
   const [view, setView] = useState("tokens");
-  const [tab, setTab] = useState("importer");
-  const [copied, setCopied] = useState(null);
-  const [chipCopied, setChipCopied] = useState(null);
-  const [shared, setShared] = useState(false);
-
-  // CSS computed directly — sin useMemo para garantizar reactividad total
-  let importerCSS, customCSS;
-  try { importerCSS = generateImporterCSS(state); } catch(e) { importerCSS = "/* Error: " + e.message + " */"; }
-  try { customCSS = generateCustomCodeCSS(state); } catch(e) { customCSS = "/* Error: " + e.message + " */"; }
-
-  const active = tab === "importer" ? importerCSS : customCSS;
-  const copy  = () => { navigator.clipboard.writeText(active).then(() => { setCopied(tab); setTimeout(() => setCopied(null), 2000); }); };
-  const share = () => {
-    const url = window.location.href.split('#')[0] + stateToHash(state);
-    navigator.clipboard.writeText(url).then(() => { setShared(true); setTimeout(() => setShared(false), 2000); });
-  };
-  const CHIPS = { importer: ["Colors", "Typography", "Gaps", "Radius"], custom: ["Spacing", "Typography"] };
-  const copyChip = (name) => {
-    const s = extractSection(active, name);
-    if (s) navigator.clipboard.writeText(s).then(() => { setChipCopied(name); setTimeout(() => setChipCopied(null), 2000); });
-  };
   const t = state.typography;
   const sp = state.spacing;
   const r = state.radius;
@@ -1828,27 +1674,6 @@ function StepPreview() {
       </div>
     </div>
 
-    {/* CSS OUTPUT */}
-    <div className="ds-preview-section">
-      <div className="ds-code-header">
-        <div className="ds-tab-bar">
-          <button className={"ds-tab" + (tab === "importer" ? " active" : "")} onClick={() => setTab("importer")}>Framework Importer</button>
-          <button className={"ds-tab" + (tab === "custom" ? " active" : "")} onClick={() => setTab("custom")}>Custom Code</button>
-        </div>
-        <div style={{ display: "flex", gap: 6 }}>
-          <button className="ds-copy-btn" onClick={share}>{shared ? "✓ URL copied!" : "Share ↗"}</button>
-          <button className="ds-copy-btn" onClick={copy}>{copied === tab ? "✓ Copied!" : "Copy all"}</button>
-        </div>
-      </div>
-      <div className="ds-code-block">{active}</div>
-      <div className="ds-section-chips">
-        {CHIPS[tab].map(name => (
-          <button key={name} className={"ds-section-chip" + (chipCopied === name ? " copied" : "")} onClick={() => copyChip(name)}>
-            {chipCopied === name ? "✓ " + name : name}
-          </button>
-        ))}
-      </div>
-    </div>
     </>}
   </div>);
 }
@@ -2032,20 +1857,9 @@ export default function App() {
 
   useEffect(() => { document.documentElement.setAttribute("data-theme", darkMode ? "dark" : "light"); }, [darkMode]);
 
-  // Al montar: shared link (hash) tiene prioridad; si no, restaura la sesión (sistema que estaba abierto)
+  // Al montar: restaura la sesión (sistema que estaba abierto antes de refrescar)
   useEffect(() => {
     try {
-      const fromHash = hashToState(window.location.hash);
-      if (fromHash) {
-        window.history.replaceState(null, "", window.location.pathname + window.location.search);
-        const doc = { ...initialState, ...fromHash };
-        const sys = { id: "sys_" + randId(), name: "Shared system", createdAt: nowISO(), updatedAt: nowISO(), doc };
-        setLibrary((prev) => { const lib = { ...prev, systems: [...prev.systems, sys] }; persistLibrary(lib); return lib; });
-        skipSave.current = true;
-        dispatch({ type: "LOAD_DOC", payload: doc });
-        setCurrentId(sys.id); setView("editor"); setDirty(false);
-        return;
-      }
       const sid = localStorage.getItem(SESSION_KEY);
       if (sid) {
         const sys = library.systems.find((s) => s.id === sid);
