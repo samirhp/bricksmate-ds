@@ -1923,7 +1923,7 @@ function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, 
   return (<>
     <header className="ds-header">
       <BrandMark />
-      <div><h1>Design System Generator</h1><p>Your saved design systems</p></div>
+      <div><h1>Design System Generator for Bricks Builder</h1><p>Your saved design systems</p></div>
       <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode" style={{ marginLeft: "auto" }}><ThemeIcon dark={darkMode} /></button>
     </header>
     <div className="ds-dash">
