@@ -367,19 +367,19 @@ const css_styles = `
     --ds-text:hsl(240,10%,3.9%); --ds-text-2:hsl(240,3.7%,46.1%); --ds-text-3:hsl(240,5%,64.9%);
     --ds-border:hsl(240,5.9%,90%); --ds-border-light:hsl(240,4.8%,95.5%);
     --ds-success:hsl(142,71%,38%); --ds-error:hsl(0,84%,55%);
-    --ds-accent:hsl(262,83%,58%); --ds-accent-hover:hsl(262,83%,50%); --ds-accent-light:hsl(262,83%,96%); --ds-accent-ring:hsla(262,83%,58%,.18);
+    --ds-accent:hsl(250,88%,66%); --ds-accent-hover:hsl(250,88%,58%); --ds-accent-light:hsl(250,100%,97%); --ds-accent-ring:hsla(250,88%,66%,.20);
     --ds-radius:8px; --ds-radius-lg:12px;
     --ds-shadow:0 1px 2px rgba(0,0,0,.05);
     --ds-shadow-md:0 1px 3px rgba(0,0,0,.08),0 1px 2px -1px rgba(0,0,0,.05);
   }
   [data-theme="dark"] {
-    /* Slate — dark azulado/frío */
-    --ds-primary:hsl(210,40%,98%); --ds-primary-hover:hsl(210,30%,88%); --ds-primary-light:hsl(217,33%,20%);
-    --ds-bg:hsl(222,24%,7%); --ds-bg-card:hsl(217,28%,14%);
-    --ds-text:hsl(210,40%,98%); --ds-text-2:hsl(215,20%,75%); --ds-text-3:hsl(215,16%,58%);
-    --ds-border:hsl(215,20%,32%); --ds-border-light:hsl(217,22%,22%);
+    /* Negro neutro (#000) + acento #765DF5 */
+    --ds-primary:hsl(0,0%,98%); --ds-primary-hover:hsl(0,0%,88%); --ds-primary-light:hsl(0,0%,18%);
+    --ds-bg:hsl(0,0%,0%); --ds-bg-card:hsl(0,0%,9%);
+    --ds-text:hsl(0,0%,98%); --ds-text-2:hsl(0,0%,70%); --ds-text-3:hsl(0,0%,50%);
+    --ds-border:hsl(0,0%,24%); --ds-border-light:hsl(0,0%,16%);
     --ds-success:hsl(142,69%,52%); --ds-error:hsl(0,84%,66%);
-    --ds-accent:hsl(262,90%,72%); --ds-accent-hover:hsl(262,90%,78%); --ds-accent-light:hsl(262,40%,20%); --ds-accent-ring:hsla(262,90%,72%,.22);
+    --ds-accent:hsl(250,88%,66%); --ds-accent-hover:hsl(250,88%,73%); --ds-accent-light:hsl(250,40%,18%); --ds-accent-ring:hsla(250,88%,66%,.25);
     --ds-shadow:0 1px 2px rgba(0,0,0,.6);
     --ds-shadow-md:0 2px 4px rgba(0,0,0,.7),0 1px 2px rgba(0,0,0,.5);
   }
@@ -409,11 +409,11 @@ const css_styles = `
   .ds-btn{padding:7px 14px;border:1px solid var(--ds-border);background:var(--ds-bg-card);color:var(--ds-text);border-radius:var(--ds-radius);font-size:13px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;font-family:inherit;box-shadow:var(--ds-shadow)}
   .ds-btn:hover:not(:disabled){background:var(--ds-bg)} .ds-btn:active:not(:disabled){transform:scale(.99)} .ds-btn:disabled{opacity:.45;cursor:not-allowed}
   .ds-btn-primary{background:var(--ds-primary);color:hsl(0,0%,98%);border-color:var(--ds-primary);box-shadow:0 1px 2px rgba(0,0,0,.1)} .ds-btn-primary:hover:not(:disabled){background:var(--ds-primary-hover);border-color:var(--ds-primary-hover)}
-  [data-theme="dark"] .ds-btn-primary,[data-theme="dark"] .ds-download-btn{color:hsl(240,10%,3.9%)}
+  [data-theme="dark"] .ds-btn-primary,[data-theme="dark"] .ds-download-btn{color:hsl(0,0%,4%)}
   [data-theme="dark"] .ds-input:focus{box-shadow:0 0 0 3px rgba(255,255,255,.1)}
   [data-theme="dark"] .ds-space-input:focus{box-shadow:0 0 0 3px rgba(255,255,255,.1)}
   [data-theme="dark"] .ds-input-error{box-shadow:0 0 0 3px rgba(239,68,68,.2)!important}
-  [data-theme="dark"] .ds-space-row.alt{background:hsl(217,24%,18%)}
+  [data-theme="dark"] .ds-space-row.alt{background:hsl(0,0%,11%)}
   .ds-btn-sm{padding:5px 10px;font-size:12px} .ds-btn-danger{color:var(--ds-error);border-color:var(--ds-error)} .ds-btn-danger:hover:not(:disabled){background:rgba(239,68,68,.06)}
   .ds-input{width:100%;padding:7px 11px;border:1px solid var(--ds-border);border-radius:var(--ds-radius);font-size:14px;font-family:inherit;color:var(--ds-text);background:var(--ds-bg-card);transition:all .15s;box-shadow:var(--ds-shadow)}
   .ds-input:hover{border-color:var(--ds-border)}
@@ -565,7 +565,7 @@ const css_styles = `
   .ds-toast.ok .ds-toast-dot{background:var(--ds-success)} .ds-toast.info .ds-toast-dot{background:var(--ds-accent)} .ds-toast.err .ds-toast-dot{background:var(--ds-error)}
 
   /* ===== Tier 2: profundidad & pulido ===== */
-  .ds-content-body,.ds-dash{background:radial-gradient(1100px circle at 50% -8%,hsla(262,80%,62%,.05),transparent 55%)}
+  .ds-content-body,.ds-dash{background:radial-gradient(1100px circle at 50% -8%,hsla(250,80%,62%,.05),transparent 55%)}
   .ds-sys-swatches{position:relative}
   .ds-sys-swatches::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(0,0,0,.14));pointer-events:none}
   .ds-mode-card:hover,.ds-export-file-card:hover,.ds-sys-card:hover{border-color:var(--ds-accent)}
