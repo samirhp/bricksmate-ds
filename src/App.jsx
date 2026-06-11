@@ -162,6 +162,7 @@ const initialState = {
     baseMobile: 100, baseDesktop: 120, scale: 1.5,
     values: initSpaceVals(100, 120, 1.5),
   },
+  gutter: { mobile: 16, desktop: 64 },
   typography: {
     useScale: true,
     headingScale: 1.25, headingBaseMob: 28, headingBaseDesk: 35,
@@ -296,6 +297,7 @@ function reducer(state, action) {
     }
     case "REMOVE_PALETTE": return { ...state, colors: { ...state.colors, palettes: state.colors.palettes.filter((p) => p.id !== action.id) } };
     case "SET_COLORS": return { ...state, colors: { ...state.colors, ...action.payload } };
+    case "SET_GUTTER": return { ...state, gutter: { ...state.gutter, [action.side]: action.value } };
     case "SET_GAPS": return { ...state, gaps: { ...state.gaps, [action.field]: action.value } };
     case "SET_RADIUS": return { ...state, radius: { ...state.radius, ...action.payload } };
     case "SET_RADIUS_VAL": return { ...state, radius: { ...state.radius, values: { ...state.radius.values, [action.key]: action.value } } };
@@ -739,6 +741,7 @@ function StepSpacing() {
 function StepSectionSpacing() {
   const { state, dispatch } = useDSContext();
   const ss = state.sectionSpacing;
+  const gut = state.gutter || { mobile: 16, desktop: 64 };
   const recalc = (bm, bd, sc) => dispatch({ type: "RECALC_SECTION_SPACING", baseMobile: bm, baseDesktop: bd, scale: sc ?? ss.scale });
   const warns = [];
   if (ss.baseMobile > ss.baseDesktop) warns.push({ type: "warn", msg: "Mobile base larger than desktop — section spacing scale decreases on larger screens" });
@@ -761,6 +764,15 @@ function StepSectionSpacing() {
       </div>
       <div className="ds-space-bar" style={{ width: Math.min(120, (ss.values[k]?.desktop || 0) * 1.2) }} />
     </div>))}
+    <div className="ds-card" style={{ marginTop: 16 }}>
+      <h4>Gutter <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— --gutter</span></h4>
+      <div className="ds-helper" style={{ marginBottom: 14 }}>Horizontal padding that keeps content off the screen edges. Fluid between viewports, so it adapts to the selected layout ({state.layoutMode === "fixed" ? "fixed, max " + state.maxViewport + "px" : "full-width"}).</div>
+      <div className="ds-grid-2">
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Mobile (px)</label><NumStepper value={gut.mobile} set={(n) => dispatch({ type: "SET_GUTTER", side: "mobile", value: n })} min={0} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Desktop (px)</label><NumStepper value={gut.desktop} set={(n) => dispatch({ type: "SET_GUTTER", side: "desktop", value: n })} min={0} /></div>
+      </div>
+      <div style={{ marginTop: 12, padding: "9px 12px", background: "var(--ds-bg)", border: "1px solid var(--ds-border-light)", borderRadius: "var(--ds-radius)", fontFamily: "'SF Mono',Consolas,monospace", fontSize: 12, color: "var(--ds-text-2)", overflowX: "auto", whiteSpace: "nowrap" }}>--gutter: {flRem(gut.mobile, gut.desktop, state)};</div>
+    </div>
   </div>);
 }
 
@@ -1148,6 +1160,8 @@ function generateCustomCodeCSS(state) {
     const v = sectionSpacing.values[k]; if (!v) return;
     css += "  --section-space-" + k + ": " + flRem(v.mobile, v.desktop, state) + ";\n";
   });
+  css += "\n  /* — Gutter (fluid, rem) ———————————————————— */\n";
+  { const g = state.gutter || { mobile: 16, desktop: 64 }; css += "  --gutter: " + flRem(g.mobile, g.desktop, state) + ";\n"; }
   css += "\n  /* — Typography (fluid, rem) ————————————————— */\n";
   ["h1","h2","h3","h4","h5","h6"].forEach((h) => { const v = typography.headings[h]; if (!v) return; css += "  --" + h + ": " + flRem(v.mobile, v.desktop, state) + ";\n"; });
   TEXT_KEYS.forEach((k) => { const v = typography.texts[k]; if (!v) return; css += "  --text-" + k + ": " + flRem(v.mobile, v.desktop, state) + ";\n"; });
@@ -1185,6 +1199,8 @@ function generateVariablesJSON(state) {
   vars.push(mk('grid-gap', gapVal(state.gaps.gridGap), 'Gaps'));
   vars.push(mk('content-gap', gapVal(state.gaps.contentGap), 'Gaps'));
   vars.push(mk('container-gap', gapVal(state.gaps.containerGap), 'Gaps'));
+  // Gutter (fluido, rem) — protege el contenido de los bordes
+  { const g = state.gutter || { mobile: 16, desktop: 64 }; vars.push(mk('gutter', flRem(g.mobile, g.desktop, state), 'Gaps')); }
   // Grid (columnas 1–12 + ratios asimétricos) — valores estáticos, sin prefijo en el value
   GRID_COLS.forEach(n => { vars.push({ name: pn('grid-' + n), value: gridValue(n), id: randId(), category: catIds['Grid'] }); });
   GRID_RATIOS.forEach(([name, value]) => { vars.push({ name: pn('grid-' + name), value, id: randId(), category: catIds['Grid'] }); });
@@ -1344,7 +1360,7 @@ function generateFrameworkCSS(state) {
   css += "/* Text */\nbody {\n  font-size: " + v('text-m') + ";\n  line-height: " + v('line-height-body') + ";\n}\n\n";
   css += "/* Headings */\nh1, h2, h3, h4, h5, h6 {\n  line-height: " + v('line-height-heading') + ";\n}\n";
   ['h1','h2','h3','h4','h5','h6'].forEach(h => { css += h + " { font-size: " + v(h) + "; }\n"; });
-  css += "\n/* Sections */\n:where(section:not(section section)) {\n  padding: " + v('section-space-m') + " " + v('space-m') + ";\n}\nsection:where(:not(.bricks-shape-divider)) {\n  gap: " + v('container-gap') + ";\n}\n:where(.brxe-container) > .brxe-block,\n:where(.brxe-container) {\n  gap: " + v('content-gap') + ";\n}\n\n/* Overflow fix */\nbody.bricks-is-frontend {\n  overflow-x: clip;\n}\n";
+  css += "\n/* Sections */\n:where(section:not(section section)) {\n  padding: " + v('section-space-m') + " " + v('gutter') + ";\n}\nsection:where(:not(.bricks-shape-divider)) {\n  gap: " + v('container-gap') + ";\n}\n:where(.brxe-container) > .brxe-block,\n:where(.brxe-container) {\n  gap: " + v('content-gap') + ";\n}\n\n/* Overflow fix */\nbody.bricks-is-frontend {\n  overflow-x: clip;\n}\n";
   css += generateButtonsCSS(state, v);
   return css;
 }
@@ -1384,6 +1400,7 @@ function LandingPreview({ state }) {
     "--tl": tx("l"), "--tm": tx("m"), "--ts": tx("s"),
     "--secM": fr(ss.values.m?.mobile || 80, ss.values.m?.desktop || 100),
     "--secL": fr(ss.values.l?.mobile || 120, ss.values.l?.desktop || 150),
+    "--gut": fr((state.gutter || {}).mobile || 16, (state.gutter || {}).desktop || 64),
     "--spS": spc("s"), "--spM": spc("m"), "--spL": spc("l"), "--spXL": spc("xl"),
     "--rm": (r.values.m || 8) + "px", "--rl": (r.values.l || 12) + "px", "--rc": (r.circle || 999) + "px",
     "--lhh": t.lineHeightHeading, "--lhb": t.lineHeightBody,
@@ -1475,7 +1492,7 @@ function LandingPreview({ state }) {
 
       {/* NAV */}
       <header style={{ borderBottom: "1px solid var(--cbd)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--spM)", padding: "var(--spM) var(--spL)", maxWidth: container, margin: "0 auto" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--spM)", padding: "var(--spM) var(--gut)", maxWidth: container, margin: "0 auto" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {logoMark}
             <span style={{ fontWeight: 700, fontSize: "var(--tl)", color: "var(--ctext)" }}>Zephtor</span>
@@ -1491,7 +1508,7 @@ function LandingPreview({ state }) {
       </header>
 
       {/* HERO */}
-      <section style={{ padding: "var(--secL) var(--spL)" }}>
+      <section style={{ padding: "var(--secL) var(--gut)" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1.05fr 0.95fr", gap: "var(--spXL)", alignItems: "center", maxWidth: container, margin: "0 auto" }}>
           <div>
             <h1 style={{ fontSize: "var(--h1)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 800, letterSpacing: "-0.02em", margin: "0 0 var(--spM)" }}>Your digital transformation begins here</h1>
@@ -1506,7 +1523,7 @@ function LandingPreview({ state }) {
       </section>
 
       {/* SUPPORT — sección alterna (imagen izquierda / texto derecha) */}
-      <section style={{ padding: "var(--secM) var(--spL)" }}>
+      <section style={{ padding: "var(--secM) var(--gut)" }}>
         <div style={{ display: "grid", gridTemplateColumns: "0.95fr 1.05fr", gap: "var(--spXL)", alignItems: "center", maxWidth: container, margin: "0 auto" }}>
           <div style={{ color: "var(--ctext)", display: "flex", justifyContent: "center" }}>{supportArt}</div>
           <div>
@@ -1518,7 +1535,7 @@ function LandingPreview({ state }) {
       </section>
 
       {/* FEATURES */}
-      <section style={{ padding: "var(--secM) var(--spL)" }}>
+      <section style={{ padding: "var(--secM) var(--gut)" }}>
         <div style={{ textAlign: "center", maxWidth: 640, margin: "0 auto var(--spXL)" }}>
           <h2 style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 var(--spS)" }}>Discover what sets Zephtor apart</h2>
           <p style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>Our suite of SaaS solutions is packed with powerful features.</p>
@@ -1534,7 +1551,7 @@ function LandingPreview({ state }) {
       </section>
 
       {/* FOOTER */}
-      <footer style={{ background: "var(--cfoot)", padding: "var(--spXL) var(--spL)" }}>
+      <footer style={{ background: "var(--cfoot)", padding: "var(--spXL) var(--gut)" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr 1fr", gap: "var(--spL)", maxWidth: container, margin: "0 auto" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "var(--spS)" }}>
