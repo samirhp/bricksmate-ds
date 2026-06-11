@@ -317,8 +317,8 @@ const STEPS = [
   { id: 1, label: "Layout Mode", check: (s) => s.layoutMode !== "" },
   { id: 2, label: "Spacing", check: (s) => s.spacing.baseMobile > 0 },
   { id: 3, label: "Section Spacing", check: (s) => s.sectionSpacing.baseMobile > 0 },
-  { id: 4, label: "Typography", check: (s) => s.typography.headingBaseMob > 0 },
-  { id: 5, label: "Colors", check: (s) => s.colors.palettes.length > 0 },
+  { id: 4, label: "Colors", check: (s) => s.colors.palettes.length > 0 },
+  { id: 5, label: "Typography", check: (s) => s.typography.headingBaseMob > 0 },
   { id: 6, label: "Gaps & Grid", check: (s) => s.gaps.gridGap !== "" },
   { id: 7, label: "Border Radius", check: (s) => s.radius.base >= 0 },
   { id: 8, label: "Buttons", check: (s) => !!s.buttons },
@@ -329,8 +329,8 @@ const DESCS = {
   1: "Choose layout approach and viewport range",
   2: "Define spacing scale (xs–xxl) with mobile and desktop values",
   3: "Define section spacing scale (xs–xxl) for large containers",
-  4: "Configure typography scale for headings and text sizes",
-  5: "Build color palettes with variants and transparencies",
+  4: "Build color palettes with variants and transparencies",
+  5: "Configure typography scale for headings and text sizes",
   6: "Define gap variables and ready-to-use grid layouts",
   7: "Set border radius scale from a base value",
   8: "Generate button styles per color, size and outline variant",
@@ -800,7 +800,8 @@ function StepSectionSpacing() {
 /* ================================================================
    STEP 4: TYPOGRAPHY
    ================================================================ */
-// Opciones de color = variables ya creadas en el sistema (paletas + variantes + b/n)
+// Opciones de color = variables ya creadas en el sistema (paletas + variantes + transparencias + b/n)
+const TRANS_STEPS = [90, 80, 70, 60, 50, 40, 30, 20, 10];
 function buildColorVarOptions(state) {
   const opts = [];
   (state.colors?.palettes || []).forEach((p) => {
@@ -810,9 +811,18 @@ function buildColorVarOptions(state) {
       if (key === "medium" || !p.variants[key]) return;
       opts.push({ group: p.name, label: key, value: "var(--" + slug + "-" + key + ")", color: p.variants[key] });
     });
+    if (p.showTransparency) TRANS_STEPS.forEach((o) => {
+      opts.push({ group: p.name, label: "alpha " + o + "%", value: "var(--" + slug + "-trans-" + o + ")", color: "hsla(" + p.hue + "," + p.saturation + "%," + p.lightness + "%," + (o / 100) + ")" });
+    });
   });
-  if (state.colors?.whiteTransparency) opts.push({ group: "Neutral", label: "White", value: "var(--white)", color: "#ffffff" });
-  if (state.colors?.blackTransparency) opts.push({ group: "Neutral", label: "Black", value: "var(--black)", color: "#000000" });
+  if (state.colors?.whiteTransparency) {
+    opts.push({ group: "Neutral", label: "White", value: "var(--white)", color: "#ffffff" });
+    TRANS_STEPS.forEach((o) => opts.push({ group: "Neutral", label: "White " + o + "%", value: "var(--white-trans-" + o + ")", color: "rgba(255,255,255," + (o / 100) + ")" }));
+  }
+  if (state.colors?.blackTransparency) {
+    opts.push({ group: "Neutral", label: "Black", value: "var(--black)", color: "#000000" });
+    TRANS_STEPS.forEach((o) => opts.push({ group: "Neutral", label: "Black " + o + "%", value: "var(--black-trans-" + o + ")", color: "rgba(0,0,0," + (o / 100) + ")" }));
+  }
   return opts;
 }
 
@@ -823,7 +833,9 @@ function ColorVarPicker({ value, onChange, opts }) {
   opts.forEach((o) => { let g = groups.find((x) => x.name === o.group); if (!g) { g = { name: o.group, items: [] }; groups.push(g); } g.items.push(o); });
   return (
     <div className="ds-cvar">
-      <span className="ds-cvar-sw" style={{ background: swatch || "var(--ds-border)" }} />
+      <span className="ds-cvar-sw" style={swatch
+        ? { backgroundImage: `linear-gradient(${swatch},${swatch}), conic-gradient(#c4c4c4 0 25%, #fff 0 50%, #c4c4c4 0 75%, #fff 0)`, backgroundSize: "100% 100%, 9px 9px" }
+        : { background: "var(--ds-border)" }} />
       <select className="ds-input" value={known ? value : "__custom"} onChange={(e) => onChange(e.target.value)}>
         {!known && <option value="__custom">Custom: {value}</option>}
         {groups.map((g) => (
@@ -910,7 +922,7 @@ function StepTypography() {
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Heading color</label>
           <ColorVarPicker value={st.headingColor} opts={colorOpts} onChange={(val) => dispatch({ type: "SET_STYLE", field: "headingColor", value: val })} /></div>
       </div>
-      <div className="ds-helper" style={{ marginTop: 8 }}>Pick a color from your design system (palettes &amp; variants). Set in Step 5 → Colors.</div>
+      <div className="ds-helper" style={{ marginTop: 8 }}>Pick a color from your design system (palettes &amp; variants). Set in Step 4 → Colors.</div>
     </div>
   </div>);
 }
@@ -1836,7 +1848,7 @@ function StepExport() {
 function StepContent() {
   const { state } = useDSContext();
   const step = STEPS.find((s) => s.id === state.currentStep);
-  const C = [null, StepLayout, StepSpacing, StepSectionSpacing, StepTypography, StepColors, StepGaps, StepRadius, StepButtons, StepPreview, StepExport][state.currentStep];
+  const C = [null, StepLayout, StepSpacing, StepSectionSpacing, StepColors, StepTypography, StepGaps, StepRadius, StepButtons, StepPreview, StepExport][state.currentStep];
   return (<div className="ds-content">
     <div className="ds-content-header"><h2>{step.label}</h2><p>{DESCS[step.id]}</p></div>
     <div className="ds-content-body"><div key={state.currentStep} className="ds-step-anim">{C && <C />}</div></div>
