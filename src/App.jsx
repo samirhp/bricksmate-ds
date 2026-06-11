@@ -28,6 +28,16 @@ function flRem(min, max, s) {
   const clampPx = fl(min, max, s);
   return clampPx.replace(/(\d+(?:\.\d+)?)px/g, (_, p) => pxToRem(parseFloat(p)));
 }
+// Evalúa un valor fluido (mobile→desktop) a un viewport concreto, en px. Para el preview "device".
+function sizeAtVP(min, max, s, vp) {
+  const mn = Number(min) || 0, mx = Number(max) || 0;
+  if (mn === mx) return mn;
+  const lo = Math.min(mn, mx), hi = Math.max(mn, mx);
+  const mnVP = Number(s.minViewport), mxVP = Number(s.maxViewport);
+  if (!(mxVP > mnVP)) return mx;
+  const tt = Math.max(0, Math.min(1, (vp - mnVP) / (mxVP - mnVP)));
+  return Math.round(Math.max(lo, Math.min(hi, mn + (mx - mn) * tt)) * 100) / 100;
+}
 function slugify(str) { return str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "color"; }
 function hslToHex(h, s, l) {
   s /= 100; l /= 100;
@@ -1417,6 +1427,16 @@ function generateFrameworkCSS(state) {
 function LandingPreview({ state }) {
   const wrapRef = useRef(null);
   const [width, setWidth] = useState(null); // px arrastrado, o null = ancho completo
+  const [maxW, setMaxW] = useState(null);   // ancho máximo del panel (full) para mapear a viewport
+  useEffect(() => {
+    const el = wrapRef.current?.parentElement;
+    if (!el) return;
+    const update = () => setMaxW(el.clientWidth - 18);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const startDrag = (e) => {
     e.preventDefault();
     const startX = e.clientX;
@@ -1433,18 +1453,23 @@ function LandingPreview({ state }) {
   const primary = "hsl(" + p.hue + "," + p.saturation + "%," + p.lightness + "%)";
   const primaryTint = "hsl(" + p.hue + "," + Math.min(90, p.saturation) + "%,96%)";
   const onPrimary = p.lightness > 60 ? "#18181b" : "#ffffff";
-  // cqw en vez de vw → el clamp() responde al ancho del CONTENEDOR (resizer), no a la ventana
-  const fr = (m, d) => flRem(m || 0, d || 0, state).replace(/vw/g, "cqw");
-  const h = (k) => fr(t.headings[k]?.mobile, t.headings[k]?.desktop);
-  const tx = (k) => fr(t.texts[k]?.mobile, t.texts[k]?.desktop);
-  const spc = (k) => fr(sp.values[k]?.mobile, sp.values[k]?.desktop);
+  // El lienzo simula un viewport: full = maxViewport (desktop), arrastrado al mínimo = minViewport (mobile).
+  // Los tamaños fluidos se evalúan a ese viewport simulado para que el preview respete lo configurado.
+  const fullW = (maxW && maxW > 300) ? maxW : null;
+  const boxW = width != null ? width : (fullW || state.maxViewport);
+  const ratio = fullW ? Math.max(0, Math.min(1, (boxW - 300) / (fullW - 300))) : 1;
+  const simVP = Math.round(state.minViewport + ratio * (state.maxViewport - state.minViewport));
+  const at = (m, d) => sizeAtVP(m, d, state, simVP) + "px";
+  const h = (k) => at(t.headings[k]?.mobile, t.headings[k]?.desktop);
+  const tx = (k) => at(t.texts[k]?.mobile, t.texts[k]?.desktop);
+  const spc = (k) => at(sp.values[k]?.mobile, sp.values[k]?.desktop);
 
   const vars = {
     "--h1": h("h1"), "--h2": h("h2"), "--h3": h("h3"), "--h4": h("h4"),
     "--tl": tx("l"), "--tm": tx("m"), "--ts": tx("s"),
-    "--secM": fr(ss.values.m?.mobile || 80, ss.values.m?.desktop || 100),
-    "--secL": fr(ss.values.l?.mobile || 120, ss.values.l?.desktop || 150),
-    "--gut": fr((state.gutter || {}).mobile || 16, (state.gutter || {}).desktop || 64),
+    "--secM": at(ss.values.m?.mobile || 80, ss.values.m?.desktop || 100),
+    "--secL": at(ss.values.l?.mobile || 120, ss.values.l?.desktop || 150),
+    "--gut": at((state.gutter || {}).mobile || 16, (state.gutter || {}).desktop || 64),
     "--spS": spc("s"), "--spM": spc("m"), "--spL": spc("l"), "--spXL": spc("xl"),
     "--rm": (r.values.m || 8) + "px", "--rl": (r.values.l || 12) + "px", "--rc": (r.circle || 999) + "px",
     "--lhh": t.lineHeightHeading, "--lhb": t.lineHeightBody,
@@ -1526,7 +1551,7 @@ function LandingPreview({ state }) {
       <span style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: "var(--ds-radius)", background: "var(--ds-primary)", color: "var(--ds-bg)" }}>
         {isFixed ? "Fixed-width · max " + maxVp + "px" : "Full-width · 100%"}
       </span>
-      <span style={{ fontSize: 11.5, color: "var(--ds-text-3)" }}>↔ Drag the right edge to resize — {width ? Math.round(width) + "px" : "full width"}</span>
+      <span style={{ fontSize: 11.5, color: "var(--ds-text-3)" }}>↔ Drag to resize — simulating ≈{simVP}px viewport{ratio >= 0.999 ? " (desktop)" : ratio <= 0.001 ? " (mobile)" : ""}</span>
       {width && <button className="ds-btn ds-btn-sm" onClick={() => setWidth(null)} style={{ marginLeft: "auto" }}>Reset width</button>}
     </div>
     {/* Área redimensionable (cqw responde a este contenedor) */}
