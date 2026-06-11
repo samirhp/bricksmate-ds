@@ -528,7 +528,7 @@ const css_styles = `
   .ds-progress-bar{height:100%;background:var(--ds-accent);border-radius:0 3px 3px 0;transition:width .4s cubic-bezier(.16,1,.3,1)}
 
   /* ===== Toasts ===== */
-  .ds-toasts{position:fixed;bottom:18px;right:18px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+  .ds-toasts{position:fixed;top:72px;right:18px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
   @keyframes ds-toast-in{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
   .ds-toast{display:flex;align-items:center;gap:9px;background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius);padding:10px 14px;font-size:13px;font-weight:500;color:var(--ds-text);box-shadow:var(--ds-shadow-md);animation:ds-toast-in .28s cubic-bezier(.16,1,.3,1);pointer-events:auto;min-width:200px}
   .ds-toast-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
