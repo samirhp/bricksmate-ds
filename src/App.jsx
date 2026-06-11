@@ -163,7 +163,7 @@ const initialState = {
   },
   gutter: { mobile: 16, desktop: 64 },
   offset: 80,
-  styles: { textColor: "#1f2937", headingColor: "#111827", textWeight: 400, headingWeight: 700 },
+  styles: { textColor: "var(--black)", headingColor: "var(--black)", textWeight: 400, headingWeight: 700 },
   typography: {
     useScale: true,
     headingScale: 1.25, headingBaseMob: 28, headingBaseDesk: 35,
@@ -369,7 +369,7 @@ const css_styles = `
   body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--ds-bg);color:var(--ds-text);line-height:1.6;-webkit-font-smoothing:antialiased}
   .ds-app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
   .ds-header{background:var(--ds-bg-card);border-bottom:1px solid var(--ds-border-light);padding:0 24px;height:54px;display:flex;align-items:center;gap:12px;box-shadow:var(--ds-shadow)}
-  .ds-header-icon{width:30px;height:30px;background:var(--ds-primary);border-radius:var(--ds-radius);display:flex;align-items:center;justify-content:center;color:var(--ds-bg);font-size:14px;flex-shrink:0}
+  .ds-header-icon{width:30px;height:30px;border-radius:var(--ds-radius);flex-shrink:0;display:block}
   .ds-header h1{font-size:14px;font-weight:600;letter-spacing:-.01em} .ds-header p{font-size:11px;color:var(--ds-text-2);margin-top:1px}
   .ds-main{display:flex;flex:1;overflow:hidden}
   .ds-sidebar{width:200px;background:var(--ds-bg-card);border-right:1px solid var(--ds-border-light);padding:12px 8px;overflow-y:auto;flex-shrink:0}
@@ -564,6 +564,9 @@ const css_styles = `
   .ds-color-field input[type=color]::-webkit-color-swatch-wrapper{padding:0}
   .ds-color-field input[type=color]::-webkit-color-swatch{border:1px solid var(--ds-border);border-radius:6px}
   .ds-color-field span{font-family:'SF Mono',Consolas,monospace;font-size:12px;color:var(--ds-text-2)}
+  .ds-cvar{display:flex;align-items:center;gap:10px}
+  .ds-cvar-sw{width:30px;height:30px;border-radius:8px;border:1px solid var(--ds-border);flex-shrink:0;box-shadow:var(--ds-shadow)}
+  .ds-cvar select{flex:1;min-width:0}
   /* Color sliders (HSL visual) */
   .ds-cslider{margin-bottom:11px} .ds-cslider:last-child{margin-bottom:0}
   .ds-cslider-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
@@ -600,7 +603,7 @@ function EditorHeader({ name, onRename, onBack, autoSave, onToggleAutoSave, dirt
   const commit = () => { const n = val.trim() || name; setEditing(false); if (n !== name) onRename(n); };
   return (<header className="ds-header">
     <button className="ds-header-back" onClick={onBack} data-tip="Back to my systems">←</button>
-    <div className="ds-header-icon">◈</div>
+    <BrandMark />
     {editing
       ? <input className="ds-input ds-input-sm" style={{ maxWidth: 240 }} autoFocus value={val} onChange={(e) => setVal(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setVal(name); setEditing(false); } }} />
       : <div><h1 onClick={() => setEditing(true)} style={{ cursor: "text" }} data-tip="Click to rename">{name}</h1><p>Design system editor</p></div>}
@@ -659,6 +662,20 @@ function NumStepper({ value, set, min, max, step = 1 }) {
 /* ================================================================
    STEP 1: LAYOUT MODE
    ================================================================ */
+// Marca de la app: token grid 2×2 sobre badge de acento (igual que el favicon)
+function BrandMark() {
+  return (
+    <svg className="ds-header-icon" viewBox="0 0 56 56" aria-hidden="true">
+      <defs><linearGradient id="bm-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#8b76f7" /><stop offset="1" stopColor="#5d44e0" /></linearGradient></defs>
+      <rect width="56" height="56" rx="14" fill="url(#bm-grad)" />
+      <rect x="13" y="13" width="14" height="14" rx="4" fill="#fff" />
+      <rect x="29" y="13" width="14" height="14" rx="4" fill="#fff" opacity=".68" />
+      <rect x="13" y="29" width="14" height="14" rx="4" fill="#fff" opacity=".45" />
+      <rect x="29" y="29" width="14" height="14" rx="4" fill="#fff" opacity=".26" />
+    </svg>
+  );
+}
+
 function LayoutIcon({ mode }) {
   // Fixed: guías punteadas juntas hacia el centro, contenido estrecho.
   // Full: guías separadas y pegadas al borde, contenido casi a todo el ancho.
@@ -783,10 +800,47 @@ function StepSectionSpacing() {
 /* ================================================================
    STEP 4: TYPOGRAPHY
    ================================================================ */
+// Opciones de color = variables ya creadas en el sistema (paletas + variantes + b/n)
+function buildColorVarOptions(state) {
+  const opts = [];
+  (state.colors?.palettes || []).forEach((p) => {
+    const slug = slugify(p.name);
+    opts.push({ group: p.name, label: "Base", value: "var(--" + slug + ")", color: hslToHex(p.hue, p.saturation, p.lightness) });
+    if (p.showVariants) VARIANT_LIGHTNESS.forEach(({ key }) => {
+      if (key === "medium" || !p.variants[key]) return;
+      opts.push({ group: p.name, label: key, value: "var(--" + slug + "-" + key + ")", color: p.variants[key] });
+    });
+  });
+  if (state.colors?.whiteTransparency) opts.push({ group: "Neutral", label: "White", value: "var(--white)", color: "#ffffff" });
+  if (state.colors?.blackTransparency) opts.push({ group: "Neutral", label: "Black", value: "var(--black)", color: "#000000" });
+  return opts;
+}
+
+function ColorVarPicker({ value, onChange, opts }) {
+  const known = opts.find((o) => o.value === value);
+  const swatch = known ? known.color : (value && value.startsWith("#") ? value : null);
+  const groups = [];
+  opts.forEach((o) => { let g = groups.find((x) => x.name === o.group); if (!g) { g = { name: o.group, items: [] }; groups.push(g); } g.items.push(o); });
+  return (
+    <div className="ds-cvar">
+      <span className="ds-cvar-sw" style={{ background: swatch || "var(--ds-border)" }} />
+      <select className="ds-input" value={known ? value : "__custom"} onChange={(e) => onChange(e.target.value)}>
+        {!known && <option value="__custom">Custom: {value}</option>}
+        {groups.map((g) => (
+          <optgroup key={g.name} label={g.name}>
+            {g.items.map((o) => <option key={o.value} value={o.value}>{o.label} · {o.value}</option>)}
+          </optgroup>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function StepTypography() {
   const { state, dispatch } = useDSContext();
   const t = state.typography;
   const st = state.styles || { textColor: "#1f2937", headingColor: "#111827", textWeight: 400, headingWeight: 700 };
+  const colorOpts = buildColorVarOptions(state);
   const WEIGHTS = [300, 400, 500, 600, 700, 800];
   const hDesk = ["h1","h2","h3","h4","h5","h6"].map(h => t.headings[h]?.desktop || 0);
   const warns = [];
@@ -852,10 +906,11 @@ function StepTypography() {
       </div>
       <div className="ds-grid-2">
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Text color</label>
-          <div className="ds-color-field"><input type="color" value={st.textColor} onChange={(e) => dispatch({ type: "SET_STYLE", field: "textColor", value: e.target.value })} /><span>{st.textColor}</span></div></div>
+          <ColorVarPicker value={st.textColor} opts={colorOpts} onChange={(val) => dispatch({ type: "SET_STYLE", field: "textColor", value: val })} /></div>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Heading color</label>
-          <div className="ds-color-field"><input type="color" value={st.headingColor} onChange={(e) => dispatch({ type: "SET_STYLE", field: "headingColor", value: e.target.value })} /><span>{st.headingColor}</span></div></div>
+          <ColorVarPicker value={st.headingColor} opts={colorOpts} onChange={(val) => dispatch({ type: "SET_STYLE", field: "headingColor", value: val })} /></div>
       </div>
+      <div className="ds-helper" style={{ marginTop: 8 }}>Pick a color from your design system (palettes &amp; variants). Set in Step 5 → Colors.</div>
     </div>
   </div>);
 }
@@ -1830,7 +1885,7 @@ function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, 
   const systems = library.systems;
   return (<>
     <header className="ds-header">
-      <div className="ds-header-icon">◈</div>
+      <BrandMark />
       <div><h1>Design System Generator</h1><p>Your saved design systems</p></div>
       <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode" style={{ marginLeft: "auto" }}><ThemeIcon dark={darkMode} /></button>
     </header>
