@@ -2020,6 +2020,7 @@ export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [dirty, setDirty] = useState(false);
   const skipSave = useRef(false);
+  const savedToastTimer = useRef(null);
   const [toasts, setToasts] = useState([]);
   const toastId = useRef(0);
   const addToast = (msg, type = "info") => {
@@ -2072,7 +2073,14 @@ export default function App() {
   useEffect(() => {
     if (view !== "editor" || currentId == null) return;
     if (skipSave.current) { skipSave.current = false; return; }
-    if (library.autoSave) saveDoc(); else setDirty(true);
+    if (library.autoSave) {
+      saveDoc(); // persiste al instante
+      // Toast con debounce: una sola confirmación cuando paras de editar
+      if (savedToastTimer.current) clearTimeout(savedToastTimer.current);
+      savedToastTimer.current = setTimeout(() => { addToast("Changes saved", "ok"); }, 700);
+    } else {
+      setDirty(true);
+    }
   }, [state]);
 
   const openSystem = (id) => {
@@ -2128,6 +2136,7 @@ export default function App() {
       if (r) saveDoc();
     }
     setView("dashboard"); setCurrentId(null); setDirty(false);
+    if (savedToastTimer.current) clearTimeout(savedToastTimer.current);
     try { localStorage.removeItem(SESSION_KEY); } catch {}
   };
 
