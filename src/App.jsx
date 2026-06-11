@@ -794,11 +794,11 @@ function StepTypography() {
       </div>)}
       {["h1","h2","h3","h4","h5","h6"].map((h) => (<div key={h} className="ds-space-row" style={{ marginBottom: 6 }}>
         <div className="ds-space-name">--{h}</div>
-        <div className="ds-space-inputs">
+        <div className="ds-space-inputs" style={{ flexGrow: 0 }}>
           <div><input className="ds-space-input" type="number" value={t.headings[h]?.mobile || 0} onChange={(e) => dispatch({ type: "SET_HEADING_VAL", key: h, side: "mobile", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Mobile</div></div>
           <div><input className="ds-space-input" type="number" value={t.headings[h]?.desktop || 0} onChange={(e) => dispatch({ type: "SET_HEADING_VAL", key: h, side: "desktop", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Desktop</div></div>
         </div>
-        <div style={{ fontSize: t.headings[h]?.desktop || 16, fontWeight: 700, lineHeight: t.lineHeightHeading, minWidth: 100 }}>Heading</div>
+        <div style={{ flex: 1, minWidth: 0, textAlign: "left", paddingLeft: 12, fontSize: t.headings[h]?.desktop || 16, fontWeight: 700, lineHeight: t.lineHeightHeading, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Heading</div>
       </div>))}
     </div>
     {/* TEXT SIZES */}
@@ -814,11 +814,11 @@ function StepTypography() {
       </div>)}
       {TEXT_KEYS.map((k) => (<div key={k} className="ds-space-row" style={{ marginBottom: 6 }}>
         <div className="ds-space-name">--text-{k}</div>
-        <div className="ds-space-inputs">
+        <div className="ds-space-inputs" style={{ flexGrow: 0 }}>
           <div><input className="ds-space-input" type="number" value={t.texts[k]?.mobile || 0} onChange={(e) => dispatch({ type: "SET_TEXT_VAL", key: k, side: "mobile", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Mobile</div></div>
           <div><input className="ds-space-input" type="number" value={t.texts[k]?.desktop || 0} onChange={(e) => dispatch({ type: "SET_TEXT_VAL", key: k, side: "desktop", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Desktop</div></div>
         </div>
-        <div style={{ fontSize: t.texts[k]?.desktop || 14, lineHeight: t.lineHeightBody, minWidth: 100 }}>Sample</div>
+        <div style={{ flex: 1, minWidth: 0, textAlign: "left", paddingLeft: 12, fontSize: t.texts[k]?.desktop || 14, lineHeight: t.lineHeightBody, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Sample</div>
       </div>))}
     </div>
     <div className="ds-card"><h4>Line heights</h4><div className="ds-grid-2">
