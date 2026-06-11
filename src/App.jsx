@@ -187,7 +187,7 @@ const initialState = {
     sizes: JSON.parse(JSON.stringify(BTN_SIZE_DEFAULTS)),
   },
   radius: { base: 8, values: {}, circle: 999 },
-  exportVariablesFilename: "bricksmate-variables.json", exportPaletteFilename: "bricksmate-palette.json", exportFrameworkFilename: "bricksmate-framework.css", varPrefix: "",
+  exportVariablesFilename: "bricksmate-variables.json", exportPaletteFilename: "bricksmate-palette.json", exportFrameworkFilename: "bricksmate-framework.css", exportClassesFilename: "bricksmate-classes.json", varPrefix: "",
 };
 
 // Init radius
@@ -1347,6 +1347,26 @@ function generateVariablesJSON(state) {
   return JSON.stringify({ variables: vars, categories }, null, 2);
 }
 
+// Clases (global classes de Bricks) — solo nombres; el estilo lo aplica el Framework CSS.
+// Categoría = nombre del sistema de diseño.
+function generateClassesJSON(state, systemName) {
+  const catId = randId();
+  const catName = (systemName && systemName.trim()) || "Design system";
+  const names = ["btn"];
+  BTN_SIZES.forEach((s) => { if (s.cls) names.push(s.cls); }); // btn--sm/md/lg/xl
+  state.colors.palettes.filter((p) => btnEnabled(state, p.id)).forEach((p) => names.push("btn--" + slugify(p.name)));
+  if (state.buttons?.outline) names.push("btn--outline");
+  names.push("no-scroll");
+  const classes = names.map((name) => ({
+    id: randId(),
+    name,
+    settings: {},
+    category: catId,
+    _categoryData: { id: catId, name: catName },
+  }));
+  return JSON.stringify(classes, null, 2);
+}
+
 function generateColorPaletteJSON(state) {
   const prefix = state.varPrefix ? state.varPrefix + '-' : '';
   const vr = (n) => 'var(--' + prefix + n + ')';
@@ -1836,7 +1856,7 @@ function StepPreview() {
    STEP 9: EXPORT
    ================================================================ */
 function StepExport() {
-  const { state, dispatch, addToast } = useDSContext();
+  const { state, dispatch, addToast, systemName } = useDSContext();
   const [status, setStatus] = useState(null);
   const [done, setDone] = useState(null);
   const warnings = [];
@@ -1881,6 +1901,13 @@ function StepExport() {
       field: "exportFrameworkFilename", fallback: "bricksmate-framework.css",
       gen: generateFrameworkCSS, mime: "text/css", label: "↓ Framework CSS",
     },
+    {
+      title: "Bricks Classes JSON",
+      desc: "Clases (.btn, .btn--md…) para que aparezcan en el editor. Categoría = nombre del sistema.",
+      sub: "Bricks → Style Manager → Classes → Import",
+      field: "exportClassesFilename", fallback: "bricksmate-classes.json",
+      gen: (s) => generateClassesJSON(s, systemName), mime: "application/json", label: "↓ Classes JSON",
+    },
   ];
 
   return (<div>
@@ -1890,7 +1917,7 @@ function StepExport() {
       <input className={"ds-input" + (state.varPrefix && !/^[a-z][a-z0-9-]*$/.test(state.varPrefix) ? " ds-input-error" : "")} value={state.varPrefix} placeholder="e.g. ds, brand, acme" onChange={(e) => dispatch({ type: "SET_FIELD", field: "varPrefix", value: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} />
       <div className="ds-helper">{state.varPrefix ? "--" + state.varPrefix + "-space-m, --" + state.varPrefix + "-primary, ..." : "Leave empty for default naming: --space-m, --primary, ..."}</div>
     </div>
-    <div className="ds-export-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+    <div className="ds-export-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}>
       {CARDS.map(c => (
         <div key={c.field} className="ds-export-file-card">
           <h4>{c.title}</h4>
@@ -2123,7 +2150,8 @@ export default function App() {
   }, [view, state, currentId, library.autoSave]);
 
   const currentSystem = library.systems.find((s) => s.id === currentId);
-  const value = useMemo(() => ({ state, dispatch, darkMode, toggleDark, addToast }), [state, darkMode]);
+  const systemName = currentSystem?.name;
+  const value = useMemo(() => ({ state, dispatch, darkMode, toggleDark, addToast, systemName }), [state, darkMode, systemName]);
 
   return (<DSContext.Provider value={value}>
     <style>{css_styles}</style>
