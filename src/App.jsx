@@ -357,7 +357,7 @@ const css_styles = `
   [data-theme="dark"] {
     /* Negro neutro (#000) + acento #765DF5 */
     --ds-primary:hsl(0,0%,98%); --ds-primary-hover:hsl(0,0%,88%); --ds-primary-light:hsl(0,0%,18%);
-    --ds-bg:hsl(0,0%,0%); --ds-bg-card:hsl(0,0%,9%);
+    --ds-bg:hsl(0,0%,7.35%); --ds-bg-card:hsl(0,0%,9%);
     --ds-text:hsl(0,0%,98%); --ds-text-2:hsl(0,0%,70%); --ds-text-3:hsl(0,0%,50%);
     --ds-border:hsl(0,0%,24%); --ds-border-light:hsl(0,0%,16%);
     --ds-success:hsl(142,69%,52%); --ds-error:hsl(0,84%,66%);
@@ -535,7 +535,6 @@ const css_styles = `
   .ds-toast.ok .ds-toast-dot{background:var(--ds-success)} .ds-toast.info .ds-toast-dot{background:var(--ds-accent)} .ds-toast.err .ds-toast-dot{background:var(--ds-error)}
 
   /* ===== Tier 2: profundidad & pulido ===== */
-  .ds-content-body,.ds-dash{background:radial-gradient(1100px circle at 50% -8%,hsla(250,80%,62%,.05),transparent 55%)}
   .ds-sys-swatches{position:relative}
   .ds-sys-swatches::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(0,0,0,.14));pointer-events:none}
   .ds-mode-card:hover,.ds-export-file-card:hover,.ds-sys-card:hover{border-color:var(--ds-accent)}
