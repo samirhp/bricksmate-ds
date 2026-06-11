@@ -1896,18 +1896,18 @@ function StepExport() {
       disabled: !state.colors.palettes.length,
     },
     {
-      title: "Framework CSS",
-      desc: "CSS base: aplica variables a body, headings y sections.",
-      sub: "Bricks → Settings → Custom Code → CSS (head)",
-      field: "exportFrameworkFilename", fallback: "bricksmate-framework.css",
-      gen: generateFrameworkCSS, mime: "text/css", label: "↓ Framework CSS",
-    },
-    {
       title: "Bricks Classes JSON",
       desc: "Clases (.btn, .btn--md…) para que aparezcan en el editor. Categoría = nombre del sistema.",
       sub: "Bricks → Style Manager → Classes → Import",
       field: "exportClassesFilename", fallback: "bricksmate-classes.json",
       gen: (s) => generateClassesJSON(s, systemName), mime: "application/json", label: "↓ Classes JSON",
+    },
+    {
+      title: "Framework CSS",
+      desc: "CSS base: aplica variables a body, headings y sections.",
+      sub: "Bricks → Settings → Custom Code → CSS (head)",
+      field: "exportFrameworkFilename", fallback: "bricksmate-framework.css",
+      gen: generateFrameworkCSS, mime: "text/css", label: "↓ Framework CSS",
     },
   ];
 
