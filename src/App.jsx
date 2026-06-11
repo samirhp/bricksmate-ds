@@ -571,7 +571,8 @@ const css_styles = `
   .ds-mode-card:hover,.ds-export-file-card:hover,.ds-sys-card:hover{border-color:var(--ds-accent)}
   .ds-card,.ds-palette-card,.ds-viewport-config{transition:border-color .18s,box-shadow .18s}
   select.ds-input{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;padding-right:30px;cursor:pointer}
-  .ds-header,.ds-content-header,.ds-footer,.ds-sidebar{position:relative;z-index:1}
+  .ds-content-header,.ds-footer,.ds-sidebar{position:relative;z-index:1}
+  .ds-header{position:relative;z-index:20}
   /* Export success */
   .ds-dl-done{background:var(--ds-success)!important;color:#fff!important;animation:ds-dl-pop .4s}
   @keyframes ds-dl-pop{0%{transform:scale(1)}40%{transform:scale(1.05)}100%{transform:scale(1)}}
