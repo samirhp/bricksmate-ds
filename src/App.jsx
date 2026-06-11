@@ -410,7 +410,7 @@ const css_styles = `
   .ds-mode-cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px}
   .ds-mode-card{background:var(--ds-bg-card);border:1.5px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:20px;cursor:pointer;transition:all .2s;text-align:center;box-shadow:var(--ds-shadow)}
   .ds-mode-card:hover{border-color:var(--ds-border);box-shadow:var(--ds-shadow-md)} .ds-mode-card.selected{border-color:var(--ds-primary);background:var(--ds-primary-light);box-shadow:0 0 0 1px var(--ds-primary)}
-  .ds-mode-icon{font-size:24px;margin-bottom:10px;display:block;color:var(--ds-text-3)} .ds-mode-card.selected .ds-mode-icon{color:var(--ds-primary)}
+  .ds-mode-icon{margin-bottom:12px;display:flex;justify-content:center;color:var(--ds-text-3)} .ds-mode-card.selected .ds-mode-icon{color:var(--ds-primary)}
   .ds-mode-card h3{font-size:14px;font-weight:600;margin-bottom:4px} .ds-mode-card p{font-size:12px;color:var(--ds-text-2);line-height:1.5}
   .ds-viewport-config{background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:18px;margin-bottom:16px;box-shadow:var(--ds-shadow)} .ds-viewport-config h4{font-size:13px;font-weight:600;margin-bottom:14px}
   .ds-viewport-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
@@ -659,6 +659,31 @@ function NumStepper({ value, set, min, max, step = 1 }) {
 /* ================================================================
    STEP 1: LAYOUT MODE
    ================================================================ */
+function LayoutIcon({ mode }) {
+  // Fixed: guías punteadas juntas hacia el centro, contenido estrecho.
+  // Full: guías separadas y pegadas al borde, contenido casi a todo el ancho.
+  const fixed = mode === "fixed";
+  const gL = fixed ? 26 : 12, gR = fixed ? 62 : 76;
+  const cX = gL + 5, cW = gR - gL - 10;
+  return (
+    <svg viewBox="0 0 88 64" width="92" height="67" fill="none" aria-hidden="true">
+      {/* marco navegador */}
+      <rect x="2" y="2" width="84" height="60" rx="7" stroke="currentColor" strokeWidth="2" opacity=".9" />
+      <line x1="2" y1="16" x2="86" y2="16" stroke="currentColor" strokeWidth="2" opacity=".5" />
+      <circle cx="9" cy="9" r="1.6" fill="currentColor" opacity=".5" />
+      <circle cx="15" cy="9" r="1.6" fill="currentColor" opacity=".5" />
+      <circle cx="21" cy="9" r="1.6" fill="currentColor" opacity=".5" />
+      {/* guías de margen (único elemento en acento) */}
+      <line x1={gL} y1="20" x2={gL} y2="58" stroke="var(--ds-accent)" strokeWidth="2" strokeDasharray="3 3" />
+      <line x1={gR} y1="20" x2={gR} y2="58" stroke="var(--ds-accent)" strokeWidth="2" strokeDasharray="3 3" />
+      {/* contenido */}
+      <rect x={cX} y="27" width={cW} height="2.6" rx="1.3" fill="currentColor" opacity=".7" />
+      <rect x={cX} y="34" width={cW} height="2.6" rx="1.3" fill="currentColor" opacity=".45" />
+      <rect x={cX} y="41" width={Math.round(cW * 0.68)} height="2.6" rx="1.3" fill="currentColor" opacity=".45" />
+    </svg>
+  );
+}
+
 function StepLayout() {
   const { state, dispatch } = useDSContext();
   const { layoutMode, minViewport, maxViewport } = state;
@@ -669,8 +694,8 @@ function StepLayout() {
   }
   return (<div>
     <div className="ds-mode-cards">
-      <div className={"ds-mode-card" + (layoutMode === "fullwidth" ? " selected" : "")} onClick={() => dispatch({ type: "SET_LAYOUT_MODE", payload: "fullwidth" })}><span className="ds-mode-icon">⬛</span><h3>Full-width (100%)</h3><p>Content spans entire viewport</p></div>
-      <div className={"ds-mode-card" + (layoutMode === "fixed" ? " selected" : "")} onClick={() => dispatch({ type: "SET_LAYOUT_MODE", payload: "fixed" })}><span className="ds-mode-icon">▣</span><h3>Fixed-width</h3><p>Content constrained to max-width</p></div>
+      <div className={"ds-mode-card" + (layoutMode === "fullwidth" ? " selected" : "")} onClick={() => dispatch({ type: "SET_LAYOUT_MODE", payload: "fullwidth" })}><span className="ds-mode-icon"><LayoutIcon mode="fullwidth" /></span><h3>Full-width (100%)</h3><p>Content spans entire viewport</p></div>
+      <div className={"ds-mode-card" + (layoutMode === "fixed" ? " selected" : "")} onClick={() => dispatch({ type: "SET_LAYOUT_MODE", payload: "fixed" })}><span className="ds-mode-icon"><LayoutIcon mode="fixed" /></span><h3>Fixed-width</h3><p>Content constrained to max-width</p></div>
     </div>
     {layoutMode && (<div className="ds-viewport-config"><h4>Viewport range</h4>
       <ValidationAlert items={warns} />
