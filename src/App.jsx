@@ -23,7 +23,7 @@ function fluidValue(min, max, minVP, maxVP, cap) {
   const pref = fmt(intercept, 2) + "px + " + fmt(slope * 100, 4) + "vw";
   return cap ? "clamp(" + lo + "px, calc(" + pref + "), " + hi + "px)" : "max(" + lo + "px, calc(" + pref + "))";
 }
-function fl(min, max, s) { return fluidValue(min, max, s.minViewport, s.maxViewport, s.capValues); }
+function fl(min, max, s) { return fluidValue(min, max, s.minViewport, s.maxViewport, true); }
 function flRem(min, max, s) {
   const clampPx = fl(min, max, s);
   return clampPx.replace(/(\d+(?:\.\d+)?)px/g, (_, p) => pxToRem(parseFloat(p)));
@@ -42,7 +42,6 @@ function hexToHsl(hex) {
     if (mx === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60; else if (mx === g) h = ((b - r) / d + 2) * 60; else h = ((r - g) / d + 4) * 60; }
   return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) };
 }
-function clampL(v) { return Math.max(0, Math.min(100, Math.round(v))); }
 function randId() { return Math.random().toString(36).slice(2, 8).padEnd(6, '0'); }
 function hslStrToHex(str) {
   const m = (str || '').match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
@@ -153,7 +152,7 @@ const initVariants = (h, s, l) => {
 
 const initialState = {
   currentStep: 1,
-  layoutMode: "", minViewport: 375, maxViewport: 1920, capValues: true,
+  layoutMode: "", minViewport: 375, maxViewport: 1920,
   spacing: {
     baseMobile: 20, baseDesktop: 24, scale: 1.5,
     values: initSpaceVals(20, 24, 1.5),
@@ -187,7 +186,7 @@ const initialState = {
     sizes: JSON.parse(JSON.stringify(BTN_SIZE_DEFAULTS)),
   },
   radius: { base: 8, values: {}, circle: 999 },
-  exportVariablesFilename: "bricksmate-variables.json", exportPaletteFilename: "bricksmate-palette.json", exportFrameworkFilename: "bricksmate-framework.css", exportClassesFilename: "bricksmate-classes.json", varPrefix: "",
+  varPrefix: "",
 };
 
 // Init radius
@@ -233,7 +232,6 @@ function reducer(state, action) {
     case "SET_STEP": return { ...state, currentStep: action.payload };
     case "SET_LAYOUT_MODE": return { ...state, layoutMode: action.payload, maxViewport: action.payload === "fixed" ? 1280 : 1920 };
     case "SET_FIELD": return { ...state, [action.field]: action.value };
-    case "SET_SPACING": return { ...state, spacing: { ...state.spacing, ...action.payload } };
     case "SET_SPACE_VALUE": {
       const nv = { ...state.spacing.values, [action.key]: { ...state.spacing.values[action.key], [action.side]: action.value } };
       return { ...state, spacing: { ...state.spacing, values: nv } };
@@ -244,7 +242,6 @@ function reducer(state, action) {
       const nv = initSpaceVals(bm, bd, sc);
       return { ...state, spacing: { ...state.spacing, baseMobile: bm, baseDesktop: bd, scale: sc, values: nv } };
     }
-    case "SET_SECTION_SPACING": return { ...state, sectionSpacing: { ...state.sectionSpacing, ...action.payload } };
     case "SET_SECTION_SPACE_VALUE": {
       const nv = { ...state.sectionSpacing.values, [action.key]: { ...state.sectionSpacing.values[action.key], [action.side]: action.value } };
       return { ...state, sectionSpacing: { ...state.sectionSpacing, values: nv } };
@@ -306,7 +303,6 @@ function reducer(state, action) {
       const cur = state.buttons.enabled?.[action.id] !== false;
       return { ...state, buttons: { ...state.buttons, enabled: { ...state.buttons.enabled, [action.id]: !cur } } };
     }
-    case "RESET": return { ...initialState, currentStep: 1 };
     default: return state;
   }
 }
@@ -666,7 +662,7 @@ function NumStepper({ value, set, min, max, step = 1 }) {
    ================================================================ */
 function StepLayout() {
   const { state, dispatch } = useDSContext();
-  const { layoutMode, minViewport, maxViewport, capValues } = state;
+  const { layoutMode, minViewport, maxViewport } = state;
   const warns = [];
   if (layoutMode) {
     if (minViewport >= maxViewport) warns.push({ type: "error", msg: "Min viewport ≥ max viewport — clamp() fallback to static values, fluid scaling won't work" });
@@ -683,11 +679,7 @@ function StepLayout() {
         <div className="ds-form-group"><label>Min viewport (px)</label><NumStepper value={minViewport} set={(n) => dispatch({ type: "SET_FIELD", field: "minViewport", value: Math.max(0, n) })} min={0} step={5} /></div>
         <div className="ds-form-group"><label>Max viewport (px)</label><NumStepper value={maxViewport} set={(n) => dispatch({ type: "SET_FIELD", field: "maxViewport", value: Math.max(0, n) })} min={0} step={10} /></div>
       </div>
-      <div className="ds-form-group"><label>Header offset (px) <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— --offset, for anchor scroll</span></label><NumStepper value={state.offset ?? 80} set={(n) => dispatch({ type: "SET_FIELD", field: "offset", value: Math.max(0, n) })} min={0} step={4} /><div className="ds-helper">Sticky header height. Anchored sections offset by --offset so they don't hide under it.</div></div>
-      <div className="ds-toggle-row" onClick={() => dispatch({ type: "SET_FIELD", field: "capValues", value: !capValues })}>
-        <div className={"ds-toggle-track" + (capValues ? " on" : "")}><div className="ds-toggle-thumb" /></div>
-        <div className="ds-toggle-text"><strong>Cap values at max viewport</strong><span>{capValues ? "clamp() — stops at " + maxViewport + "px" : "max() — scales beyond " + maxViewport + "px"}</span></div>
-      </div>
+      <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Header offset (px) <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— --offset, for anchor scroll</span></label><NumStepper value={state.offset ?? 80} set={(n) => dispatch({ type: "SET_FIELD", field: "offset", value: Math.max(0, n) })} min={0} step={4} /><div className="ds-helper">Sticky header height. Anchored sections offset by --offset so they don't hide under it.</div></div>
     </div>)}
   </div>);
 }
@@ -1689,49 +1681,46 @@ function StepExport() {
   if (!state.layoutMode) warnings.push({ msg: "Select a layout mode in Step 1", step: 1 });
   if (!state.colors.palettes.length) warnings.push({ msg: "Add at least one color palette in Step 4", step: 4 });
 
-  const dl = (generator, filenameField, fallback, mime) => {
+  const baseName = slugify(systemName || "design-system");
+
+  const dl = (generator, filename, mime, key) => {
     try {
       const content = generator(state);
-      const fn = state[filenameField] || fallback;
       const blob = new Blob([content], { type: mime });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a"); a.href = url; a.download = fn;
+      const a = document.createElement("a"); a.href = url; a.download = filename;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      setStatus({ type: "ok", file: fn }); setTimeout(() => setStatus(null), 4000);
-      setDone(filenameField); setTimeout(() => setDone((d) => d === filenameField ? null : d), 1600);
-      addToast?.(fn + " downloaded", "ok");
+      setStatus({ type: "ok", file: filename }); setTimeout(() => setStatus(null), 4000);
+      setDone(key); setTimeout(() => setDone((d) => d === key ? null : d), 1600);
+      addToast?.(filename + " downloaded", "ok");
     } catch (e) { setStatus({ type: "error", msg: e.message }); addToast?.("Export failed", "err"); }
   };
 
   const CARDS = [
     {
-      title: "Variables JSON",
+      id: "variables", suffix: "variables.json", title: "Variables JSON",
       desc: "Todos los tokens: spacing, tipografía, gaps y radius.",
       sub: "Bricks → Style Manager → Variables → Import",
-      field: "exportVariablesFilename", fallback: "bricksmate-variables.json",
       gen: generateVariablesJSON, mime: "application/json", label: "↓ Variables JSON",
     },
     {
-      title: "Color Palette JSON",
+      id: "palette", suffix: "palette.json", title: "Color Palette JSON",
       desc: "Swatches de color para el selector de colores del editor.",
       sub: "Bricks → Style Manager → Color Palettes → Import",
-      field: "exportPaletteFilename", fallback: "bricksmate-palette.json",
       gen: generateColorPaletteJSON, mime: "application/json", label: "↓ Palette JSON",
       disabled: !state.colors.palettes.length,
     },
     {
-      title: "Bricks Classes JSON",
+      id: "classes", suffix: "classes.json", title: "Bricks Classes JSON",
       desc: "Clases (.btn, .btn--md…) para que aparezcan en el editor. Categoría = nombre del sistema.",
       sub: "Bricks → Style Manager → Classes → Import",
-      field: "exportClassesFilename", fallback: "bricksmate-classes.json",
       gen: (s) => generateClassesJSON(s, systemName), mime: "application/json", label: "↓ Classes JSON",
     },
     {
-      title: "Framework CSS",
+      id: "framework", suffix: "framework.css", title: "Framework CSS",
       desc: "CSS base: aplica variables a body, headings y sections.",
       sub: "Bricks → Settings → Custom Code → CSS (head)",
-      field: "exportFrameworkFilename", fallback: "bricksmate-framework.css",
       gen: generateFrameworkCSS, mime: "text/css", label: "↓ Framework CSS",
     },
   ];
@@ -1744,15 +1733,18 @@ function StepExport() {
       <div className="ds-helper">{state.varPrefix ? "--" + state.varPrefix + "-space-m, --" + state.varPrefix + "-primary, ..." : "Leave empty for default naming: --space-m, --primary, ..."}</div>
     </div>
     <div className="ds-export-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}>
-      {CARDS.map(c => (
-        <div key={c.field} className="ds-export-file-card">
+      {CARDS.map(c => {
+        const filename = baseName + "-" + c.suffix;
+        return (
+        <div key={c.id} className="ds-export-file-card">
           <h4>{c.title}</h4>
           <p>{c.desc}</p>
-          <div style={{ fontSize: 11, color: "var(--ds-text-3)", marginBottom: 14, fontFamily: "monospace" }}>{c.sub}</div>
-          <div className="ds-form-group"><label style={{ fontSize: 12 }}>Filename</label><input className="ds-input ds-input-sm" value={state[c.field] || c.fallback} onChange={(e) => dispatch({ type: "SET_FIELD", field: c.field, value: e.target.value })} /></div>
-          <button className={"ds-download-btn" + (done === c.field ? " ds-dl-done" : "")} onClick={() => dl(c.gen, c.field, c.fallback, c.mime)} disabled={warnings.length > 0 || c.disabled}>{done === c.field ? "✓ Downloaded!" : c.label}</button>
+          <div style={{ fontSize: 11, color: "var(--ds-text-3)", marginBottom: 8, fontFamily: "monospace" }}>{c.sub}</div>
+          <div style={{ fontSize: 12, color: "var(--ds-text-2)", marginBottom: 14, fontFamily: "monospace", padding: "7px 10px", background: "var(--ds-bg)", border: "1px solid var(--ds-border-light)", borderRadius: "var(--ds-radius)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{filename}</div>
+          <button className={"ds-download-btn" + (done === c.id ? " ds-dl-done" : "")} onClick={() => dl(c.gen, filename, c.mime, c.id)} disabled={warnings.length > 0 || c.disabled} style={{ marginTop: "auto" }}>{done === c.id ? "✓ Downloaded!" : c.label}</button>
         </div>
-      ))}
+        );
+      })}
     </div>
     {status?.type === "ok"    && <div className="ds-status ok">✓ {status.file} descargado correctamente</div>}
     {status?.type === "error" && <div className="ds-status" style={{ background: "rgba(220,53,69,.08)", color: "var(--ds-error)", border: "1px solid var(--ds-error)" }}>⚠ Error: {status.msg}</div>}
