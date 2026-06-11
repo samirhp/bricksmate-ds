@@ -124,11 +124,11 @@ const BTN_SIZES = [
   { key: "xl", label: "Extra Large", cls: "btn--xl" },
 ];
 const BTN_SIZE_DEFAULTS = {
-  sm:      { py: 0.45, px: 0.9, font: "s" },
-  default: { py: 0.6,  px: 1.2, font: "m" },
-  md:      { py: 0.75, px: 1.5, font: "m" },
-  lg:      { py: 0.9,  px: 1.8, font: "l" },
-  xl:      { py: 1.1,  px: 2.2, font: "xl" },
+  sm:      { py: 0.42, px: 0.85, font: "s" },
+  default: { py: 0.5,  px: 1.05, font: "m" },
+  md:      { py: 0.55, px: 1.2,  font: "mm" },
+  lg:      { py: 0.58, px: 1.35, font: "l" },
+  xl:      { py: 0.74, px: 1.6,  font: "l" },
 };
 const btnEnabled = (state, id) => state.buttons?.enabled?.[id] !== false; // por defecto activado
 const btnContrast = (l) => (l > 60 ? "#18181b" : "#ffffff");
@@ -315,6 +315,7 @@ function reducer(state, action) {
       const sizes = { ...state.buttons.sizes, [action.key]: { ...state.buttons.sizes[action.key], [action.field]: action.value } };
       return { ...state, buttons: { ...state.buttons, sizes } };
     }
+    case "RESET_BTN_SIZES": return { ...state, buttons: { ...state.buttons, sizes: JSON.parse(JSON.stringify(BTN_SIZE_DEFAULTS)) } };
     case "TOGGLE_BTN_COLOR": {
       const cur = state.buttons.enabled?.[action.id] !== false;
       return { ...state, buttons: { ...state.buttons, enabled: { ...state.buttons.enabled, [action.id]: !cur } } };
@@ -1031,7 +1032,10 @@ function StepButtons() {
   return (<div>
     {/* SIZES */}
     <div className="ds-card">
-      <h4>Sizes <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— padding in em (scales with font-size), font from your type scale</span></h4>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+        <h4 style={{ margin: 0 }}>Sizes <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— padding in em, font from your type scale</span></h4>
+        <button className="ds-btn ds-btn-sm" onClick={() => dispatch({ type: "RESET_BTN_SIZES" })} data-tip="Restore the default (gentle) size scale">↺ Reset to defaults</button>
+      </div>
       <div className="ds-btn-sizes">
         <div className="ds-btn-sizes-head"><span>Size</span><span>Padding Y</span><span>Padding X</span><span>Font</span></div>
         {BTN_SIZES.map((s) => { const sz = b.sizes[s.key]; return (
