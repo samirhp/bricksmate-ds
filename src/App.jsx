@@ -441,7 +441,7 @@ const css_styles = `
   .ds-header-icon{width:30px;height:30px;border-radius:var(--ds-radius);flex-shrink:0;display:block}
   .ds-header h1{font-size:14px;font-weight:600;letter-spacing:-.01em} .ds-header p{font-size:11px;color:var(--ds-text-2);margin-top:1px}
   .ds-main{display:flex;flex:1;overflow:hidden}
-  .ds-sidebar{width:200px;background:var(--ds-bg-card);border-right:1px solid var(--ds-border-light);padding:12px 8px;overflow-y:auto;flex-shrink:0}
+  .ds-sidebar{width:200px;background:var(--ds-bg-card);border-right:1px solid var(--ds-border-light);padding:12px 8px;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column}
   .ds-sidebar-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:var(--ds-text-3);padding:0 10px;margin-bottom:6px}
   .ds-step-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:var(--ds-radius);cursor:pointer;transition:all .15s;margin-bottom:1px;position:relative}
   .ds-step-item::before{content:'';position:absolute;left:0;top:18%;bottom:18%;width:2px;border-radius:2px;background:transparent;transition:background .15s}
@@ -671,13 +671,14 @@ const css_styles = `
   .ds-guest-banner span{flex:1;min-width:200px;line-height:1.45;color:var(--ds-text-2)}
   .ds-guest-banner .ds-btn{flex-shrink:0}
   /* ===== Cross-promo (marca personal) ===== */
-  .ds-promo{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-top:24px;padding:20px 22px;border-radius:var(--ds-radius-lg);background:linear-gradient(135deg,hsla(250,88%,66%,.14),hsla(250,88%,66%,.04));border:1px solid var(--ds-accent-ring)}
-  .ds-promo-img{width:60px;height:60px;border-radius:var(--ds-radius-lg);object-fit:cover;flex-shrink:0;border:1px solid var(--ds-accent-ring)}
-  .ds-promo-txt{flex:1 1 240px}
-  .ds-promo-txt h4{margin:0 0 4px;font-size:15px;font-weight:650;color:var(--ds-text)}
-  .ds-promo-txt p{margin:0;font-size:13px;color:var(--ds-text-2);line-height:1.5;max-width:460px}
-  .ds-promo-cta{flex-shrink:0;background:var(--ds-accent);color:#fff;text-decoration:none;font-size:14px;font-weight:600;padding:11px 20px;border-radius:var(--ds-radius);white-space:nowrap;transition:background .15s}
-  .ds-promo-cta:hover{background:var(--ds-accent-hover)}
+  .ds-spromo{margin:auto 4px 2px;padding-top:14px;border-top:1px solid var(--ds-border-light);display:flex;flex-direction:column;gap:9px}
+  .ds-spromo-img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:var(--ds-radius);border:1px solid var(--ds-accent-ring);display:block}
+  .ds-spromo-txt{font-size:11.5px;line-height:1.4;color:var(--ds-text-3)}
+  .ds-spromo-txt strong{display:block;color:var(--ds-text);font-weight:600;font-size:12.5px;margin-bottom:2px}
+  .ds-spromo-cta{display:flex;gap:6px;text-decoration:none}
+  .ds-spromo-label{flex:1;display:flex;align-items:center;justify-content:center;background:var(--ds-bg);border:1px solid var(--ds-border);border-radius:var(--ds-radius);font-size:11.5px;font-weight:600;color:var(--ds-text);padding:8px 10px;transition:all .15s}
+  .ds-spromo-arrow{width:36px;display:flex;align-items:center;justify-content:center;background:var(--ds-accent);color:#fff;border-radius:var(--ds-radius);font-size:14px;flex-shrink:0;transition:background .15s}
+  .ds-spromo-cta:hover .ds-spromo-label{border-color:var(--ds-accent)} .ds-spromo-cta:hover .ds-spromo-arrow{background:var(--ds-accent-hover)}
   .ds-credit{margin-top:28px;text-align:center;font-size:12px;color:var(--ds-text-3)}
   .ds-credit a{color:var(--ds-accent);text-decoration:none;font-weight:500}
   .ds-credit a:hover{text-decoration:underline}
@@ -838,7 +839,9 @@ function Sidebar() {
   return (<nav className="ds-sidebar"><div className="ds-sidebar-title">Steps</div>{STEPS.map((s) => (
     <div key={s.id} className={"ds-step-item" + (state.currentStep === s.id ? " active" : "")} onClick={() => dispatch({ type: "SET_STEP", payload: s.id })}>
       <div className="ds-step-num">{s.id}</div><span className="ds-step-label">{s.label}</span>{s.check(state) && <div className="ds-step-check">✓</div>}
-    </div>))}</nav>);
+    </div>))}
+    <SidebarPromo />
+  </nav>);
 }
 function Footer() {
   const { state, dispatch } = useDSContext();
@@ -2014,17 +2017,17 @@ function StepPreview() {
 /* ================================================================
    STEP 9: EXPORT
    ================================================================ */
-// Cross-promo de marca personal (SamirH) → genera leads de servicios
+// Cross-promo de marca personal (Samir Haddad) → genera leads de servicios
 const CAL_URL = "https://cal.com/samirh";
-function SamirPromo() {
+function SidebarPromo() {
   return (
-    <div className="ds-promo">
-      <img className="ds-promo-img" src="/samirh.png" alt="Samir Haddad" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-      <div className="ds-promo-txt">
-        <h4>Need it done for you?</h4>
-        <p>I'm Samir Haddad — I design &amp; build high-converting websites and design systems in Bricks. Let's talk about your project.</p>
-      </div>
-      <a className="ds-promo-cta" href={CAL_URL} target="_blank" rel="noopener noreferrer">Book a free call →</a>
+    <div className="ds-spromo">
+      <img className="ds-spromo-img" src="/samirh.png" alt="Samir Haddad" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+      <div className="ds-spromo-txt"><strong>Still have questions?</strong>Book a free call with me.</div>
+      <a className="ds-spromo-cta" href={CAL_URL} target="_blank" rel="noopener noreferrer">
+        <span className="ds-spromo-label">Book a call</span>
+        <span className="ds-spromo-arrow">→</span>
+      </a>
     </div>
   );
 }
@@ -2105,7 +2108,6 @@ function StepExport() {
     </div>
     {status?.type === "ok"    && <div className="ds-status ok">✓ {status.file} descargado correctamente</div>}
     {status?.type === "error" && <div className="ds-status" style={{ background: "rgba(220,53,69,.08)", color: "var(--ds-error)", border: "1px solid var(--ds-error)" }}>⚠ Error: {status.msg}</div>}
-    <SamirPromo />
   </div>);
 }
 
