@@ -101,8 +101,8 @@ const initHeadings = (baseMob, baseDesk, scale) => {
   return hs;
 };
 
-const TEXT_KEYS = ["xs", "s", "m", "mm", "l", "xl", "xxl"];
-const TEXT_STEPS = { xs: -2, s: -1, m: 0, mm: 0.5, l: 1, xl: 2, xxl: 3 };
+const TEXT_KEYS = ["xs", "s", "m", "l", "xl", "xxl"];
+const TEXT_STEPS = { xs: -2, s: -1, m: 0, l: 1, xl: 2, xxl: 3 };
 
 const initTexts = (baseMob, baseDesk, scale) => {
   const ts = {};
@@ -138,7 +138,7 @@ const BTN_SIZES = [
 const BTN_SIZE_DEFAULTS = {
   sm:      { py: 0.42, px: 0.85, font: "s" },
   default: { py: 0.5,  px: 1.05, font: "m" },
-  md:      { py: 0.55, px: 1.2,  font: "mm" },
+  md:      { py: 0.55, px: 1.2,  font: "m" },
   lg:      { py: 0.58, px: 1.35, font: "l" },
   xl:      { py: 0.74, px: 1.6,  font: "l" },
 };
@@ -149,7 +149,8 @@ const btnContrast = (l) => (l > 60 ? "#18181b" : "#ffffff");
 function buttonInlineStyle(state, p, sizeKey, outline, hover) {
   const b = state.buttons || { sizes: BTN_SIZE_DEFAULTS, radiusKey: "m" };
   const sz = (b.sizes && b.sizes[sizeKey]) || BTN_SIZE_DEFAULTS[sizeKey];
-  const fontPx = state.typography.texts[sz.font]?.desktop || 16;
+  const fontKey = TEXT_KEYS.includes(sz.font) ? sz.font : "m"; // tolera claves antiguas (p.ej. "mm")
+  const fontPx = state.typography.texts[fontKey]?.desktop || 16;
   const radiusPx = b.radiusKey === "circle" ? state.radius.circle : (state.radius.values[b.radiusKey] || 0);
   const ms = b.transitionMs ?? 150;
   const col = "hsl(" + p.hue + "," + p.saturation + "%," + p.lightness + "%)";
@@ -988,22 +989,22 @@ function buildColorVarOptions(state) {
   const opts = [];
   (state.colors?.palettes || []).forEach((p) => {
     const slug = slugify(p.name);
-    opts.push({ group: p.name, label: "Base", value: "var(--" + slug + ")", color: hslToHex(p.hue, p.saturation, p.lightness) });
+    opts.push({ label: p.name, value: "var(--" + slug + ")", color: hslToHex(p.hue, p.saturation, p.lightness) });
     if (p.showVariants) VARIANT_LIGHTNESS.forEach(({ key }) => {
       if (key === "medium" || !p.variants[key]) return;
-      opts.push({ group: p.name, label: key, value: "var(--" + slug + "-" + key + ")", color: p.variants[key] });
+      opts.push({ label: p.name + " " + key, value: "var(--" + slug + "-" + key + ")", color: p.variants[key] });
     });
     if (p.showTransparency) TRANS_STEPS.forEach((o) => {
-      opts.push({ group: p.name, label: "alpha " + o + "%", value: "var(--" + slug + "-trans-" + o + ")", color: "hsla(" + p.hue + "," + p.saturation + "%," + p.lightness + "%," + (o / 100) + ")" });
+      opts.push({ label: p.name + " alpha " + o + "%", value: "var(--" + slug + "-trans-" + o + ")", color: "hsla(" + p.hue + "," + p.saturation + "%," + p.lightness + "%," + (o / 100) + ")" });
     });
   });
   if (state.colors?.whiteTransparency) {
-    opts.push({ group: "Neutral", label: "White", value: "var(--white)", color: "#ffffff" });
-    TRANS_STEPS.forEach((o) => opts.push({ group: "Neutral", label: "White " + o + "%", value: "var(--white-trans-" + o + ")", color: "rgba(255,255,255," + (o / 100) + ")" }));
+    opts.push({ label: "White", value: "var(--white)", color: "#ffffff" });
+    TRANS_STEPS.forEach((o) => opts.push({ label: "White alpha " + o + "%", value: "var(--white-trans-" + o + ")", color: "rgba(255,255,255," + (o / 100) + ")" }));
   }
   if (state.colors?.blackTransparency) {
-    opts.push({ group: "Neutral", label: "Black", value: "var(--black)", color: "#000000" });
-    TRANS_STEPS.forEach((o) => opts.push({ group: "Neutral", label: "Black " + o + "%", value: "var(--black-trans-" + o + ")", color: "rgba(0,0,0," + (o / 100) + ")" }));
+    opts.push({ label: "Black", value: "var(--black)", color: "#000000" });
+    TRANS_STEPS.forEach((o) => opts.push({ label: "Black alpha " + o + "%", value: "var(--black-trans-" + o + ")", color: "rgba(0,0,0," + (o / 100) + ")" }));
   }
   return opts;
 }
@@ -1011,8 +1012,6 @@ function buildColorVarOptions(state) {
 function ColorVarPicker({ value, onChange, opts }) {
   const known = opts.find((o) => o.value === value);
   const swatch = known ? known.color : (value && value.startsWith("#") ? value : null);
-  const groups = [];
-  opts.forEach((o) => { let g = groups.find((x) => x.name === o.group); if (!g) { g = { name: o.group, items: [] }; groups.push(g); } g.items.push(o); });
   return (
     <div className="ds-cvar">
       <span className="ds-cvar-sw" style={swatch
@@ -1020,11 +1019,7 @@ function ColorVarPicker({ value, onChange, opts }) {
         : { background: "var(--ds-border)" }} />
       <select className="ds-input" value={known ? value : "__custom"} onChange={(e) => onChange(e.target.value)}>
         {!known && <option value="__custom">Custom: {value}</option>}
-        {groups.map((g) => (
-          <optgroup key={g.name} label={g.name}>
-            {g.items.map((o) => <option key={o.value} value={o.value}>{o.label} · {o.value}</option>)}
-          </optgroup>
-        ))}
+        {opts.map((o) => <option key={o.value} value={o.value}>{o.label} · {o.value}</option>)}
       </select>
     </div>
   );
@@ -1448,7 +1443,7 @@ function generateVariablesJSON(state) {
       id: catIds['Texts'], name: 'Texts',
       scale: {
         scaleScope: 'typography', scaleType: 'custom',
-        scaleNames: ['xs','s','m','mm','l','xl','xxl'],
+        scaleNames: ['xs','s','m','l','xl','xxl'],
         prefix: pn('text-'),
         minFontSize: ty.textBaseMob, minScaleRatio: ty.textScale, minScaleRatioSelect: ty.textScale,
         maxFontSize: ty.textBaseDesk, maxScaleRatio: ty.textScale, maxScaleRatioSelect: ty.textScale,
@@ -1534,14 +1529,15 @@ function generateButtonsCSS(state, v) {
   const palettes = state.colors.palettes.filter((pl) => btnEnabled(state, pl.id));
   const rad = b.radiusKey === "circle" ? v("radius-circle") : v("radius-" + b.radiusKey);
   const d = b.sizes.default;
+  const fk = (f) => TEXT_KEYS.includes(f) ? f : "m"; // tolera claves antiguas (p.ej. "mm")
   let css = "\n/* ================================================\n * BUTTONS (BEM) — compose: class=\"btn btn--primary btn--lg\"\n * ================================================ */\n";
   css += ".btn {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  gap: 0.5em;\n";
   css += "  padding: " + v("pad-btn-y-default") + " " + v("pad-btn-x-default") + ";\n";
-  css += "  font-size: " + v("text-" + d.font) + ";\n  font-weight: 600;\n  line-height: 1.2;\n  text-decoration: none;\n  cursor: pointer;\n  border: 1.5px solid transparent;\n";
+  css += "  font-size: " + v("text-" + fk(d.font)) + ";\n  font-weight: 600;\n  line-height: 1.2;\n  text-decoration: none;\n  cursor: pointer;\n  border: 1.5px solid transparent;\n";
   css += "  border-radius: " + rad + ";\n  transition: background-color " + v("btn-transition") + ", color " + v("btn-transition") + ", border-color " + v("btn-transition") + ";\n}\n";
   BTN_SIZES.filter((s) => s.cls).forEach((s) => {
     const sz = b.sizes[s.key];
-    css += "." + s.cls + " {\n  padding: " + v("pad-btn-y-" + s.key) + " " + v("pad-btn-x-" + s.key) + ";\n  font-size: " + v("text-" + sz.font) + ";\n}\n";
+    css += "." + s.cls + " {\n  padding: " + v("pad-btn-y-" + s.key) + " " + v("pad-btn-x-" + s.key) + ";\n  font-size: " + v("text-" + fk(sz.font)) + ";\n}\n";
   });
   palettes.forEach((pl) => {
     const slug = slugify(pl.name);
