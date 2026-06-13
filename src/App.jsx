@@ -659,6 +659,13 @@ const css_styles = `
   .ds-migrate-name{font-size:13px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .ds-migrate-meta{font-size:11px;color:var(--ds-text-3);white-space:nowrap}
   .ds-migrate-foot{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--ds-text-2)}
+  .ds-admin-badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#fff;background:var(--ds-accent);padding:2px 7px;border-radius:999px}
+  .ds-admin-table{width:100%;border-collapse:collapse;background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);overflow:hidden}
+  .ds-admin-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ds-text-3);padding:12px 16px;border-bottom:1px solid var(--ds-border-light);font-weight:600}
+  .ds-admin-table td{padding:12px 16px;font-size:13px;border-bottom:1px solid var(--ds-border-light);color:var(--ds-text);vertical-align:middle}
+  .ds-admin-table tr:last-child td{border-bottom:none}
+  .ds-admin-limit{display:flex;align-items:center;gap:10px}
+  .ds-admin-inf{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--ds-text-2);cursor:pointer;user-select:none}
 
   @media (prefers-reduced-motion:reduce){.ds-step-anim,.ds-step-check,.ds-toast{animation:none}*{transition-duration:.01ms!important}}
 `;
@@ -749,10 +756,11 @@ function SelectMigrateModal({ prompt, onConfirm, onClose }) {
   );
 }
 // Control de cuenta en cabecera
-function AuthControl({ user, onSignIn, onSignOut }) {
+function AuthControl({ user, isAdmin, onSignIn, onSignOut }) {
   if (!cloudEnabled) return null;
   if (user) return (
     <div className="ds-auth-chip" title={user.email}>
+      {isAdmin && <span className="ds-admin-badge">Admin</span>}
       <span className="ds-auth-email">{user.email}</span>
       <button className="ds-auth-out" onClick={onSignOut}>Sign out</button>
     </div>
@@ -769,7 +777,7 @@ function GuestBanner({ onSignIn }) {
     </div>
   );
 }
-function EditorHeader({ name, onRename, onBack, autoSave, onToggleAutoSave, dirty, onSave, darkMode, toggleDark, user, onSignIn, onSignOut }) {
+function EditorHeader({ name, onRename, onBack, autoSave, onToggleAutoSave, dirty, onSave, darkMode, toggleDark, user, onSignIn, onSignOut, isAdmin }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(name);
   useEffect(() => { setVal(name); }, [name]);
@@ -788,7 +796,7 @@ function EditorHeader({ name, onRename, onBack, autoSave, onToggleAutoSave, dirt
       <button className="ds-btn ds-btn-primary ds-btn-sm" onClick={onSave} disabled={autoSave || !dirty} data-tip="Save changes (⌘/Ctrl + S)">
         {autoSave ? "✓ Auto-saved" : (dirty ? "Save changes" : "✓ Saved")}
       </button>
-      <AuthControl user={user} onSignIn={onSignIn} onSignOut={onSignOut} />
+      <AuthControl user={user} isAdmin={isAdmin} onSignIn={onSignIn} onSignOut={onSignOut} />
       <button className="ds-header-theme" onClick={toggleDark} data-tip="Toggle light / dark theme"><ThemeIcon dark={darkMode} /></button>
     </div>
   </header>);
@@ -2089,22 +2097,24 @@ function SystemCard({ sys, onOpen, onDuplicate, onDelete, onRename }) {
   </div>);
 }
 
-function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, onDelete, onRename, user, onSignIn, onSignOut, atMax }) {
+function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, onDelete, onRename, user, onSignIn, onSignOut, limit, isAdmin, onOpenAdmin }) {
   const systems = library.systems;
+  const atMax = !!user && limit != null && systems.length >= limit;
   return (<>
     <header className="ds-header">
       <BrandMark />
       <div><h1>Design System Generator for Bricks Builder</h1><p>Your saved design systems</p></div>
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
-        <AuthControl user={user} onSignIn={onSignIn} onSignOut={onSignOut} />
+        {isAdmin && <button className="ds-btn ds-btn-sm" onClick={onOpenAdmin} data-tip="Manage users">Users</button>}
+        <AuthControl user={user} isAdmin={isAdmin} onSignIn={onSignIn} onSignOut={onSignOut} />
         <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode"><ThemeIcon dark={darkMode} /></button>
       </div>
     </header>
     <div className="ds-dash">
       {!user && <GuestBanner onSignIn={onSignIn} />}
       <div className="ds-dash-head">
-        <div><h2 className="ds-dash-title">My design systems</h2><p className="ds-dash-sub">{user ? systems.length + " / " + MAX_SYSTEMS + " in cloud" : systems.length + " system" + (systems.length === 1 ? "" : "s") + " on this device"}</p></div>
-        <button className="ds-btn ds-btn-primary" onClick={onNew} disabled={!!user && atMax} data-tip={!!user && atMax ? "Cloud limit: " + MAX_SYSTEMS + " max" : undefined}>+ New system</button>
+        <div><h2 className="ds-dash-title">My design systems</h2><p className="ds-dash-sub">{user ? systems.length + " / " + (limit == null ? "∞" : limit) + " in cloud" : systems.length + " system" + (systems.length === 1 ? "" : "s") + " on this device"}</p></div>
+        <button className="ds-btn ds-btn-primary" onClick={onNew} disabled={atMax} data-tip={atMax ? "Cloud limit reached (" + limit + ")" : undefined}>+ New system</button>
       </div>
       {systems.length === 0
         ? <div className="ds-dash-empty">
@@ -2118,6 +2128,68 @@ function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, 
           </div>}
     </div>
   </>);
+}
+
+// Página de administración: listado de usuarios + límite editable (solo admin; gate real en la BD)
+function AdminUsers({ onBack, darkMode, toggleDark, addToast }) {
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState(null);
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try { const { data, error } = await supabase.rpc("admin_list_users"); if (error) throw error; if (active) setRows(data || []); }
+      catch (e) { if (active) setErr(e.message || "Could not load users"); }
+    })();
+    return () => { active = false; };
+  }, []);
+  const setLimit = async (id, value) => {
+    try {
+      const { error } = await supabase.rpc("admin_set_limit", { target: id, new_limit: value });
+      if (error) throw error;
+      setRows((rs) => rs.map((r) => r.id === id ? { ...r, system_limit: value } : r));
+      addToast("Limit updated", "ok");
+    } catch (e) { addToast("Could not update limit", "err"); }
+  };
+  return (<>
+    <header className="ds-header">
+      <button className="ds-header-back" onClick={onBack} data-tip="Back to my systems">←</button>
+      <BrandMark />
+      <div><h1>Users</h1><p>Admin · manage cloud limits</p></div>
+      <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode" style={{ marginLeft: "auto" }}><ThemeIcon dark={darkMode} /></button>
+    </header>
+    <div className="ds-dash">
+      {err ? <div className="ds-warning">⚠ {err}</div>
+        : rows == null ? <div className="ds-auth-loading">Loading users…</div>
+        : rows.length === 0 ? <p className="ds-dash-sub">No users yet.</p>
+        : (<table className="ds-admin-table">
+            <thead><tr><th>Email</th><th>Systems</th><th>Cloud limit</th></tr></thead>
+            <tbody>{rows.map((r) => <AdminUserRow key={r.id} row={r} onSetLimit={setLimit} />)}</tbody>
+          </table>)}
+    </div>
+  </>);
+}
+function AdminUserRow({ row, onSetLimit }) {
+  const [val, setVal] = useState(row.system_limit == null ? "" : String(row.system_limit));
+  const [inf, setInf] = useState(row.system_limit == null);
+  useEffect(() => { const u = row.system_limit == null; setInf(u); setVal(u ? "" : String(row.system_limit)); }, [row.system_limit]);
+  const save = () => {
+    const next = inf ? null : Math.max(0, parseInt(val, 10) || 0);
+    if (next === row.system_limit) return;
+    onSetLimit(row.id, next);
+  };
+  return (
+    <tr>
+      <td>{row.email}{row.is_admin && <span className="ds-admin-badge" style={{ marginLeft: 8 }}>Admin</span>}</td>
+      <td>{row.systems_count}</td>
+      <td>
+        <div className="ds-admin-limit">
+          <label className="ds-admin-inf"><input type="checkbox" checked={inf} onChange={(e) => { const c = e.target.checked; setInf(c); if (!c && !val) setVal("5"); }} /> ∞</label>
+          <input className="ds-input ds-input-sm" type="number" min="0" style={{ width: 70 }} value={inf ? "" : val} disabled={inf} placeholder="—" onChange={(e) => setVal(e.target.value)} onBlur={save} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} />
+          <button className="ds-btn ds-btn-sm" onClick={save}>Save</button>
+        </div>
+      </td>
+    </tr>
+  );
 }
 
 export default function App() {
@@ -2142,6 +2214,8 @@ export default function App() {
   const [authReady, setAuthReady] = useState(!cloudEnabled); // sin nube → listo al instante
   const [authOpen, setAuthOpen] = useState(false);           // modal magic link
   const [migratePrompt, setMigratePrompt] = useState(null);  // { candidates, slots } → modal de selección
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [userLimit, setUserLimit] = useState(MAX_SYSTEMS);   // null = ilimitado
   const cloudMode = !!user;
   const cloudSaveTimer = useRef(null);
   const cloudSavePending = useRef(null);
@@ -2192,21 +2266,28 @@ export default function App() {
     if (loadedUserRef.current === u.id) return;
     loadedUserRef.current = u.id;
     try {
+      // Perfil: admin + límite personalizado (null = ilimitado)
+      let lim = MAX_SYSTEMS;
+      try {
+        const { data: prof } = await supabase.from("profiles").select("is_admin, system_limit").eq("id", u.id).single();
+        if (prof) { setIsAdmin(!!prof.is_admin); lim = prof.system_limit; setUserLimit(prof.system_limit); }
+      } catch {}
       const existing = await cloudListSystems();
       setLibrary({ autoSave: true, systems: existing });
       restoreSession(existing);
-      // Migración de locales
+      // Migración de locales (slots según el límite del usuario; null = ilimitado)
       const existingIds = new Set(existing.map((s) => s.id));
       const candidates = readLocalSystems().filter((s) => !existingIds.has(s.id));
-      const slots = MAX_SYSTEMS - existing.length;
       if (!candidates.length) return;
-      if (slots <= 0) { addToast("Cloud is full (" + MAX_SYSTEMS + "/" + MAX_SYSTEMS + ") — local systems kept on this device", "info"); return; }
+      const slots = (lim == null) ? candidates.length : (lim - existing.length);
+      if (slots <= 0) { addToast("Cloud is full — local systems kept on this device", "info"); return; }
       if (candidates.length <= slots) await migrateThese(candidates);
       else setMigratePrompt({ candidates, slots }); // hay que elegir
     } catch (e) { addToast("Could not load your cloud systems", "err"); }
   };
   const handleSignedOut = () => {
     loadedUserRef.current = null;
+    setIsAdmin(false); setUserLimit(MAX_SYSTEMS);
     setLibrary(loadLibrary());
     setView("dashboard"); setCurrentId(null); setDirty(false);
     try { localStorage.removeItem(SESSION_KEY); } catch {}
@@ -2284,9 +2365,9 @@ export default function App() {
     try { localStorage.setItem(SESSION_KEY, id); } catch {}
   };
   const atLimit = () => {
-    // El tope solo aplica en la nube; en local es ilimitado.
-    if (cloudMode && library.systems.length >= MAX_SYSTEMS) {
-      addToast("Cloud limit reached: " + MAX_SYSTEMS + " max. Delete one to add another.", "err");
+    // El tope solo aplica en la nube y si el usuario tiene un límite (null = ilimitado).
+    if (cloudMode && userLimit != null && library.systems.length >= userLimit) {
+      addToast("Cloud limit reached: " + userLimit + " max. Delete one to add another.", "err");
       return true;
     }
     return false;
@@ -2297,7 +2378,7 @@ export default function App() {
     const sys = { id: "sys_" + randId(), name: "Design system " + (library.systems.length + 1), createdAt: nowISO(), updatedAt: nowISO(), doc };
     if (cloudMode) {
       try { await cloudInsertSystem(sys); }
-      catch (e) { addToast(isLimitError(e) ? "Limit reached: " + MAX_SYSTEMS + " max" : "Could not create system", "err"); return; }
+      catch (e) { addToast(isLimitError(e) ? "Cloud limit reached" + (userLimit != null ? ": " + userLimit + " max" : "") : "Could not create system", "err"); return; }
     }
     const lib = { ...library, systems: [...library.systems, sys] };
     setLibrary(lib); if (!cloudMode) persistLibrary(lib);
@@ -2313,7 +2394,7 @@ export default function App() {
     const copy = { id: "sys_" + randId(), name: sys.name + " (copy)", createdAt: nowISO(), updatedAt: nowISO(), doc: JSON.parse(JSON.stringify(sys.doc)) };
     if (cloudMode) {
       try { await cloudInsertSystem(copy); }
-      catch (e) { addToast(isLimitError(e) ? "Limit reached: " + MAX_SYSTEMS + " max" : "Could not duplicate", "err"); return; }
+      catch (e) { addToast(isLimitError(e) ? "Cloud limit reached" + (userLimit != null ? ": " + userLimit + " max" : "") : "Could not duplicate", "err"); return; }
     }
     const lib = { ...library, systems: [...library.systems, copy] };
     setLibrary(lib); if (!cloudMode) persistLibrary(lib);
@@ -2369,7 +2450,6 @@ export default function App() {
 
   const currentSystem = library.systems.find((s) => s.id === currentId);
   const systemName = currentSystem?.name;
-  const atMax = library.systems.length >= MAX_SYSTEMS;
   const value = useMemo(() => ({ state, dispatch, darkMode, toggleDark, addToast, systemName, user, openAuth }), [state, darkMode, systemName, user]);
 
   return (<DSContext.Provider value={value}>
@@ -2377,10 +2457,12 @@ export default function App() {
     <div className="ds-app" data-theme={darkMode ? "dark" : "light"}>
       {!authReady
         ? <div className="ds-auth-loading">Loading…</div>
+        : view === "admin"
+        ? <AdminUsers onBack={() => setView("dashboard")} darkMode={darkMode} toggleDark={toggleDark} addToast={addToast} myLimit={userLimit} />
         : view === "dashboard"
-        ? <Dashboard library={library} darkMode={darkMode} toggleDark={toggleDark} onOpen={openSystem} onNew={createSystem} onDuplicate={duplicateSystem} onDelete={deleteSystem} onRename={renameSystem} user={user} onSignIn={openAuth} onSignOut={signOut} atMax={atMax} />
+        ? <Dashboard library={library} darkMode={darkMode} toggleDark={toggleDark} onOpen={openSystem} onNew={createSystem} onDuplicate={duplicateSystem} onDelete={deleteSystem} onRename={renameSystem} user={user} onSignIn={openAuth} onSignOut={signOut} limit={userLimit} isAdmin={isAdmin} onOpenAdmin={() => setView("admin")} />
         : <>
-            <EditorHeader name={currentSystem?.name || "Untitled"} onRename={(n) => renameSystem(currentId, n)} onBack={backToDashboard} autoSave={library.autoSave} onToggleAutoSave={toggleAutoSave} dirty={dirty} onSave={() => saveDoc(true)} darkMode={darkMode} toggleDark={toggleDark} user={user} onSignIn={openAuth} onSignOut={signOut} />
+            <EditorHeader name={currentSystem?.name || "Untitled"} onRename={(n) => renameSystem(currentId, n)} onBack={backToDashboard} autoSave={library.autoSave} onToggleAutoSave={toggleAutoSave} dirty={dirty} onSave={() => saveDoc(true)} darkMode={darkMode} toggleDark={toggleDark} user={user} onSignIn={openAuth} onSignOut={signOut} isAdmin={isAdmin} />
             <ProgressBar />
             <div className="ds-main"><Sidebar /><StepContent /></div>
             <Footer />
