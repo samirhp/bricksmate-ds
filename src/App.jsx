@@ -179,10 +179,10 @@ function buttonInlineStyle(state, p, sizeKey, outline, hover) {
 }
 
 // Botón de preview con hover real (los estilos inline no soportan :hover)
-function PreviewButton({ state, palette, sizeKey, outline, children }) {
+function PreviewButton({ state, palette, sizeKey, outline, children, dataVar }) {
   const [hover, setHover] = useState(false);
   return (
-    <button style={buttonInlineStyle(state, palette, sizeKey, outline, hover)}
+    <button data-var={dataVar} style={buttonInlineStyle(state, palette, sizeKey, outline, hover)}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
       {children || "Button"}
     </button>
@@ -1811,6 +1811,16 @@ function LandingPreview({ state }) {
   const wrapRef = useRef(null);
   const [width, setWidth] = useState(null); // px arrastrado, o null = ancho completo
   const [maxW, setMaxW] = useState(null);   // ancho máximo del panel (full) para mapear a viewport
+  const [inspect, setInspect] = useState(false); // modo inspector de variables
+  const [hl, setHl] = useState(null);             // highlight activo { top,left,width,height,label }
+  const onInspectMove = (e) => {
+    if (!inspect || !wrapRef.current) return;
+    const el = e.target.closest("[data-var]");
+    if (!el) { setHl(null); return; }
+    const wr = wrapRef.current.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    setHl({ top: r.top - wr.top, left: r.left - wr.left, width: r.width, height: r.height, label: el.getAttribute("data-var") });
+  };
   useEffect(() => {
     const el = wrapRef.current?.parentElement;
     if (!el) return;
@@ -1937,12 +1947,19 @@ function LandingPreview({ state }) {
         {isFixed ? "Fixed-width · max " + maxVp + "px" : "Full-width · 100%"}
       </span>
       <span style={{ fontSize: 11.5, color: "var(--ds-text-3)" }}>↔ Drag to resize — simulating ≈{simVP}px viewport{ratio >= 0.999 ? " (desktop)" : ratio <= 0.001 ? " (mobile)" : ""}</span>
-      {width && <button className="ds-btn ds-btn-sm" onClick={() => setWidth(null)} style={{ marginLeft: "auto" }}>Reset width</button>}
+      <button className={"ds-btn ds-btn-sm" + (inspect ? " ds-btn-primary" : "")} onClick={() => { setInspect((v) => !v); setHl(null); }} style={{ marginLeft: "auto" }} data-tip="Hover elements to see their CSS variables">🔍 Inspect</button>
+      {width && <button className="ds-btn ds-btn-sm" onClick={() => setWidth(null)}>Reset width</button>}
     </div>
     {/* Área redimensionable (cqw responde a este contenedor) */}
     <div style={{ position: "relative", paddingRight: 18 }}>
       <div ref={wrapRef} style={{ ...vars, position: "relative", width: width ? width + "px" : "100%", maxWidth: "100%", containerType: "inline-size" }}>
-        <div style={{ background: "var(--cbg)", color: "var(--ctext)", fontFamily: "'Inter',system-ui,sans-serif", borderRadius: "var(--ds-radius-lg)", overflow: "hidden", border: "1px solid var(--ds-border-light)" }}>
+        {inspect && hl && (
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 6 }}>
+            <div style={{ position: "absolute", top: hl.top, left: hl.left, width: hl.width, height: hl.height, outline: "2px solid var(--ds-accent)", outlineOffset: "-1px", background: "hsla(250,88%,66%,.08)", borderRadius: 3, boxSizing: "border-box" }} />
+            <div style={{ position: "absolute", top: Math.max(2, hl.top - 23), left: Math.max(2, hl.left), background: "var(--ds-accent)", color: "#fff", fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 5, whiteSpace: "nowrap", fontFamily: "'SF Mono',Consolas,monospace", boxShadow: "var(--ds-shadow-md)" }}>{hl.label}</div>
+          </div>
+        )}
+        <div onMouseMove={onInspectMove} onMouseLeave={() => setHl(null)} style={{ background: "var(--cbg)", color: "var(--ctext)", fontFamily: "'Inter',system-ui,sans-serif", borderRadius: "var(--ds-radius-lg)", overflow: "hidden", border: "1px solid var(--ds-border-light)", cursor: inspect ? "crosshair" : "default" }}>
 
       {/* NAV */}
       <header style={{ borderBottom: "1px solid var(--cbd)" }}>
@@ -1952,25 +1969,25 @@ function LandingPreview({ state }) {
             <span style={{ fontWeight: 700, fontSize: "var(--tl)", color: "var(--ctext)" }}>Zephtor</span>
           </div>
           {!mobile && <nav style={{ display: "flex", gap: "var(--spM)", alignItems: "center" }}>
-            {["Home", "Features", "Pricing", "About Us", "Contact"].map((x) => <span key={x} style={{ fontSize: "var(--ts)", color: "var(--ctext)", cursor: "pointer", whiteSpace: "nowrap" }}>{x}</span>)}
+            {["Home", "Features", "Pricing", "About Us", "Contact"].map((x) => <span key={x} data-var="font-size: var(--text-s)" style={{ fontSize: "var(--ts)", color: "var(--ctext)", cursor: "pointer", whiteSpace: "nowrap" }}>{x}</span>)}
           </nav>}
           <div style={{ display: "flex", alignItems: "center", gap: "var(--spM)" }}>
             {mobile
               ? <span style={{ fontSize: "var(--tl)", color: "var(--ctext)", cursor: "pointer", lineHeight: 1 }}>☰</span>
-              : <><PreviewButton state={state} palette={p} sizeKey="s" outline={false}>Sign up</PreviewButton><button style={linkBtn}>Login</button></>}
+              : <><PreviewButton state={state} palette={p} sizeKey="s" outline={false} dataVar=".btn--s · var(--primary)">Sign up</PreviewButton><button style={linkBtn}>Login</button></>}
           </div>
         </div>
       </header>
 
       {/* HERO */}
-      <section style={{ padding: "var(--secL) var(--gut)" }}>
+      <section data-var="padding: var(--section-space-l) var(--gutter)" style={{ padding: "var(--secL) var(--gut)" }}>
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1.05fr 0.95fr", gap: "var(--spXL)", alignItems: "center", maxWidth: container, margin: "0 auto" }}>
           <div style={{ minWidth: 0 }}>
-            <h1 style={{ fontSize: "var(--h1)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 800, letterSpacing: "-0.02em", margin: "0 0 var(--spM)", overflowWrap: "break-word" }}>Your digital transformation begins here</h1>
-            <p style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)", maxWidth: "min(420px, 100%)" }}>Unlock the full potential of your business. Start your journey today and watch your operations transform to fit your needs like a glove.</p>
-            <div style={{ display: "flex", gap: "var(--spS)", flexWrap: "wrap" }}>
-              <PreviewButton state={state} palette={p} sizeKey="l" outline={false}>Learn more</PreviewButton>
-              <PreviewButton state={state} palette={p} sizeKey="l" outline={true}>Watch demo</PreviewButton>
+            <h1 data-var="font-size: var(--h1)" style={{ fontSize: "var(--h1)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 800, letterSpacing: "-0.02em", margin: "0 0 var(--spM)", overflowWrap: "break-word" }}>Your digital transformation begins here</h1>
+            <p data-var="font-size: var(--text-m)" style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)", maxWidth: "min(420px, 100%)" }}>Unlock the full potential of your business. Start your journey today and watch your operations transform to fit your needs like a glove.</p>
+            <div style={{ display: "flex", gap: "var(--spS)", flexWrap: "wrap" }} data-var="gap: var(--space-s)">
+              <PreviewButton state={state} palette={p} sizeKey="l" outline={false} dataVar=".btn--l · var(--primary)">Learn more</PreviewButton>
+              <PreviewButton state={state} palette={p} sizeKey="l" outline={true} dataVar=".btn--l.btn--outline · var(--primary)">Watch demo</PreviewButton>
             </div>
           </div>
           {!mobile && <div style={{ color: "var(--ctext)", display: "flex", justifyContent: "center" }}>{heroArt}</div>}
@@ -1978,28 +1995,28 @@ function LandingPreview({ state }) {
       </section>
 
       {/* SUPPORT — sección alterna (imagen izquierda / texto derecha) */}
-      <section style={{ padding: "var(--secM) var(--gut)" }}>
+      <section data-var="padding: var(--section-space-m) var(--gutter)" style={{ padding: "var(--secM) var(--gut)" }}>
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "0.95fr 1.05fr", gap: "var(--spXL)", alignItems: "center", maxWidth: container, margin: "0 auto" }}>
           {!mobile && <div style={{ color: "var(--ctext)", display: "flex", justifyContent: "center" }}>{supportArt}</div>}
           <div style={{ minWidth: 0 }}>
-            <h2 style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 var(--spM)", overflowWrap: "break-word" }}>Dedicated support</h2>
-            <p style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)" }}>Zephtor provides ongoing support and training to ensure you maximize the value of our software. Our experts are here to assist you at every step of your digital transformation journey.</p>
-            <PreviewButton state={state} palette={p} sizeKey="default" outline={false}>Learn more</PreviewButton>
+            <h2 data-var="font-size: var(--h2)" style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 var(--spM)", overflowWrap: "break-word" }}>Dedicated support</h2>
+            <p data-var="font-size: var(--text-m)" style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)" }}>Zephtor provides ongoing support and training to ensure you maximize the value of our software. Our experts are here to assist you at every step of your digital transformation journey.</p>
+            <PreviewButton state={state} palette={p} sizeKey="default" outline={false} dataVar=".btn · var(--primary)">Learn more</PreviewButton>
           </div>
         </div>
       </section>
 
       {/* FEATURES */}
-      <section style={{ padding: "var(--secM) var(--gut)" }}>
+      <section data-var="padding: var(--section-space-m) var(--gutter)" style={{ padding: "var(--secM) var(--gut)" }}>
         <div style={{ textAlign: "center", maxWidth: "min(640px, 100%)", margin: "0 auto var(--spXL)" }}>
-          <h2 style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 var(--spS)", overflowWrap: "break-word" }}>Discover what sets Zephtor apart</h2>
-          <p style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>Our suite of SaaS solutions is packed with powerful features.</p>
+          <h2 data-var="font-size: var(--h2)" style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 var(--spS)", overflowWrap: "break-word" }}>Discover what sets Zephtor apart</h2>
+          <p data-var="font-size: var(--text-m)" style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>Our suite of SaaS solutions is packed with powerful features.</p>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(" + (mobile ? 1 : tablet ? 2 : 4) + ",1fr)", gap: "var(--spL)", maxWidth: container, margin: "0 auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(" + (mobile ? 1 : tablet ? 2 : 4) + ",1fr)", gap: "var(--spL)", maxWidth: container, margin: "0 auto" }} data-var="gap: var(--space-l)">
           {features.map((f) => (
             <div key={f.t} style={{ minWidth: 0 }}>
-              <h3 style={{ fontSize: "var(--tl)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, margin: "0 0 var(--spS)", overflowWrap: "break-word" }}>{f.t}</h3>
-              <p style={{ fontSize: "var(--ts)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>{f.d}</p>
+              <h3 data-var="font-size: var(--text-l)" style={{ fontSize: "var(--tl)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, margin: "0 0 var(--spS)", overflowWrap: "break-word" }}>{f.t}</h3>
+              <p data-var="font-size: var(--text-s)" style={{ fontSize: "var(--ts)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>{f.d}</p>
             </div>
           ))}
         </div>
