@@ -23,12 +23,11 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } } },
     );
     const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user?.email) { console.log("subscribe: unauthorized", error?.message ?? "no user"); return json({ error: "unauthorized", detail: error?.message ?? "no user" }, 200); }
-    console.log("subscribe: user", user.email);
+    if (error || !user?.email) { console.log("subscribe: unauthorized"); return json({ error: "unauthorized" }, 401); }
 
     const token = Deno.env.get("ACUMBAMAIL_TOKEN");
     const listId = Deno.env.get("ACUMBAMAIL_LIST_ID");
-    if (!token || !listId) { console.log("subscribe: missing_config", { hasToken: !!token, hasList: !!listId }); return json({ error: "missing_config", hasToken: !!token, hasList: !!listId }, 200); }
+    if (!token || !listId) { console.log("subscribe: missing_config"); return json({ error: "missing_config" }, 500); }
 
     // Acumbamail API → addSubscriber (con merge fields para personalizar emails)
     const m = (user.user_metadata ?? {}) as Record<string, string>;
