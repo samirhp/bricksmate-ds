@@ -1869,6 +1869,12 @@ function LandingPreview({ state }) {
   const h = (k) => at(t.headings[k]?.mobile, t.headings[k]?.desktop);
   const tx = (k) => at(t.texts[k]?.mobile, t.texts[k]?.desktop);
   const spc = (k) => at(sp.values[k]?.mobile, sp.values[k]?.desktop);
+  // Colores de texto/encabezado del design system (resuelve var(--…) a un color concreto para el preview)
+  const colorOpts = buildColorVarOptions(state);
+  const resolveColor = (v, fb) => { if (!v) return fb; if (v.startsWith("#")) return v; const o = colorOpts.find((x) => x.value === v); return o ? o.color : fb; };
+  const st = state.styles || {};
+  const cText = resolveColor(st.textColor, "#1f2937");
+  const cHead = resolveColor(st.headingColor, "#111827");
 
   const vars = {
     "--h1": h("h1"), "--h2": h("h2"), "--h3": h("h3"), "--h4": h("h4"),
@@ -1879,8 +1885,9 @@ function LandingPreview({ state }) {
     "--spS": spc("s"), "--spM": spc("m"), "--spL": spc("l"), "--spXL": spc("xl"),
     "--rm": (r.values.m || 8) + "px", "--rl": (r.values.l || 12) + "px", "--rc": (r.circle || 999) + "px",
     "--lhh": t.lineHeightHeading, "--lhb": t.lineHeightBody,
+    "--hw": st.headingWeight ?? 700, "--tw": st.textWeight ?? 400,
     "--cp": primary, "--cpt": primaryTint, "--cop": onPrimary,
-    "--cbg": "#ffffff", "--ctext": "#1a1a1a", "--cmut": "#5f6b7a", "--cbd": "#e5e7eb", "--cfoot": "#f3f4f6",
+    "--cbg": "#ffffff", "--ctext": cText, "--chead": cHead, "--cmut": cText, "--cbd": "#e5e7eb", "--cfoot": "#f3f4f6",
   };
 
   // Layout mode → contenedor de las secciones
@@ -1980,7 +1987,7 @@ function LandingPreview({ state }) {
             </div>
           );
         })()}
-        <div onMouseMove={onInspectMove} onMouseLeave={() => setHl(null)} style={{ background: "var(--cbg)", color: "var(--ctext)", fontFamily: "'Inter',system-ui,sans-serif", borderRadius: "var(--ds-radius-lg)", overflow: "hidden", border: "1px solid var(--ds-border-light)", cursor: inspect ? "crosshair" : "default" }}>
+        <div onMouseMove={onInspectMove} onMouseLeave={() => setHl(null)} style={{ background: "var(--cbg)", color: "var(--ctext)", fontWeight: "var(--tw)", fontFamily: "'Inter',system-ui,sans-serif", borderRadius: "var(--ds-radius-lg)", overflow: "hidden", border: "1px solid var(--ds-border-light)", cursor: inspect ? "crosshair" : "default" }}>
 
       {/* NAV */}
       <header style={{ borderBottom: "1px solid var(--cbd)" }}>
@@ -2004,8 +2011,8 @@ function LandingPreview({ state }) {
       <section data-var="padding: var(--section-space-l) var(--gutter)" style={{ padding: "var(--secL) var(--gut)" }}>
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1.05fr 0.95fr", gap: "var(--spXL)", alignItems: "center", maxWidth: container, margin: "0 auto" }}>
           <div style={{ minWidth: 0 }}>
-            <h1 data-var="font-size: var(--h1)" style={{ fontSize: "var(--h1)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 800, letterSpacing: "-0.02em", margin: "0 0 var(--spM)", overflowWrap: "break-word" }}>Your digital transformation begins here</h1>
-            <p data-var="font-size: var(--text-m)" style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)", maxWidth: "min(420px, 100%)" }}>Unlock the full potential of your business. Start your journey today and watch your operations transform to fit your needs like a glove.</p>
+            <h1 data-var="var(--h1) · var(--heading-color) · var(--heading-weight)" style={{ fontSize: "var(--h1)", lineHeight: "var(--lhh)", color: "var(--chead)", fontWeight: "var(--hw)", letterSpacing: "-0.02em", margin: "0 0 var(--spM)", overflowWrap: "break-word" }}>Your digital transformation begins here</h1>
+            <p data-var="var(--text-m) · var(--text-color) · var(--text-weight)" style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)", maxWidth: "min(420px, 100%)" }}>Unlock the full potential of your business. Start your journey today and watch your operations transform to fit your needs like a glove.</p>
             <div style={{ display: "flex", gap: "var(--spS)", flexWrap: "wrap" }} data-var="gap: var(--space-s)">
               <PreviewButton state={state} palette={p} sizeKey="l" outline={false} dataVar=".btn--l · var(--primary)">Learn more</PreviewButton>
               <PreviewButton state={state} palette={p} sizeKey="l" outline={true} dataVar=".btn--l.btn--outline · var(--primary)">Watch demo</PreviewButton>
@@ -2020,8 +2027,8 @@ function LandingPreview({ state }) {
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "0.95fr 1.05fr", gap: "var(--spXL)", alignItems: "center", maxWidth: container, margin: "0 auto" }}>
           {!mobile && <div style={{ color: "var(--ctext)", display: "flex", justifyContent: "center" }}>{supportArt}</div>}
           <div style={{ minWidth: 0 }}>
-            <h2 data-var="font-size: var(--h2)" style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 var(--spM)", overflowWrap: "break-word" }}>Dedicated support</h2>
-            <p data-var="font-size: var(--text-m)" style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)" }}>Zephtor provides ongoing support and training to ensure you maximize the value of our software. Our experts are here to assist you at every step of your digital transformation journey.</p>
+            <h2 data-var="var(--h2) · var(--heading-color) · var(--heading-weight)" style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--chead)", fontWeight: "var(--hw)", letterSpacing: "-0.02em", margin: "0 0 var(--spM)", overflowWrap: "break-word" }}>Dedicated support</h2>
+            <p data-var="var(--text-m) · var(--text-color) · var(--text-weight)" style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)" }}>Zephtor provides ongoing support and training to ensure you maximize the value of our software. Our experts are here to assist you at every step of your digital transformation journey.</p>
             <PreviewButton state={state} palette={p} sizeKey="default" outline={false} dataVar=".btn · var(--primary)">Learn more</PreviewButton>
           </div>
         </div>
@@ -2030,14 +2037,14 @@ function LandingPreview({ state }) {
       {/* FEATURES */}
       <section data-var="padding: var(--section-space-m) var(--gutter)" style={{ padding: "var(--secM) var(--gut)" }}>
         <div style={{ textAlign: "center", maxWidth: "min(640px, 100%)", margin: "0 auto var(--spXL)" }}>
-          <h2 data-var="font-size: var(--h2)" style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 var(--spS)", overflowWrap: "break-word" }}>Discover what sets Zephtor apart</h2>
-          <p data-var="font-size: var(--text-m)" style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>Our suite of SaaS solutions is packed with powerful features.</p>
+          <h2 data-var="var(--h2) · var(--heading-color) · var(--heading-weight)" style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--chead)", fontWeight: "var(--hw)", letterSpacing: "-0.02em", margin: "0 0 var(--spS)", overflowWrap: "break-word" }}>Discover what sets Zephtor apart</h2>
+          <p data-var="var(--text-m) · var(--text-color) · var(--text-weight)" style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>Our suite of SaaS solutions is packed with powerful features.</p>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(" + (mobile ? 1 : tablet ? 2 : 4) + ",1fr)", gap: "var(--spL)", maxWidth: container, margin: "0 auto" }} data-var="gap: var(--space-l)">
           {features.map((f) => (
             <div key={f.t} style={{ minWidth: 0 }}>
-              <h3 data-var="font-size: var(--text-l)" style={{ fontSize: "var(--tl)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, margin: "0 0 var(--spS)", overflowWrap: "break-word" }}>{f.t}</h3>
-              <p data-var="font-size: var(--text-s)" style={{ fontSize: "var(--ts)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>{f.d}</p>
+              <h3 data-var="var(--text-l) · var(--heading-color) · var(--heading-weight)" style={{ fontSize: "var(--tl)", lineHeight: "var(--lhh)", color: "var(--chead)", fontWeight: "var(--hw)", margin: "0 0 var(--spS)", overflowWrap: "break-word" }}>{f.t}</h3>
+              <p data-var="var(--text-s) · var(--text-color) · var(--text-weight)" style={{ fontSize: "var(--ts)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>{f.d}</p>
             </div>
           ))}
         </div>
