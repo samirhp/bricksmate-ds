@@ -699,6 +699,9 @@ const css_styles = `
   .ds-admin-table tr:last-child td{border-bottom:none}
   .ds-admin-limit{display:flex;align-items:center;gap:10px}
   .ds-admin-inf{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--ds-text-2);cursor:pointer;user-select:none}
+  .ds-optin{display:flex;align-items:flex-start;gap:8px;margin:12px 0;cursor:pointer}
+  .ds-optin input{margin-top:2px;flex-shrink:0;cursor:pointer}
+  .ds-optin span{font-size:11.5px;line-height:1.45;color:var(--ds-text-3)}
 
   @media (prefers-reduced-motion:reduce){.ds-step-anim,.ds-step-check,.ds-toast{animation:none}*{transition-duration:.01ms!important}}
 `;
@@ -720,6 +723,7 @@ function ThemeIcon({ dark }) {
 // Modal de inicio de sesión por magic link
 function SignInModal({ onClose, addToast }) {
   const [email, setEmail] = useState("");
+  const [optIn, setOptIn] = useState(false);
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const submit = async (e) => {
@@ -727,7 +731,9 @@ function SignInModal({ onClose, addToast }) {
     if (!email.trim() || busy || !supabase) return;
     setBusy(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: window.location.origin } });
+      // Puente del opt-in a través del round-trip del magic link (se sincroniza tras login)
+      try { localStorage.setItem("dsg-optin", optIn ? "1" : "0"); } catch {}
+      const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: window.location.origin, data: { marketing_opt_in: optIn } } });
       if (error) throw error;
       setSent(true);
     } catch (err) { addToast?.("Could not send link: " + (err.message || "error"), "err"); }
@@ -746,7 +752,8 @@ function SignInModal({ onClose, addToast }) {
             <h3>Sign in to save in the cloud</h3>
             <p>Enter your email and we'll send a magic link — no password. Your design systems sync to your account and stay safe across devices.</p>
             <input className="ds-input" type="email" required placeholder="you@email.com" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
-            <button className="ds-btn ds-btn-primary" type="submit" disabled={busy} style={{ width: "100%", marginTop: 10 }}>{busy ? "Sending…" : "Send magic link"}</button>
+            <label className="ds-optin"><input type="checkbox" checked={optIn} onChange={(e) => setOptIn(e.target.checked)} /><span>I want to receive occasional tips &amp; updates from Samir Haddad. No spam, unsubscribe anytime.</span></label>
+            <button className="ds-btn ds-btn-primary" type="submit" disabled={busy} style={{ width: "100%", marginTop: 4 }}>{busy ? "Sending…" : "Send magic link"}</button>
           </form>
         )}
       </div>
@@ -2354,6 +2361,12 @@ export default function App() {
       try {
         const { data: prof } = await supabase.from("profiles").select("is_admin, system_limit").eq("id", u.id).single();
         if (prof) { setIsAdmin(!!prof.is_admin); lim = prof.system_limit; setUserLimit(prof.system_limit); }
+      } catch {}
+      // Opt-in de marketing → sincroniza con Acumbamail (Edge Function). Solo si dio consentimiento.
+      try {
+        const opted = (localStorage.getItem("dsg-optin") === "1") || u.user_metadata?.marketing_opt_in;
+        if (opted) { supabase.functions.invoke("subscribe").catch(() => {}); }
+        localStorage.removeItem("dsg-optin");
       } catch {}
       const existing = await cloudListSystems();
       setLibrary({ autoSave: true, systems: existing });
