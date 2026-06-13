@@ -1962,9 +1962,9 @@ function LandingPreview({ state }) {
       {/* HERO */}
       <section style={{ padding: "var(--secL) var(--gut)" }}>
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1.05fr 0.95fr", gap: "var(--spXL)", alignItems: "center", maxWidth: container, margin: "0 auto" }}>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <h1 style={{ fontSize: "var(--h1)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 800, letterSpacing: "-0.02em", margin: "0 0 var(--spM)", overflowWrap: "break-word" }}>Your digital transformation begins here</h1>
-            <p style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)", maxWidth: 420 }}>Unlock the full potential of your business. Start your journey today and watch your operations transform to fit your needs like a glove.</p>
+            <p style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)", maxWidth: "min(420px, 100%)" }}>Unlock the full potential of your business. Start your journey today and watch your operations transform to fit your needs like a glove.</p>
             <div style={{ display: "flex", gap: "var(--spS)", flexWrap: "wrap" }}>
               <PreviewButton state={state} palette={p} sizeKey="l" outline={false}>Learn more</PreviewButton>
               <PreviewButton state={state} palette={p} sizeKey="l" outline={true}>Watch demo</PreviewButton>
@@ -1978,8 +1978,8 @@ function LandingPreview({ state }) {
       <section style={{ padding: "var(--secM) var(--gut)" }}>
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "0.95fr 1.05fr", gap: "var(--spXL)", alignItems: "center", maxWidth: container, margin: "0 auto" }}>
           {!mobile && <div style={{ color: "var(--ctext)", display: "flex", justifyContent: "center" }}>{supportArt}</div>}
-          <div>
-            <h2 style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 var(--spM)" }}>Dedicated support</h2>
+          <div style={{ minWidth: 0 }}>
+            <h2 style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 var(--spM)", overflowWrap: "break-word" }}>Dedicated support</h2>
             <p style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)" }}>Zephtor provides ongoing support and training to ensure you maximize the value of our software. Our experts are here to assist you at every step of your digital transformation journey.</p>
             <PreviewButton state={state} palette={p} sizeKey="default" outline={false}>Learn more</PreviewButton>
           </div>
@@ -1988,14 +1988,14 @@ function LandingPreview({ state }) {
 
       {/* FEATURES */}
       <section style={{ padding: "var(--secM) var(--gut)" }}>
-        <div style={{ textAlign: "center", maxWidth: 640, margin: "0 auto var(--spXL)" }}>
-          <h2 style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 var(--spS)" }}>Discover what sets Zephtor apart</h2>
+        <div style={{ textAlign: "center", maxWidth: "min(640px, 100%)", margin: "0 auto var(--spXL)" }}>
+          <h2 style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 var(--spS)", overflowWrap: "break-word" }}>Discover what sets Zephtor apart</h2>
           <p style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>Our suite of SaaS solutions is packed with powerful features.</p>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(" + (mobile ? 1 : tablet ? 2 : 4) + ",1fr)", gap: "var(--spL)", maxWidth: container, margin: "0 auto" }}>
           {features.map((f) => (
-            <div key={f.t}>
-              <h3 style={{ fontSize: "var(--tl)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, margin: "0 0 var(--spS)" }}>{f.t}</h3>
+            <div key={f.t} style={{ minWidth: 0 }}>
+              <h3 style={{ fontSize: "var(--tl)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, margin: "0 0 var(--spS)", overflowWrap: "break-word" }}>{f.t}</h3>
               <p style={{ fontSize: "var(--ts)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>{f.d}</p>
             </div>
           ))}
@@ -2005,7 +2005,7 @@ function LandingPreview({ state }) {
       {/* FOOTER */}
       <footer style={{ background: "var(--cfoot)", padding: "var(--spXL) var(--gut)" }}>
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "1.6fr 1fr 1fr 1fr", gap: "var(--spL)", maxWidth: container, margin: "0 auto" }}>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "var(--spS)" }}>
               {logoMark}
               <span style={{ fontWeight: 700, fontSize: "var(--tl)", color: "var(--ctext)" }}>Zephtor</span>
@@ -2013,7 +2013,7 @@ function LandingPreview({ state }) {
             <p style={{ fontSize: "var(--ts)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>Your digital transformation partner.</p>
           </div>
           {footerCols.map((col) => (
-            <div key={col.h}>
+            <div key={col.h} style={{ minWidth: 0 }}>
               <div style={{ fontSize: "var(--ts)", fontWeight: 700, color: "var(--ctext)", marginBottom: "var(--spM)" }}>{col.h}</div>
               {col.links.map((l) => (
                 <div key={l} style={{ fontSize: "var(--ts)", lineHeight: 1.4, color: "var(--cmut)", marginBottom: "var(--spS)", textDecoration: "underline", cursor: "pointer" }}>{l}</div>
