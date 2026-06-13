@@ -477,9 +477,12 @@ const css_styles = `
   .ds-card{background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:18px;margin-bottom:16px;box-shadow:var(--ds-shadow)} .ds-card h4{font-size:13px;font-weight:600;margin-bottom:12px}
   .ds-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px} .ds-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
   .ds-mode-cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px}
-  .ds-mode-card{background:var(--ds-bg-card);border:1.5px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:20px;cursor:pointer;transition:all .2s;text-align:center;box-shadow:var(--ds-shadow)}
-  .ds-mode-card:hover{border-color:var(--ds-border);box-shadow:var(--ds-shadow-md)} .ds-mode-card.selected{border-color:var(--ds-primary);background:var(--ds-primary-light);box-shadow:0 0 0 1px var(--ds-primary)}
-  .ds-mode-icon{margin-bottom:12px;display:flex;justify-content:center;color:var(--ds-text-3)} .ds-mode-card.selected .ds-mode-icon{color:var(--ds-primary)}
+  .ds-mode-card{position:relative;background:var(--ds-bg-card);border:1.5px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:20px;cursor:pointer;transition:all .2s;text-align:center;box-shadow:var(--ds-shadow)}
+  .ds-mode-card:hover{border-color:var(--ds-border);box-shadow:var(--ds-shadow-md)} .ds-mode-card.selected{border-color:var(--ds-accent);background:var(--ds-accent-light);box-shadow:0 0 0 3px var(--ds-accent-ring)}
+  .ds-mode-cards.has-sel .ds-mode-card:not(.selected){opacity:.5} .ds-mode-cards.has-sel .ds-mode-card:not(.selected):hover{opacity:1}
+  .ds-mode-check{position:absolute;top:10px;right:10px;width:20px;height:20px;border-radius:50%;background:var(--ds-accent);color:#fff;font-size:12px;font-weight:700;display:none;align-items:center;justify-content:center;line-height:1}
+  .ds-mode-card.selected .ds-mode-check{display:flex}
+  .ds-mode-icon{margin-bottom:12px;display:flex;justify-content:center;color:var(--ds-text-3)} .ds-mode-card.selected .ds-mode-icon{color:var(--ds-accent)}
   .ds-mode-card h3{font-size:14px;font-weight:600;margin-bottom:4px} .ds-mode-card p{font-size:12px;color:var(--ds-text-2);line-height:1.5}
   .ds-viewport-config{background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:18px;margin-bottom:16px;box-shadow:var(--ds-shadow)} .ds-viewport-config h4{font-size:13px;font-weight:600;margin-bottom:14px}
   .ds-viewport-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
@@ -907,9 +910,9 @@ function StepLayout() {
     else if ((maxViewport - minViewport) < 300) warns.push({ type: "warn", msg: "Viewport range below 300px — fluid values will barely scale" });
   }
   return (<div>
-    <div className="ds-mode-cards">
-      <div className={"ds-mode-card" + (layoutMode === "fullwidth" ? " selected" : "")} onClick={() => dispatch({ type: "SET_LAYOUT_MODE", payload: "fullwidth" })}><span className="ds-mode-icon"><LayoutIcon mode="fullwidth" /></span><h3>Full-width (100%)</h3><p>Content spans entire viewport</p></div>
-      <div className={"ds-mode-card" + (layoutMode === "fixed" ? " selected" : "")} onClick={() => dispatch({ type: "SET_LAYOUT_MODE", payload: "fixed" })}><span className="ds-mode-icon"><LayoutIcon mode="fixed" /></span><h3>Fixed-width</h3><p>Content constrained to max-width</p></div>
+    <div className={"ds-mode-cards" + (layoutMode ? " has-sel" : "")}>
+      <div className={"ds-mode-card" + (layoutMode === "fullwidth" ? " selected" : "")} onClick={() => dispatch({ type: "SET_LAYOUT_MODE", payload: "fullwidth" })}><span className="ds-mode-check">✓</span><span className="ds-mode-icon"><LayoutIcon mode="fullwidth" /></span><h3>Full-width (100%)</h3><p>Content spans entire viewport</p></div>
+      <div className={"ds-mode-card" + (layoutMode === "fixed" ? " selected" : "")} onClick={() => dispatch({ type: "SET_LAYOUT_MODE", payload: "fixed" })}><span className="ds-mode-check">✓</span><span className="ds-mode-icon"><LayoutIcon mode="fixed" /></span><h3>Fixed-width</h3><p>Content constrained to max-width</p></div>
     </div>
     {layoutMode && (<div className="ds-viewport-config"><h4>Viewport range</h4>
       <ValidationAlert items={warns} />
