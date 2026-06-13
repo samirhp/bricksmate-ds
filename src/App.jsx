@@ -670,6 +670,15 @@ const css_styles = `
   .ds-guest-banner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring);border-radius:var(--ds-radius);padding:10px 14px;font-size:12.5px;margin-bottom:16px}
   .ds-guest-banner span{flex:1;min-width:200px;line-height:1.45;color:var(--ds-text-2)}
   .ds-guest-banner .ds-btn{flex-shrink:0}
+  /* ===== Cross-promo (marca personal) ===== */
+  .ds-promo{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-top:24px;padding:20px 22px;border-radius:var(--ds-radius-lg);background:linear-gradient(135deg,hsla(250,88%,66%,.14),hsla(250,88%,66%,.04));border:1px solid var(--ds-accent-ring)}
+  .ds-promo-txt h4{margin:0 0 4px;font-size:15px;font-weight:650;color:var(--ds-text)}
+  .ds-promo-txt p{margin:0;font-size:13px;color:var(--ds-text-2);line-height:1.5;max-width:460px}
+  .ds-promo-cta{flex-shrink:0;background:var(--ds-accent);color:#fff;text-decoration:none;font-size:14px;font-weight:600;padding:11px 20px;border-radius:var(--ds-radius);white-space:nowrap;transition:background .15s}
+  .ds-promo-cta:hover{background:var(--ds-accent-hover)}
+  .ds-credit{margin-top:28px;text-align:center;font-size:12px;color:var(--ds-text-3)}
+  .ds-credit a{color:var(--ds-accent);text-decoration:none;font-weight:500}
+  .ds-credit a:hover{text-decoration:underline}
   .ds-modal-wide{max-width:460px}
   .ds-migrate-list{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow:auto;margin:4px 0 14px}
   .ds-migrate-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--ds-border-light);border-radius:var(--ds-radius);cursor:pointer;transition:all .12s}
@@ -2003,6 +2012,20 @@ function StepPreview() {
 /* ================================================================
    STEP 9: EXPORT
    ================================================================ */
+// Cross-promo de marca personal (SamirH) → genera leads de servicios
+const CAL_URL = "https://cal.com/samirh";
+function SamirPromo() {
+  return (
+    <div className="ds-promo">
+      <div className="ds-promo-txt">
+        <h4>Need it done for you?</h4>
+        <p>I'm SamirH — I design &amp; build high-converting websites and design systems in Bricks. Let's talk about your project.</p>
+      </div>
+      <a className="ds-promo-cta" href={CAL_URL} target="_blank" rel="noopener noreferrer">Book a free call →</a>
+    </div>
+  );
+}
+
 function StepExport() {
   const { state, dispatch, addToast, systemName, user, openAuth } = useDSContext();
   const [status, setStatus] = useState(null);
@@ -2079,6 +2102,7 @@ function StepExport() {
     </div>
     {status?.type === "ok"    && <div className="ds-status ok">✓ {status.file} descargado correctamente</div>}
     {status?.type === "error" && <div className="ds-status" style={{ background: "rgba(220,53,69,.08)", color: "var(--ds-error)", border: "1px solid var(--ds-error)" }}>⚠ Error: {status.msg}</div>}
+    <SamirPromo />
   </div>);
 }
 
@@ -2179,6 +2203,7 @@ function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, 
         : <div className="ds-dash-grid">
             {systems.map((s) => <SystemCard key={s.id} sys={s} onOpen={onOpen} onDuplicate={onDuplicate} onDelete={onDelete} onRename={onRename} />)}
           </div>}
+      <div className="ds-credit">A free tool by <a href={CAL_URL} target="_blank" rel="noopener noreferrer">SamirH</a> — design &amp; development for Bricks.</div>
     </div>
   </>);
 }
