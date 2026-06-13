@@ -925,10 +925,12 @@ function StepLayout() {
     </div>)}
     {layoutMode && (<div className="ds-viewport-config"><h4>Viewport range</h4>
       <ValidationAlert items={warns} />
-      <div className="ds-viewport-row">
-        <div className="ds-form-group"><label>Min viewport (px)</label><NumStepper value={minViewport} set={(n) => dispatch({ type: "SET_FIELD", field: "minViewport", value: Math.max(0, n) })} min={0} step={5} /></div>
-        <div className="ds-form-group"><label>Max viewport (px)</label><NumStepper value={maxViewport} set={(n) => dispatch({ type: "SET_FIELD", field: "maxViewport", value: Math.max(0, n) })} min={0} step={10} /></div>
+      <div className="ds-viewport-row" style={{ marginBottom: 0 }}>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Min viewport (px)</label><NumStepper value={minViewport} set={(n) => dispatch({ type: "SET_FIELD", field: "minViewport", value: Math.max(0, n) })} min={0} step={5} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Max viewport (px)</label><NumStepper value={maxViewport} set={(n) => dispatch({ type: "SET_FIELD", field: "maxViewport", value: Math.max(0, n) })} min={0} step={10} /></div>
       </div>
+    </div>)}
+    {layoutMode && (<div className="ds-viewport-config" style={{ marginTop: 14 }}><h4>Header &amp; structure</h4>
       <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Header offset (px) <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— --offset, for anchor scroll</span></label><NumStepper value={state.offset ?? 80} set={(n) => dispatch({ type: "SET_FIELD", field: "offset", value: Math.max(0, n) })} min={0} step={4} /><div className="ds-helper">Sticky header height. Anchored sections offset by --offset so they don't hide under it.</div></div>
     </div>)}
   </div>);
