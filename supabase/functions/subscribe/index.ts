@@ -14,6 +14,7 @@ Deno.serve(async (req) => {
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
+  console.log("subscribe: invoked", req.method);
   try {
     // Usuario autenticado a partir de su JWT
     const supabase = createClient(
@@ -22,11 +23,12 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } } },
     );
     const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user?.email) return json({ error: "unauthorized" }, 401);
+    if (error || !user?.email) { console.log("subscribe: unauthorized", error?.message ?? "no user"); return json({ error: "unauthorized", detail: error?.message ?? "no user" }, 200); }
+    console.log("subscribe: user", user.email);
 
     const token = Deno.env.get("ACUMBAMAIL_TOKEN");
     const listId = Deno.env.get("ACUMBAMAIL_LIST_ID");
-    if (!token || !listId) return json({ error: "missing_config" }, 500);
+    if (!token || !listId) { console.log("subscribe: missing_config", { hasToken: !!token, hasList: !!listId }); return json({ error: "missing_config", hasToken: !!token, hasList: !!listId }, 200); }
 
     // Acumbamail API → addSubscriber (con merge fields para personalizar emails)
     const m = (user.user_metadata ?? {}) as Record<string, string>;

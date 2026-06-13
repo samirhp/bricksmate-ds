@@ -2570,11 +2570,20 @@ export default function App() {
         if (prof) { setIsAdmin(!!prof.is_admin); lim = prof.system_limit; setUserLimit(prof.system_limit); }
       } catch {}
       // Opt-in de marketing → sincroniza con Acumbamail (Edge Function). Solo si dio consentimiento.
+      // [DEBUG TEMPORAL] toasts para diagnosticar la sincronización
       try {
         const opted = (localStorage.getItem("dsg-optin") === "1") || u.user_metadata?.marketing_opt_in;
-        if (opted) { supabase.functions.invoke("subscribe").catch(() => {}); }
+        if (opted) {
+          addToast("Newsletter: syncing…", "info");
+          supabase.functions.invoke("subscribe").then(({ data, error }) => {
+            if (error) addToast("Newsletter error: " + (error.message || error.name || "unknown"), "err");
+            else addToast("Newsletter: " + JSON.stringify(data).slice(0, 120), data?.ok === false ? "err" : "ok");
+          }).catch((e) => addToast("Newsletter threw: " + (e?.message || "?"), "err"));
+        } else {
+          addToast("Newsletter: opt-in not detected", "info");
+        }
         localStorage.removeItem("dsg-optin");
-      } catch {}
+      } catch (e) { addToast("Newsletter catch: " + (e?.message || "?"), "err"); }
       const existing = await cloudListSystems();
       setLibrary({ autoSave: true, systems: existing });
       restoreSession(existing);
