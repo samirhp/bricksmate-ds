@@ -2369,7 +2369,7 @@ function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, 
 }
 
 // Página de administración: listado de usuarios + límite editable (solo admin; gate real en la BD)
-function AdminUsers({ onBack, darkMode, toggleDark, addToast }) {
+function AdminUsers({ onBack, darkMode, toggleDark, addToast, selfId }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState(null);
   useEffect(() => {
@@ -2388,11 +2388,20 @@ function AdminUsers({ onBack, darkMode, toggleDark, addToast }) {
       addToast("Limit updated", "ok");
     } catch (e) { addToast("Could not update limit", "err"); }
   };
+  const removeUser = async (id, email) => {
+    if (!window.confirm('Delete user "' + email + '"?\nThis permanently removes their account and all their design systems. This cannot be undone.')) return;
+    try {
+      const { error } = await supabase.rpc("admin_delete_user", { target: id });
+      if (error) throw error;
+      setRows((rs) => rs.filter((r) => r.id !== id));
+      addToast("User deleted", "info");
+    } catch (e) { addToast(/CANNOT_DELETE_SELF/.test(e.message || "") ? "You can't delete your own account here" : "Could not delete user", "err"); }
+  };
   return (<>
     <header className="ds-header">
       <button className="ds-header-back" onClick={onBack} data-tip="Back to my systems">←</button>
       <BrandMark />
-      <div><h1>Users</h1><p>Admin · manage cloud limits</p></div>
+      <div><h1>Users</h1><p>Admin · manage limits &amp; accounts</p></div>
       <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode" style={{ marginLeft: "auto" }}><ThemeIcon dark={darkMode} /></button>
     </header>
     <div className="ds-dash">
@@ -2400,13 +2409,13 @@ function AdminUsers({ onBack, darkMode, toggleDark, addToast }) {
         : rows == null ? <div className="ds-auth-loading">Loading users…</div>
         : rows.length === 0 ? <p className="ds-dash-sub">No users yet.</p>
         : (<table className="ds-admin-table">
-            <thead><tr><th>Name</th><th>Email</th><th>Country</th><th>Systems</th><th>Cloud limit</th></tr></thead>
-            <tbody>{rows.map((r) => <AdminUserRow key={r.id} row={r} onSetLimit={setLimit} />)}</tbody>
+            <thead><tr><th>Name</th><th>Email</th><th>Country</th><th>Systems</th><th>Cloud limit</th><th></th></tr></thead>
+            <tbody>{rows.map((r) => <AdminUserRow key={r.id} row={r} onSetLimit={setLimit} onDelete={removeUser} isSelf={r.id === selfId} />)}</tbody>
           </table>)}
     </div>
   </>);
 }
-function AdminUserRow({ row, onSetLimit }) {
+function AdminUserRow({ row, onSetLimit, onDelete, isSelf }) {
   const [val, setVal] = useState(row.system_limit == null ? "" : String(row.system_limit));
   const [inf, setInf] = useState(row.system_limit == null);
   useEffect(() => { const u = row.system_limit == null; setInf(u); setVal(u ? "" : String(row.system_limit)); }, [row.system_limit]);
@@ -2429,6 +2438,9 @@ function AdminUserRow({ row, onSetLimit }) {
           <input className="ds-input ds-input-sm" type="number" min="0" style={{ width: 70 }} value={inf ? "" : val} disabled={inf} placeholder="—" onChange={(e) => setVal(e.target.value)} onBlur={save} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} />
           <button className="ds-btn ds-btn-sm" onClick={save}>Save</button>
         </div>
+      </td>
+      <td style={{ textAlign: "right" }}>
+        <button className="ds-btn ds-btn-sm ds-btn-danger" onClick={() => onDelete(row.id, row.email)} disabled={isSelf} data-tip={isSelf ? "You can't delete your own account" : "Delete user"} title={isSelf ? "You can't delete your own account" : "Delete user"}>✕</button>
       </td>
     </tr>
   );
@@ -2749,7 +2761,7 @@ export default function App() {
       {!authReady
         ? <div className="ds-auth-loading">Loading…</div>
         : view === "admin"
-        ? <AdminUsers onBack={() => setView("dashboard")} darkMode={darkMode} toggleDark={toggleDark} addToast={addToast} myLimit={userLimit} />
+        ? <AdminUsers onBack={() => setView("dashboard")} darkMode={darkMode} toggleDark={toggleDark} addToast={addToast} myLimit={userLimit} selfId={user?.id} />
         : view === "account"
         ? <AccountView user={user} onBack={() => setView("dashboard")} darkMode={darkMode} toggleDark={toggleDark} addToast={addToast} onSignOut={signOut} />
         : view === "dashboard"
