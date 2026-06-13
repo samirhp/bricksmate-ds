@@ -2023,9 +2023,9 @@ function SidebarPromo() {
   return (
     <div className="ds-spromo">
       <img className="ds-spromo-img" src="/samirh.png" alt="Samir Haddad" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-      <div className="ds-spromo-txt"><strong>Still have questions?</strong>Book a free call with me.</div>
+      <div className="ds-spromo-txt"><strong>Websites that sell.</strong>Custom Bricks sites &amp; design systems.</div>
       <a className="ds-spromo-cta" href={CAL_URL} target="_blank" rel="noopener noreferrer">
-        <span className="ds-spromo-label">Book a call</span>
+        <span className="ds-spromo-label">Work with me</span>
         <span className="ds-spromo-arrow">→</span>
       </a>
     </div>
