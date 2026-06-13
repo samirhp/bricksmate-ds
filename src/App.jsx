@@ -1985,7 +1985,7 @@ function LandingPreview({ state }) {
             </div>
             <div style={{ position: "fixed", left: flipX ? Math.max(4, hl.px - W - 12) : hl.px + 16, top: flipY ? Math.max(4, hl.py - estH - 8) : hl.py + 16, width: W, background: "#0e0e0e", color: "#e5e5e5", border: "1px solid #2c2c2c", borderRadius: 8, padding: "9px 11px", boxShadow: "0 10px 30px rgba(0,0,0,.5)", fontFamily: "'SF Mono',Consolas,monospace", fontSize: 11, lineHeight: 1.55, pointerEvents: "none", zIndex: 10000 }}>
               <div style={{ color: "var(--ds-accent)", fontWeight: 700, marginBottom: 6 }}>
-                {hl.label.split(" · ").map((v, i) => <div key={i} style={{ whiteSpace: "nowrap" }}>{v}</div>)}
+                {hl.label.split(" · ").map((v, i) => <div key={i} style={{ whiteSpace: "normal", overflowWrap: "anywhere" }}>{v}</div>)}
               </div>
               {(hl.css || []).map((line, i) => <div key={i} style={{ whiteSpace: "nowrap", color: "#cfcfcf" }}>{line}</div>)}
             </div>
