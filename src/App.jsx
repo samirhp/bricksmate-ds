@@ -131,19 +131,30 @@ const gridValue = (n) => "repeat(" + n + ", minmax(0, 1fr))";
 // Buttons — 5 tamaños. "default" es la base (.btn); el resto son modificadores BEM.
 // Padding en em (escala con el font-size del botón) expuesto como variables --pad-btn-*.
 const BTN_SIZES = [
-  { key: "sm", label: "Small", cls: "btn--sm" },
-  { key: "default", label: "Default", cls: "" },
-  { key: "md", label: "Medium", cls: "btn--md" },
-  { key: "lg", label: "Large", cls: "btn--lg" },
-  { key: "xl", label: "Extra Large", cls: "btn--xl" },
+  { key: "xs",      label: "Extra Small", cls: "btn--xs" },
+  { key: "s",       label: "Small",       cls: "btn--s" },
+  { key: "default", label: "Default",     cls: "" },
+  { key: "l",       label: "Large",       cls: "btn--l" },
+  { key: "xl",      label: "Extra Large", cls: "btn--xl" },
 ];
+// Cada tamaño de botón usa su fuente homónima (.btn--xs → --text-xs). El default usa --text-m.
 const BTN_SIZE_DEFAULTS = {
-  sm:      { py: 0.45, px: 0.95, font: "s" },
+  xs:      { py: 0.4,  px: 0.85, font: "xs" },
+  s:       { py: 0.45, px: 0.95, font: "s" },
   default: { py: 0.5,  px: 1.1,  font: "m" },
-  md:      { py: 0.52, px: 1.15, font: "l" },
-  lg:      { py: 0.55, px: 1.2,  font: "xl" },
-  xl:      { py: 0.6,  px: 1.3,  font: "xxl" },
+  l:       { py: 0.55, px: 1.2,  font: "l" },
+  xl:      { py: 0.6,  px: 1.3,  font: "xl" },
 };
+// Migra button.sizes de la escala antigua (sm/md/lg) a la nueva (xs/s/default/l/xl)
+function normalizeButtons(buttons) {
+  if (!buttons) return buttons;
+  const keys = BTN_SIZES.map((s) => s.key);
+  const sizes = buttons.sizes || {};
+  const hasAllNew = keys.every((k) => sizes[k]);
+  const hasOld = sizes.sm || sizes.md || sizes.lg;
+  if (hasAllNew && !hasOld) return buttons; // ya está en el esquema nuevo
+  return { ...buttons, sizes: JSON.parse(JSON.stringify(BTN_SIZE_DEFAULTS)) };
+}
 const btnEnabled = (state, id) => state.buttons?.enabled?.[id] !== false; // por defecto activado
 const btnContrast = (l) => (l > 60 ? "#18181b" : "#ffffff");
 // Estilo inline de botón compartido (paso Buttons + Landing) → ambos previews idénticos.
@@ -286,7 +297,7 @@ const isLimitError = (e) => !!e && (e.message || "").includes("SYSTEMS_LIMIT_REA
 
 function reducer(state, action) {
   switch (action.type) {
-    case "LOAD_DOC": return action.payload;
+    case "LOAD_DOC": return { ...action.payload, buttons: normalizeButtons(action.payload.buttons) };
     case "SET_STEP": return { ...state, currentStep: action.payload };
     case "SET_LAYOUT_MODE": return { ...state, layoutMode: action.payload, maxViewport: action.payload === "fixed" ? 1280 : 1920 };
     case "SET_FIELD": return { ...state, [action.field]: action.value };
@@ -1283,7 +1294,7 @@ function StepButtons() {
       </div>
       <div className="ds-btn-sizes">
         <div className="ds-btn-sizes-head"><span>Size</span><span>Padding Y</span><span>Padding X</span><span>Font</span></div>
-        {BTN_SIZES.map((s) => { const sz = b.sizes[s.key]; return (
+        {BTN_SIZES.map((s) => { const sz = b.sizes[s.key] || BTN_SIZE_DEFAULTS[s.key]; return (
           <div key={s.key} className="ds-btn-sizes-row">
             <span className="ds-btn-size-label">{s.label} <em>{s.cls ? "." + s.cls : ".btn"}</em></span>
             <input className="ds-input ds-input-sm" type="number" step="0.05" min="0" value={sz.py} onChange={(e) => dispatch({ type: "SET_BTN_SIZE", key: s.key, field: "py", value: parseFloat(e.target.value) || 0 })} />
@@ -2014,7 +2025,7 @@ function StepExport() {
     },
     {
       id: "classes", suffix: "classes.json", title: "Bricks Classes JSON",
-      desc: "Clases (.btn, .btn--md…) para que aparezcan en el editor. Categoría = nombre del sistema.",
+      desc: "Clases (.btn, .btn--s, .btn--l…) para que aparezcan en el editor. Categoría = nombre del sistema.",
       sub: "Bricks → Style Manager → Classes → Import",
       gen: (s) => generateClassesJSON(s, systemName), mime: "application/json", label: "↓ Classes JSON",
     },
