@@ -483,6 +483,9 @@ const css_styles = `
   .ds-mode-check{position:absolute;top:10px;right:10px;width:20px;height:20px;border-radius:50%;background:var(--ds-accent);color:#fff;font-size:12px;font-weight:700;display:none;align-items:center;justify-content:center;line-height:1}
   .ds-mode-card.selected .ds-mode-check{display:flex}
   .ds-mode-icon{margin-bottom:12px;display:flex;justify-content:center;color:var(--ds-text-3)} .ds-mode-card.selected .ds-mode-icon{color:var(--ds-accent)}
+  .ds-mode-info{background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring);border-radius:var(--ds-radius);padding:11px 14px;font-size:12.5px;line-height:1.55;color:var(--ds-text-2);margin-bottom:18px}
+  .ds-mode-info strong{color:var(--ds-text)}
+  .ds-mode-info .sub{display:block;margin-top:6px;color:var(--ds-text-3);font-size:11.5px}
   .ds-mode-card h3{font-size:14px;font-weight:600;margin-bottom:4px} .ds-mode-card p{font-size:12px;color:var(--ds-text-2);line-height:1.5}
   .ds-viewport-config{background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:18px;margin-bottom:16px;box-shadow:var(--ds-shadow)} .ds-viewport-config h4{font-size:13px;font-weight:600;margin-bottom:14px}
   .ds-viewport-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
@@ -914,6 +917,12 @@ function StepLayout() {
       <div className={"ds-mode-card" + (layoutMode === "fullwidth" ? " selected" : "")} onClick={() => dispatch({ type: "SET_LAYOUT_MODE", payload: "fullwidth" })}><span className="ds-mode-check">✓</span><span className="ds-mode-icon"><LayoutIcon mode="fullwidth" /></span><h3>Full-width (100%)</h3><p>Content spans entire viewport</p></div>
       <div className={"ds-mode-card" + (layoutMode === "fixed" ? " selected" : "")} onClick={() => dispatch({ type: "SET_LAYOUT_MODE", payload: "fixed" })}><span className="ds-mode-check">✓</span><span className="ds-mode-icon"><LayoutIcon mode="fixed" /></span><h3>Fixed-width</h3><p>Content constrained to max-width</p></div>
     </div>
+    {layoutMode && (<div className="ds-mode-info">
+      <strong>{layoutMode === "fixed" ? "Fixed-width" : "Full-width"}</strong> — {layoutMode === "fixed"
+        ? "content is capped to a max width and centered. Fluid tokens (type, spacing, gaps…) reach their largest values at that max width and stop growing — wider screens just add side margins."
+        : "content spans the full screen (100%). Fluid tokens (type, spacing, gaps…) keep scaling across the whole viewport, up to your max viewport."}
+      <span className="sub">Both modes use the same fields below — the layout mode only changes how those fluid values are calculated (the max viewport caps fluid growth).</span>
+    </div>)}
     {layoutMode && (<div className="ds-viewport-config"><h4>Viewport range</h4>
       <ValidationAlert items={warns} />
       <div className="ds-viewport-row">
