@@ -558,7 +558,8 @@ const css_styles = `
   .ds-dash-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:24px;max-width:1100px;margin-left:auto;margin-right:auto}
   .ds-dash-title{font-size:20px;font-weight:700;letter-spacing:-.02em}
   .ds-dash-sub{font-size:13px;color:var(--ds-text-2);margin-top:3px}
-  .ds-dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr));gap:16px;max-width:1100px;margin:0 auto}
+  .ds-dash-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;max-width:1100px;margin:0 auto}
+  .ds-dash-grid .ds-sys-card{flex:0 1 320px}
   .ds-dash-empty{text-align:center;padding:64px 20px;max-width:420px;margin:40px auto;border:1px dashed var(--ds-border);border-radius:var(--ds-radius-lg)}
   .ds-sys-card{background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);overflow:hidden;box-shadow:var(--ds-shadow);transition:box-shadow .15s,border-color .15s;display:flex;flex-direction:column}
   .ds-sys-card:hover{box-shadow:var(--ds-shadow-md);border-color:var(--ds-border)}
@@ -2461,7 +2462,7 @@ function AccountView({ user, onBack, darkMode, toggleDark, addToast, onSignOut }
           <div className="ds-form-group"><label>Last name</label><input className="ds-input" value={lastName} onChange={(e) => setLastName(e.target.value)} /></div>
         </div>
         <div className="ds-form-group"><label>Country</label><CountrySelect value={country} onChange={setCountry} /></div>
-        <div className="ds-form-group"><label>Email</label><input className="ds-input" value={user.email} disabled /><div className="ds-helper">Your email is your login. Changing it needs a verified flow — tell me if you want it enabled.</div></div>
+        <div className="ds-form-group"><label>Email</label><input className="ds-input" value={user.email} disabled /><div className="ds-helper">This is your login email address.</div></div>
         <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
           <button className="ds-btn ds-btn-primary" onClick={save} disabled={busy}>{busy ? "Saving…" : "Save changes"}</button>
           <button className="ds-btn" onClick={onSignOut}>Sign out</button>
