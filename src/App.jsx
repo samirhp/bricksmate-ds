@@ -532,9 +532,12 @@ const css_styles = `
   .ds-export-file-card h4{font-size:14px;font-weight:600;margin-bottom:4px}
   .ds-export-file-card>p{font-size:12px;color:var(--ds-text-2);margin-bottom:14px;line-height:1.5}
   .ds-export-file-card .ds-download-btn{font-size:13px;padding:9px 14px;margin-top:auto}
-  .ds-resize-handle{position:absolute;top:0;bottom:0;right:-18px;width:18px;display:flex;align-items:center;justify-content:center;cursor:ew-resize;touch-action:none}
-  .ds-resize-handle::before{content:'';width:5px;height:46px;border-radius:3px;background:var(--ds-border);transition:background .15s}
-  .ds-resize-handle:hover::before{background:var(--ds-primary)}
+  .ds-resize-handle{position:absolute;top:0;bottom:0;right:-20px;width:20px;display:flex;align-items:center;justify-content:center;cursor:ew-resize;touch-action:none}
+  .ds-grip{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:13px;height:56px;border-radius:7px;background:var(--ds-accent);box-shadow:0 2px 10px var(--ds-accent-ring);animation:ds-grip-pulse 2.2s ease-in-out infinite;transition:height .15s,box-shadow .15s}
+  .ds-grip i{width:3px;height:3px;border-radius:50%;background:rgba(255,255,255,.92)}
+  .ds-resize-handle:hover .ds-grip{height:72px;box-shadow:0 2px 14px var(--ds-accent-ring);animation:none}
+  @keyframes ds-grip-pulse{0%,100%{transform:translateX(0)}50%{transform:translateX(-3px)}}
+  @media (prefers-reduced-motion:reduce){.ds-grip{animation:none}}
   .ds-btn-sizes{display:flex;flex-direction:column;gap:8px}
   .ds-btn-sizes-head,.ds-btn-sizes-row{display:grid;grid-template-columns:1.3fr 1fr 1fr 1.1fr;gap:10px;align-items:center}
   .ds-btn-sizes-head{font-size:11px;color:var(--ds-text-3);font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:0 2px 2px}
@@ -2023,7 +2026,7 @@ function LandingPreview({ state }) {
         </div>
       </footer>
         </div>
-        <div className="ds-resize-handle" onMouseDown={startDrag} title="Drag to resize" />
+        <div className="ds-resize-handle" onMouseDown={startDrag} title="Drag to resize"><span className="ds-grip"><i /><i /><i /></span></div>
       </div>
     </div>
   </div>);
