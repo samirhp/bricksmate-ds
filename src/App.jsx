@@ -57,9 +57,11 @@ function hexToHsl(hex) {
 }
 function randId() { return Math.random().toString(36).slice(2, 8).padEnd(6, '0'); }
 function hslStrToHex(str) {
+  if (/^#[0-9a-f]{3,8}$/i.test(str || '')) return str; // ya es hex (variante personalizada)
   const m = (str || '').match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
   return m ? hslToHex(+m[1], +m[2], +m[3]) : '#000000';
 }
+const toHexColor = (v) => (v && v.startsWith('#')) ? v : hslStrToHex(v);
 function pxToRem(px) { return (px / 16).toFixed(3).replace(/\.?0+$/, '') + 'rem'; }
 
 const SCALES = [
@@ -491,10 +493,11 @@ const css_styles = `
   .ds-color-picker-row{display:flex;align-items:flex-start;gap:14px;margin-bottom:14px}
   .ds-color-swatch{width:60px;height:60px;border-radius:var(--ds-radius);border:1px solid var(--ds-border);overflow:hidden;flex-shrink:0;position:relative;cursor:pointer;box-shadow:var(--ds-shadow-md)}
   .ds-color-swatch input[type="color"]{position:absolute;inset:-8px;width:calc(100% + 16px);height:calc(100% + 16px);border:none;cursor:pointer}
-  .ds-variants-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:12px}
-  .ds-variant-item{text-align:center}
-  .ds-variant-box{height:44px;border-radius:5px;border:1px solid var(--ds-border-light)}
-  .ds-variant-label{font-size:10px;color:var(--ds-text-3);margin-top:3px;font-family:monospace}
+  .ds-variants-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:12px;align-items:stretch}
+  .ds-variant-item{text-align:center;display:flex;flex-direction:column}
+  .ds-variant-box{height:44px;border-radius:5px;border:1px solid var(--ds-border-light);position:relative;overflow:hidden;cursor:pointer}
+  .ds-variant-box input[type=color]{position:absolute;inset:0;width:100%;height:100%;opacity:0;border:none;padding:0;margin:0;cursor:pointer}
+  .ds-variant-label{font-size:10px;color:var(--ds-text-3);margin-top:3px;font-family:monospace;flex:1}
   .ds-variant-input{width:100%;padding:4px 6px;border:1px solid var(--ds-border);border-radius:4px;font-size:11px;text-align:center;font-family:monospace;margin-top:3px;background:var(--ds-bg-card);color:var(--ds-text);transition:border-color .15s}
   .ds-variant-input:focus{outline:none;border-color:var(--ds-primary)}
   .ds-transparency-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(60px,1fr));gap:5px;margin-top:8px}
@@ -989,22 +992,22 @@ function buildColorVarOptions(state) {
   const opts = [];
   (state.colors?.palettes || []).forEach((p) => {
     const slug = slugify(p.name);
-    opts.push({ label: p.name, value: "var(--" + slug + ")", color: hslToHex(p.hue, p.saturation, p.lightness) });
+    opts.push({ group: p.name, label: "Base", value: "var(--" + slug + ")", color: hslToHex(p.hue, p.saturation, p.lightness) });
     if (p.showVariants) VARIANT_LIGHTNESS.forEach(({ key }) => {
       if (key === "medium" || !p.variants[key]) return;
-      opts.push({ label: p.name + " " + key, value: "var(--" + slug + "-" + key + ")", color: p.variants[key] });
+      opts.push({ group: p.name, label: key, value: "var(--" + slug + "-" + key + ")", color: p.variants[key] });
     });
     if (p.showTransparency) TRANS_STEPS.forEach((o) => {
-      opts.push({ label: p.name + " alpha " + o + "%", value: "var(--" + slug + "-trans-" + o + ")", color: "hsla(" + p.hue + "," + p.saturation + "%," + p.lightness + "%," + (o / 100) + ")" });
+      opts.push({ group: p.name, label: p.name + " " + o + "%", value: "var(--" + slug + "-trans-" + o + ")", color: "hsla(" + p.hue + "," + p.saturation + "%," + p.lightness + "%," + (o / 100) + ")" });
     });
   });
   if (state.colors?.whiteTransparency) {
-    opts.push({ label: "White", value: "var(--white)", color: "#ffffff" });
-    TRANS_STEPS.forEach((o) => opts.push({ label: "White alpha " + o + "%", value: "var(--white-trans-" + o + ")", color: "rgba(255,255,255," + (o / 100) + ")" }));
+    opts.push({ group: "Black & White", label: "White", value: "var(--white)", color: "#ffffff" });
+    TRANS_STEPS.forEach((o) => opts.push({ group: "Black & White", label: "White " + o + "%", value: "var(--white-trans-" + o + ")", color: "rgba(255,255,255," + (o / 100) + ")" }));
   }
   if (state.colors?.blackTransparency) {
-    opts.push({ label: "Black", value: "var(--black)", color: "#000000" });
-    TRANS_STEPS.forEach((o) => opts.push({ label: "Black alpha " + o + "%", value: "var(--black-trans-" + o + ")", color: "rgba(0,0,0," + (o / 100) + ")" }));
+    opts.push({ group: "Black & White", label: "Black", value: "var(--black)", color: "#000000" });
+    TRANS_STEPS.forEach((o) => opts.push({ group: "Black & White", label: "Black " + o + "%", value: "var(--black-trans-" + o + ")", color: "rgba(0,0,0," + (o / 100) + ")" }));
   }
   return opts;
 }
@@ -1012,6 +1015,8 @@ function buildColorVarOptions(state) {
 function ColorVarPicker({ value, onChange, opts }) {
   const known = opts.find((o) => o.value === value);
   const swatch = known ? known.color : (value && value.startsWith("#") ? value : null);
+  const groups = [];
+  opts.forEach((o) => { let g = groups.find((x) => x.name === o.group); if (!g) { g = { name: o.group, items: [] }; groups.push(g); } g.items.push(o); });
   return (
     <div className="ds-cvar">
       <span className="ds-cvar-sw" style={swatch
@@ -1019,7 +1024,11 @@ function ColorVarPicker({ value, onChange, opts }) {
         : { background: "var(--ds-border)" }} />
       <select className="ds-input" value={known ? value : "__custom"} onChange={(e) => onChange(e.target.value)}>
         {!known && <option value="__custom">Custom: {value}</option>}
-        {opts.map((o) => <option key={o.value} value={o.value}>{o.label} · {o.value}</option>)}
+        {groups.map((g) => (
+          <optgroup key={g.name} label={g.name}>
+            {g.items.map((o) => <option key={o.value} value={o.value}>{o.label} · {o.value}</option>)}
+          </optgroup>
+        ))}
       </select>
     </div>
   );
@@ -1150,7 +1159,9 @@ function PaletteCard({ palette }) {
     </div>
     {showVariants && (<div className="ds-variants-grid">
       {VARIANT_LIGHTNESS.map(({ key }) => (<div key={key} className="ds-variant-item">
-        <div className="ds-variant-box" style={{ backgroundColor: variants[key] || hexVal }} />
+        <div className="ds-variant-box" style={{ backgroundColor: variants[key] || hexVal }} title="Pick a color">
+          <input type="color" value={toHexColor(variants[key] || hexVal)} onChange={(e) => dispatch({ type: "UPDATE_PALETTE_VARIANT", id, key, value: e.target.value })} />
+        </div>
         <div className="ds-variant-label">--{slugify(name)}-{key}</div>
         <input className="ds-variant-input" value={variants[key] || ""} onChange={(e) => dispatch({ type: "UPDATE_PALETTE_VARIANT", id, key, value: e.target.value })} />
       </div>))}
