@@ -179,10 +179,10 @@ function buttonInlineStyle(state, p, sizeKey, outline, hover) {
 }
 
 // Botón de preview con hover real (los estilos inline no soportan :hover)
-function PreviewButton({ state, palette, sizeKey, outline, children, dataVar }) {
+function PreviewButton({ state, palette, sizeKey, outline, children, dataVar, colorVar }) {
   const [hover, setHover] = useState(false);
   return (
-    <button data-var={dataVar} style={buttonInlineStyle(state, palette, sizeKey, outline, hover)}
+    <button data-var={dataVar} data-color={colorVar} style={buttonInlineStyle(state, palette, sizeKey, outline, hover)}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
       {children || "Button"}
     </button>
@@ -1822,21 +1822,21 @@ function LandingPreview({ state }) {
     const cs = getComputedStyle(el);
     const box = (t, rt, b, l) => (t === rt && rt === b && b === l) ? t : (t === b && rt === l) ? t + " " + rt : t + " " + rt + " " + b + " " + l;
     const css = [];
-    const add = (label, val, skip) => { if (val && val !== "normal" && val !== skip) css.push(label + ": " + val); };
-    add("font-size", cs.fontSize);
+    const push = (text, swatch) => css.push({ text, swatch: swatch || null });
+    push("font-size: " + cs.fontSize);
     // line-height: fiel al DS (su multiplicador/variable, no el px computado)
     let lh = cs.lineHeight;
     const lhi = (el.style.lineHeight || "").trim();
     const mv = lhi.match(/var\((--[\w-]+)\)/);
     if (mv) { const v = getComputedStyle(wrapRef.current).getPropertyValue(mv[1]).trim(); if (v) lh = v; }
     else if (/^[0-9.]+$/.test(lhi)) lh = lhi;
-    add("line-height", lh);
-    add("font-weight", cs.fontWeight, "400");
+    push("line-height: " + lh);
+    if (cs.fontWeight && cs.fontWeight !== "400") push("font-weight: " + cs.fontWeight);
     const pad = box(cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft);
-    if (pad !== "0px") css.push("padding: " + pad);
-    if (cs.borderTopLeftRadius !== "0px") css.push("border-radius: " + cs.borderTopLeftRadius);
-    if (cs.backgroundColor && cs.backgroundColor !== "rgba(0, 0, 0, 0)") css.push("background: " + cs.backgroundColor);
-    if (cs.columnGap && cs.columnGap !== "normal") css.push("gap: " + cs.columnGap);
+    if (pad !== "0px") push("padding: " + pad);
+    if (cs.borderTopLeftRadius !== "0px") push("border-radius: " + cs.borderTopLeftRadius);
+    if (cs.backgroundColor && cs.backgroundColor !== "rgba(0, 0, 0, 0)") { const cv = el.getAttribute("data-color"); push("background: " + (cv || cs.backgroundColor), cs.backgroundColor); }
+    if (cs.columnGap && cs.columnGap !== "normal") push("gap: " + cs.columnGap);
     setHl({ top: r.top - wr.top, left: r.left - wr.left, width: r.width, height: r.height, label: el.getAttribute("data-var"), css, px: e.clientX, py: e.clientY });
   };
   useEffect(() => {
@@ -1862,6 +1862,7 @@ function LandingPreview({ state }) {
   const t = state.typography, sp = state.spacing, ss = state.sectionSpacing, r = state.radius;
   const p = state.colors.palettes[0] || { hue: 210, saturation: 75, lightness: 50 };
   const primary = "hsl(" + p.hue + "," + p.saturation + "%," + p.lightness + "%)";
+  const primaryVar = "var(--" + slugify(p.name || "primary") + ")";
   const primaryTint = "hsl(" + p.hue + "," + Math.min(90, p.saturation) + "%,96%)";
   const onPrimary = p.lightness > 60 ? "#18181b" : "#ffffff";
   // El lienzo simula un viewport: full = maxViewport (desktop), arrastrado al mínimo = minViewport (mobile).
@@ -1987,7 +1988,12 @@ function LandingPreview({ state }) {
               <div style={{ color: "var(--ds-accent)", fontWeight: 700, marginBottom: 6 }}>
                 {hl.label.split(" · ").map((v, i) => <div key={i} style={{ whiteSpace: "normal", overflowWrap: "anywhere" }}>{v}</div>)}
               </div>
-              {(hl.css || []).map((line, i) => <div key={i} style={{ whiteSpace: "nowrap", color: "#cfcfcf" }}>{line}</div>)}
+              {(hl.css || []).map((item, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, color: "#cfcfcf" }}>
+                  {item.swatch && <span style={{ width: 11, height: 11, borderRadius: 3, background: item.swatch, border: "1px solid rgba(255,255,255,.3)", flexShrink: 0 }} />}
+                  <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.text}</span>
+                </div>
+              ))}
             </div>
           </>);
         })()}
@@ -2006,7 +2012,7 @@ function LandingPreview({ state }) {
           <div style={{ display: "flex", alignItems: "center", gap: "var(--spM)" }}>
             {mobile
               ? <span style={{ fontSize: "var(--tl)", color: "var(--ctext)", cursor: "pointer", lineHeight: 1 }}>☰</span>
-              : <><PreviewButton state={state} palette={p} sizeKey="s" outline={false} dataVar=".btn--s · var(--primary)">Sign up</PreviewButton><button data-var="font-size: var(--text-s)" style={linkBtn}>Login</button></>}
+              : <><PreviewButton state={state} palette={p} sizeKey="s" outline={false} dataVar=".btn--s" colorVar={primaryVar}>Sign up</PreviewButton><button data-var="font-size: var(--text-s)" style={linkBtn}>Login</button></>}
           </div>
         </div>
       </header>
@@ -2018,8 +2024,8 @@ function LandingPreview({ state }) {
             <h1 data-var="var(--h1) · var(--line-height-heading) · var(--heading-weight)" style={{ fontSize: "var(--h1)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: "var(--hw)", letterSpacing: "-0.02em", margin: "0 0 var(--spM)", overflowWrap: "break-word" }}>Your digital transformation begins here</h1>
             <p data-var="var(--text-m) · var(--line-height-body) · var(--text-weight)" style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)", maxWidth: "min(420px, 100%)" }}>Unlock the full potential of your business. Start your journey today and watch your operations transform to fit your needs like a glove.</p>
             <div style={{ display: "flex", gap: "var(--spS)", flexWrap: "wrap" }} data-var="gap: var(--space-s)">
-              <PreviewButton state={state} palette={p} sizeKey="l" outline={false} dataVar=".btn--l · var(--primary)">Learn more</PreviewButton>
-              <PreviewButton state={state} palette={p} sizeKey="l" outline={true} dataVar=".btn--l.btn--outline · var(--primary)">Watch demo</PreviewButton>
+              <PreviewButton state={state} palette={p} sizeKey="l" outline={false} dataVar=".btn--l" colorVar={primaryVar}>Learn more</PreviewButton>
+              <PreviewButton state={state} palette={p} sizeKey="l" outline={true} dataVar=".btn--l.btn--outline" colorVar={primaryVar}>Watch demo</PreviewButton>
             </div>
           </div>
           {!mobile && <div style={{ color: "var(--ctext)", display: "flex", justifyContent: "center" }}>{heroArt}</div>}
@@ -2033,7 +2039,7 @@ function LandingPreview({ state }) {
           <div style={{ minWidth: 0 }}>
             <h2 data-var="var(--h2) · var(--line-height-heading) · var(--heading-weight)" style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: "var(--hw)", letterSpacing: "-0.02em", margin: "0 0 var(--spM)", overflowWrap: "break-word" }}>Dedicated support</h2>
             <p data-var="var(--text-m) · var(--line-height-body) · var(--text-weight)" style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)" }}>Zephtor provides ongoing support and training to ensure you maximize the value of our software. Our experts are here to assist you at every step of your digital transformation journey.</p>
-            <PreviewButton state={state} palette={p} sizeKey="default" outline={false} dataVar=".btn · var(--primary)">Learn more</PreviewButton>
+            <PreviewButton state={state} palette={p} sizeKey="default" outline={false} dataVar=".btn" colorVar={primaryVar}>Learn more</PreviewButton>
           </div>
         </div>
       </section>
