@@ -729,7 +729,7 @@ const css_styles = `
   .ds-cs-opt:hover{background:var(--ds-bg)} .ds-cs-opt.sel{background:var(--ds-accent-light)}
   .ds-cs-empty{padding:12px;text-align:center;color:var(--ds-text-3);font-size:12px}
   /* Panel de cuenta */
-  .ds-account{max-width:480px}
+  .ds-account{max-width:480px;margin:0 auto}
   .ds-account-head{display:flex;align-items:center;gap:14px;margin-bottom:22px}
   .ds-account-name{font-size:16px;font-weight:600;color:var(--ds-text)}
   .ds-account-email{font-size:13px;color:var(--ds-text-3)}
@@ -2179,7 +2179,7 @@ function SidebarPromo() {
   return (
     <div className="ds-spromo">
       <img className="ds-spromo-img" src="/samirh.png" alt="Samir Haddad" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-      <div className="ds-spromo-txt"><strong>Websites that sell.</strong>Custom Bricks sites &amp; design systems.</div>
+      <div className="ds-spromo-txt"><strong>Websites that sell</strong>Custom Bricks sites &amp; design systems.</div>
       <a className="ds-spromo-cta" href={CAL_URL} target="_blank" rel="noopener noreferrer">
         <span className="ds-spromo-label">Work with me</span>
         <span className="ds-spromo-arrow">→</span>
@@ -2401,7 +2401,7 @@ function AdminUsers({ onBack, darkMode, toggleDark, addToast }) {
         : rows == null ? <div className="ds-auth-loading">Loading users…</div>
         : rows.length === 0 ? <p className="ds-dash-sub">No users yet.</p>
         : (<table className="ds-admin-table">
-            <thead><tr><th>Email</th><th>Systems</th><th>Cloud limit</th></tr></thead>
+            <thead><tr><th>Name</th><th>Email</th><th>Country</th><th>Systems</th><th>Cloud limit</th></tr></thead>
             <tbody>{rows.map((r) => <AdminUserRow key={r.id} row={r} onSetLimit={setLimit} />)}</tbody>
           </table>)}
     </div>
@@ -2416,9 +2416,13 @@ function AdminUserRow({ row, onSetLimit }) {
     if (next === row.system_limit) return;
     onSetLimit(row.id, next);
   };
+  const fullName = [row.first_name, row.last_name].filter(Boolean).join(" ");
+  const cc = COUNTRIES.find((c) => c.n === row.country)?.c;
   return (
     <tr>
-      <td>{row.email}{row.is_admin && <span className="ds-admin-badge" style={{ marginLeft: 8 }}>Admin</span>}</td>
+      <td>{fullName || <span style={{ color: "var(--ds-text-3)" }}>—</span>}{row.is_admin && <span className="ds-admin-badge" style={{ marginLeft: 8 }}>Admin</span>}</td>
+      <td>{row.email}</td>
+      <td>{row.country ? <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>{cc && <img className="ds-cs-flag" src={flagUrl(cc)} alt="" />}{row.country}</span> : <span style={{ color: "var(--ds-text-3)" }}>—</span>}</td>
       <td>{row.systems_count}</td>
       <td>
         <div className="ds-admin-limit">
