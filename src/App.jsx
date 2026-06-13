@@ -705,6 +705,33 @@ const css_styles = `
   .ds-auth-switch{margin-top:14px;text-align:center;font-size:12px;color:var(--ds-text-3)}
   .ds-auth-switch button{background:none;border:none;color:var(--ds-accent);font-weight:600;cursor:pointer;font-size:12px;font-family:inherit;padding:0}
   .ds-auth-switch button:hover{text-decoration:underline}
+  /* Acciones de auth + avatar */
+  .ds-auth-actions{display:flex;align-items:center;gap:8px}
+  .ds-auth-link{background:none;border:none;color:var(--ds-text-2);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;padding:6px 4px}
+  .ds-auth-link:hover{color:var(--ds-text)}
+  .ds-auth-user{display:flex;align-items:center;gap:7px;background:none;border:none;cursor:pointer;font-family:inherit;padding:3px 6px;border-radius:var(--ds-radius)}
+  .ds-auth-user:hover{background:var(--ds-bg)}
+  .ds-auth-name{font-size:12.5px;color:var(--ds-text);font-weight:500;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ds-avatar{border-radius:50%;object-fit:cover;display:inline-block;flex-shrink:0}
+  .ds-avatar-ini{display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:600;line-height:1}
+  /* Selector de país (dropdown con buscador + banderas) */
+  .ds-cs{position:relative}
+  .ds-cs-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;cursor:pointer;text-align:left}
+  .ds-cs-val{display:flex;align-items:center;gap:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ds-cs-ph{color:var(--ds-text-3)}
+  .ds-cs-flag{width:20px;height:15px;border-radius:2px;object-fit:cover;flex-shrink:0;box-shadow:0 0 0 1px rgba(0,0,0,.1);display:inline-block}
+  .ds-cs-caret{color:var(--ds-text-3);font-size:10px;flex-shrink:0}
+  .ds-cs-panel{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:60;background:var(--ds-bg-card);border:1px solid var(--ds-border);border-radius:var(--ds-radius);box-shadow:var(--ds-shadow-md);padding:6px;max-height:240px;display:flex;flex-direction:column}
+  .ds-cs-search{margin-bottom:6px}
+  .ds-cs-list{overflow-y:auto}
+  .ds-cs-opt{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--ds-text)}
+  .ds-cs-opt:hover{background:var(--ds-bg)} .ds-cs-opt.sel{background:var(--ds-accent-light)}
+  .ds-cs-empty{padding:12px;text-align:center;color:var(--ds-text-3);font-size:12px}
+  /* Panel de cuenta */
+  .ds-account{max-width:480px}
+  .ds-account-head{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+  .ds-account-name{font-size:16px;font-weight:600;color:var(--ds-text)}
+  .ds-account-email{font-size:13px;color:var(--ds-text-3)}
 
   @media (prefers-reduced-motion:reduce){.ds-step-anim,.ds-step-check,.ds-toast{animation:none}*{transition-duration:.01ms!important}}
 `;
@@ -723,11 +750,63 @@ function ThemeIcon({ dark }) {
         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
       </svg>);
 }
-const COUNTRIES = ["Spain","Mexico","Argentina","Colombia","Chile","Peru","Venezuela","Ecuador","Guatemala","Cuba","Bolivia","Dominican Republic","Honduras","Paraguay","El Salvador","Nicaragua","Costa Rica","Panama","Uruguay","Puerto Rico","United States","Canada","United Kingdom","Ireland","Portugal","France","Germany","Italy","Netherlands","Belgium","Switzerland","Austria","Sweden","Norway","Denmark","Finland","Poland","Czechia","Romania","Greece","Hungary","Ukraine","Russia","Turkey","Morocco","Algeria","Tunisia","Egypt","Nigeria","South Africa","Kenya","Ghana","Brazil","Australia","New Zealand","India","Pakistan","Bangladesh","Indonesia","Philippines","Vietnam","Thailand","Malaysia","Singapore","Japan","South Korea","China","Hong Kong","Taiwan","United Arab Emirates","Saudi Arabia","Israel","Qatar","Other"];
+const COUNTRIES = [
+  { n: "Spain", c: "es" }, { n: "Mexico", c: "mx" }, { n: "Argentina", c: "ar" }, { n: "Colombia", c: "co" }, { n: "Chile", c: "cl" },
+  { n: "Peru", c: "pe" }, { n: "Venezuela", c: "ve" }, { n: "Ecuador", c: "ec" }, { n: "Guatemala", c: "gt" }, { n: "Cuba", c: "cu" },
+  { n: "Bolivia", c: "bo" }, { n: "Dominican Republic", c: "do" }, { n: "Honduras", c: "hn" }, { n: "Paraguay", c: "py" }, { n: "El Salvador", c: "sv" },
+  { n: "Nicaragua", c: "ni" }, { n: "Costa Rica", c: "cr" }, { n: "Panama", c: "pa" }, { n: "Uruguay", c: "uy" }, { n: "Puerto Rico", c: "pr" },
+  { n: "United States", c: "us" }, { n: "Canada", c: "ca" }, { n: "United Kingdom", c: "gb" }, { n: "Ireland", c: "ie" }, { n: "Portugal", c: "pt" },
+  { n: "France", c: "fr" }, { n: "Germany", c: "de" }, { n: "Italy", c: "it" }, { n: "Netherlands", c: "nl" }, { n: "Belgium", c: "be" },
+  { n: "Switzerland", c: "ch" }, { n: "Austria", c: "at" }, { n: "Sweden", c: "se" }, { n: "Norway", c: "no" }, { n: "Denmark", c: "dk" },
+  { n: "Finland", c: "fi" }, { n: "Poland", c: "pl" }, { n: "Czechia", c: "cz" }, { n: "Romania", c: "ro" }, { n: "Greece", c: "gr" },
+  { n: "Hungary", c: "hu" }, { n: "Ukraine", c: "ua" }, { n: "Russia", c: "ru" }, { n: "Turkey", c: "tr" }, { n: "Morocco", c: "ma" },
+  { n: "Algeria", c: "dz" }, { n: "Tunisia", c: "tn" }, { n: "Egypt", c: "eg" }, { n: "Nigeria", c: "ng" }, { n: "South Africa", c: "za" },
+  { n: "Kenya", c: "ke" }, { n: "Ghana", c: "gh" }, { n: "Brazil", c: "br" }, { n: "Australia", c: "au" }, { n: "New Zealand", c: "nz" },
+  { n: "India", c: "in" }, { n: "Pakistan", c: "pk" }, { n: "Bangladesh", c: "bd" }, { n: "Indonesia", c: "id" }, { n: "Philippines", c: "ph" },
+  { n: "Vietnam", c: "vn" }, { n: "Thailand", c: "th" }, { n: "Malaysia", c: "my" }, { n: "Singapore", c: "sg" }, { n: "Japan", c: "jp" },
+  { n: "South Korea", c: "kr" }, { n: "China", c: "cn" }, { n: "Hong Kong", c: "hk" }, { n: "Taiwan", c: "tw" }, { n: "United Arab Emirates", c: "ae" },
+  { n: "Saudi Arabia", c: "sa" }, { n: "Israel", c: "il" }, { n: "Qatar", c: "qa" }, { n: "Other", c: "" },
+];
+const flagUrl = (code) => "https://flagcdn.com/20x15/" + code + ".png";
+
+// Selector de país con buscador + banderas (dropdown personalizado, consistente en todos los SO)
+function CountrySelect({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const ref = useRef(null);
+  useEffect(() => {
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+  const sel = COUNTRIES.find((c) => c.n === value);
+  const filtered = COUNTRIES.filter((c) => c.n.toLowerCase().includes(q.trim().toLowerCase()));
+  return (
+    <div className="ds-cs" ref={ref}>
+      <button type="button" className="ds-input ds-cs-btn" onClick={() => setOpen((o) => !o)}>
+        {sel ? <span className="ds-cs-val">{sel.c && <img className="ds-cs-flag" src={flagUrl(sel.c)} alt="" />}{sel.n}</span> : <span className="ds-cs-ph">Country…</span>}
+        <span className="ds-cs-caret">▾</span>
+      </button>
+      {open && (
+        <div className="ds-cs-panel">
+          <input className="ds-input ds-cs-search" placeholder="Search country…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+          <div className="ds-cs-list">
+            {filtered.map((c) => (
+              <div key={c.n} className={"ds-cs-opt" + (c.n === value ? " sel" : "")} onClick={() => { onChange(c.n); setOpen(false); setQ(""); }}>
+                {c.c ? <img className="ds-cs-flag" src={flagUrl(c.c)} alt="" loading="lazy" /> : <span className="ds-cs-flag" />}{c.n}
+              </div>
+            ))}
+            {!filtered.length && <div className="ds-cs-empty">No matches</div>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Modal de auth: Sign up (datos básicos) ↔ Sign in (magic link). Ambos usan OTP por email.
-function AuthModal({ onClose, addToast }) {
-  const [mode, setMode] = useState("signup"); // signup | signin
+function AuthModal({ onClose, addToast, initialMode }) {
+  const [mode, setMode] = useState(initialMode || "signup"); // signup | signin
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -781,12 +860,7 @@ function AuthModal({ onClose, addToast }) {
               </div>
             )}
             <input className="ds-input" type="email" required placeholder="you@email.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ marginBottom: isSignup ? 10 : 0 }} autoFocus={!isSignup} />
-            {isSignup && (
-              <select className="ds-input" value={country} onChange={(e) => setCountry(e.target.value)} required>
-                <option value="" disabled>Country…</option>
-                {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            )}
+            {isSignup && <CountrySelect value={country} onChange={setCountry} />}
             {isSignup && <label className="ds-optin"><input type="checkbox" checked={optIn} onChange={(e) => setOptIn(e.target.checked)} /><span>I want to receive occasional tips &amp; updates from Samir Haddad. No spam, unsubscribe anytime.</span></label>}
             <button className="ds-btn ds-btn-primary" type="submit" disabled={busy} style={{ width: "100%", marginTop: isSignup ? 4 : 10 }}>{busy ? "Sending…" : (isSignup ? "Create account" : "Send magic link")}</button>
             <div className="ds-auth-switch">
@@ -835,17 +909,51 @@ function SelectMigrateModal({ prompt, onConfirm, onClose }) {
     </div>
   );
 }
+// Nombre visible del usuario (nombre + apellido, o email)
+function userDisplayName(user) {
+  const m = user?.user_metadata || {};
+  const name = [m.first_name, m.last_name].filter(Boolean).join(" ").trim();
+  return name || user?.email || "Account";
+}
+async function emailHash(email) {
+  const data = new TextEncoder().encode((email || "").trim().toLowerCase());
+  const buf = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+function avatarColor(str) {
+  let h = 0; for (let i = 0; i < (str || "").length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  return "hsl(" + (h % 360) + ",52%,45%)";
+}
+// Avatar: Gravatar si existe (por el email), si no iniciales sobre color determinista
+function Avatar({ user, size = 32 }) {
+  const m = user?.user_metadata || {};
+  const initials = (((m.first_name || "")[0] || "") + ((m.last_name || "")[0] || "") || (user?.email || "?")[0] || "?").toUpperCase();
+  const [src, setSrc] = useState(null);
+  useEffect(() => {
+    let active = true;
+    if (user?.email && crypto?.subtle) emailHash(user.email).then((h) => { if (active) setSrc("https://gravatar.com/avatar/" + h + "?d=404&s=" + (size * 2)); }).catch(() => {});
+    return () => { active = false; };
+  }, [user?.email, size]);
+  if (src) return <img className="ds-avatar" src={src} width={size} height={size} alt="" onError={() => setSrc(null)} />;
+  return <span className="ds-avatar ds-avatar-ini" style={{ width: size, height: size, background: avatarColor((m.first_name || "") + (m.last_name || "") + (user?.email || "")), fontSize: Math.round(size * 0.42) }}>{initials}</span>;
+}
+
 // Control de cuenta en cabecera
-function AuthControl({ user, isAdmin, onSignIn, onSignOut }) {
+function AuthControl({ user, isAdmin, onAuth, onSignOut, onAccount }) {
   if (!cloudEnabled) return null;
   if (user) return (
-    <div className="ds-auth-chip" title={user.email}>
+    <div className="ds-auth-chip">
       {isAdmin && <span className="ds-admin-badge">Admin</span>}
-      <span className="ds-auth-email">{user.email}</span>
+      <button className="ds-auth-user" onClick={onAccount} title="Account settings"><Avatar user={user} size={24} /><span className="ds-auth-name">{userDisplayName(user)}</span></button>
       <button className="ds-auth-out" onClick={onSignOut}>Sign out</button>
     </div>
   );
-  return <button className="ds-btn ds-btn-sm" onClick={onSignIn} data-tip="Create an account to save in the cloud">Sign up</button>;
+  return (
+    <div className="ds-auth-actions">
+      <button className="ds-auth-link" onClick={() => onAuth("signin")}>Sign in</button>
+      <button className="ds-btn ds-btn-sm" onClick={() => onAuth("signup")} data-tip="Create an account to save in the cloud">Sign up</button>
+    </div>
+  );
 }
 // Aviso de modo invitado
 function GuestBanner({ onSignIn }) {
@@ -857,7 +965,7 @@ function GuestBanner({ onSignIn }) {
     </div>
   );
 }
-function EditorHeader({ name, onRename, onBack, autoSave, onToggleAutoSave, dirty, onSave, darkMode, toggleDark, user, onSignIn, onSignOut, isAdmin }) {
+function EditorHeader({ name, onRename, onBack, autoSave, onToggleAutoSave, dirty, onSave, darkMode, toggleDark, user, onAuth, onAccount, onSignOut, isAdmin }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(name);
   useEffect(() => { setVal(name); }, [name]);
@@ -876,7 +984,7 @@ function EditorHeader({ name, onRename, onBack, autoSave, onToggleAutoSave, dirt
       <button className="ds-btn ds-btn-primary ds-btn-sm" onClick={onSave} disabled={autoSave || !dirty} data-tip="Save changes (⌘/Ctrl + S)">
         {autoSave ? "✓ Auto-saved" : (dirty ? "Save changes" : "✓ Saved")}
       </button>
-      <AuthControl user={user} isAdmin={isAdmin} onSignIn={onSignIn} onSignOut={onSignOut} />
+      <AuthControl user={user} isAdmin={isAdmin} onAuth={onAuth} onAccount={onAccount} onSignOut={onSignOut} />
       <button className="ds-header-theme" onClick={toggleDark} data-tip="Toggle light / dark theme"><ThemeIcon dark={darkMode} /></button>
     </div>
   </header>);
@@ -2132,7 +2240,7 @@ function StepExport() {
   ];
 
   return (<div>
-    {!user && <GuestBanner onSignIn={openAuth} />}
+    {!user && <GuestBanner onSignIn={() => openAuth("signup")} />}
     {warnings.map((w, i) => <div key={i} className="ds-warning" onClick={() => dispatch({ type: "SET_STEP", payload: w.step })}>⚠ {w.msg}</div>)}
     <div className="ds-form-group" style={{ marginBottom: 20 }}>
       <label>Variable prefix <span style={{ fontWeight: 400, color: "var(--ds-text-3)" }}>(optional)</span></label>
@@ -2226,7 +2334,7 @@ function SystemCard({ sys, onOpen, onDuplicate, onDelete, onRename }) {
   </div>);
 }
 
-function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, onDelete, onRename, user, onSignIn, onSignOut, limit, isAdmin, onOpenAdmin }) {
+function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, onDelete, onRename, user, onAuth, onAccount, onSignOut, limit, isAdmin, onOpenAdmin }) {
   const systems = library.systems;
   const atMax = !!user && limit != null && systems.length >= limit;
   return (<>
@@ -2235,12 +2343,12 @@ function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, 
       <div><h1>Design System Generator for Bricks Builder</h1><p>Your saved design systems</p></div>
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
         {isAdmin && <button className="ds-btn ds-btn-sm" onClick={onOpenAdmin} data-tip="Manage users">Users</button>}
-        <AuthControl user={user} isAdmin={isAdmin} onSignIn={onSignIn} onSignOut={onSignOut} />
+        <AuthControl user={user} isAdmin={isAdmin} onAuth={onAuth} onAccount={onAccount} onSignOut={onSignOut} />
         <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode"><ThemeIcon dark={darkMode} /></button>
       </div>
     </header>
     <div className="ds-dash">
-      {!user && <GuestBanner onSignIn={onSignIn} />}
+      {!user && <GuestBanner onSignIn={() => onAuth("signup")} />}
       <div className="ds-dash-head">
         <div><h2 className="ds-dash-title">My design systems</h2><p className="ds-dash-sub">{user ? systems.length + " / " + (limit == null ? "∞" : limit) + " in cloud" : systems.length + " system" + (systems.length === 1 ? "" : "s") + " on this device"}</p></div>
         <button className="ds-btn ds-btn-primary" onClick={onNew} disabled={atMax} data-tip={atMax ? "Cloud limit reached (" + limit + ")" : undefined}>+ New system</button>
@@ -2322,6 +2430,48 @@ function AdminUserRow({ row, onSetLimit }) {
   );
 }
 
+// Panel de usuario: editar nombre/apellidos/país (vía updateUser → solo el propio usuario)
+function AccountView({ user, onBack, darkMode, toggleDark, addToast, onSignOut }) {
+  const m = user?.user_metadata || {};
+  const [firstName, setFirstName] = useState(m.first_name || "");
+  const [lastName, setLastName] = useState(m.last_name || "");
+  const [country, setCountry] = useState(m.country || "");
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ data: { ...m, first_name: firstName.trim(), last_name: lastName.trim(), country } });
+      if (error) throw error;
+      addToast("Profile updated", "ok");
+    } catch (e) { addToast("Could not update profile", "err"); }
+    setBusy(false);
+  };
+  return (<>
+    <header className="ds-header">
+      <button className="ds-header-back" onClick={onBack} data-tip="Back to my systems">←</button>
+      <BrandMark />
+      <div><h1>Account</h1><p>Your profile</p></div>
+      <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode" style={{ marginLeft: "auto" }}><ThemeIcon dark={darkMode} /></button>
+    </header>
+    <div className="ds-dash">
+      <div className="ds-account">
+        <div className="ds-account-head"><Avatar user={user} size={64} /><div><div className="ds-account-name">{userDisplayName(user)}</div><div className="ds-account-email">{user.email}</div></div></div>
+        <div className="ds-grid-2">
+          <div className="ds-form-group"><label>First name</label><input className="ds-input" value={firstName} onChange={(e) => setFirstName(e.target.value)} /></div>
+          <div className="ds-form-group"><label>Last name</label><input className="ds-input" value={lastName} onChange={(e) => setLastName(e.target.value)} /></div>
+        </div>
+        <div className="ds-form-group"><label>Country</label><CountrySelect value={country} onChange={setCountry} /></div>
+        <div className="ds-form-group"><label>Email</label><input className="ds-input" value={user.email} disabled /><div className="ds-helper">Your email is your login. Changing it needs a verified flow — tell me if you want it enabled.</div></div>
+        <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+          <button className="ds-btn ds-btn-primary" onClick={save} disabled={busy}>{busy ? "Saving…" : "Save changes"}</button>
+          <button className="ds-btn" onClick={onSignOut}>Sign out</button>
+        </div>
+        <div className="ds-helper" style={{ marginTop: 16 }}>Profile photo: we use your <a href="https://gravatar.com" target="_blank" rel="noopener noreferrer" style={{ color: "var(--ds-accent)" }}>Gravatar</a> if you have one, otherwise your initials.</div>
+      </div>
+    </div>
+  </>);
+}
+
 export default function App() {
   const [darkMode, setDarkMode] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches);
   const toggleDark = () => setDarkMode((d) => !d);
@@ -2342,7 +2492,8 @@ export default function App() {
   // ── Auth / nube ──
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(!cloudEnabled); // sin nube → listo al instante
-  const [authOpen, setAuthOpen] = useState(false);           // modal magic link
+  const [authOpen, setAuthOpen] = useState(false);           // modal de auth
+  const [authMode, setAuthMode] = useState("signup");        // signup | signin
   const [migratePrompt, setMigratePrompt] = useState(null);  // { candidates, slots } → modal de selección
   const [isAdmin, setIsAdmin] = useState(false);
   const [userLimit, setUserLimit] = useState(MAX_SYSTEMS);   // null = ilimitado
@@ -2351,7 +2502,7 @@ export default function App() {
   const cloudSavePending = useRef(null);
   const restoredRef = useRef(false);
   const loadedUserRef = useRef(null);
-  const openAuth = () => setAuthOpen(true);
+  const openAuth = (mode = "signup") => { setAuthMode(mode); setAuthOpen(true); };
 
   // Reabre el último sistema editado (una vez por carga)
   const restoreSession = (systems) => {
@@ -2595,15 +2746,17 @@ export default function App() {
         ? <div className="ds-auth-loading">Loading…</div>
         : view === "admin"
         ? <AdminUsers onBack={() => setView("dashboard")} darkMode={darkMode} toggleDark={toggleDark} addToast={addToast} myLimit={userLimit} />
+        : view === "account"
+        ? <AccountView user={user} onBack={() => setView("dashboard")} darkMode={darkMode} toggleDark={toggleDark} addToast={addToast} onSignOut={signOut} />
         : view === "dashboard"
-        ? <Dashboard library={library} darkMode={darkMode} toggleDark={toggleDark} onOpen={openSystem} onNew={createSystem} onDuplicate={duplicateSystem} onDelete={deleteSystem} onRename={renameSystem} user={user} onSignIn={openAuth} onSignOut={signOut} limit={userLimit} isAdmin={isAdmin} onOpenAdmin={() => setView("admin")} />
+        ? <Dashboard library={library} darkMode={darkMode} toggleDark={toggleDark} onOpen={openSystem} onNew={createSystem} onDuplicate={duplicateSystem} onDelete={deleteSystem} onRename={renameSystem} user={user} onAuth={openAuth} onAccount={() => setView("account")} onSignOut={signOut} limit={userLimit} isAdmin={isAdmin} onOpenAdmin={() => setView("admin")} />
         : <>
-            <EditorHeader name={currentSystem?.name || "Untitled"} onRename={(n) => renameSystem(currentId, n)} onBack={backToDashboard} autoSave={library.autoSave} onToggleAutoSave={toggleAutoSave} dirty={dirty} onSave={() => saveDoc(true)} darkMode={darkMode} toggleDark={toggleDark} user={user} onSignIn={openAuth} onSignOut={signOut} isAdmin={isAdmin} />
+            <EditorHeader name={currentSystem?.name || "Untitled"} onRename={(n) => renameSystem(currentId, n)} onBack={backToDashboard} autoSave={library.autoSave} onToggleAutoSave={toggleAutoSave} dirty={dirty} onSave={() => saveDoc(true)} darkMode={darkMode} toggleDark={toggleDark} user={user} onAuth={openAuth} onAccount={() => setView("account")} onSignOut={signOut} isAdmin={isAdmin} />
             <ProgressBar />
             <div className="ds-main"><Sidebar /><ErrorBoundary resetKey={state.currentStep}><StepContent /></ErrorBoundary></div>
             <Footer />
           </>}
-      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} addToast={addToast} />}
+      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} addToast={addToast} initialMode={authMode} />}
       {migratePrompt && <SelectMigrateModal prompt={migratePrompt} onClose={() => setMigratePrompt(null)} onConfirm={async (sel) => { setMigratePrompt(null); await migrateThese(sel); }} />}
       <ToastHost toasts={toasts} />
     </div>
