@@ -672,6 +672,8 @@ const css_styles = `
   .ds-guest-banner .ds-btn{flex-shrink:0}
   /* ===== Cross-promo (marca personal) ===== */
   .ds-promo{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-top:24px;padding:20px 22px;border-radius:var(--ds-radius-lg);background:linear-gradient(135deg,hsla(250,88%,66%,.14),hsla(250,88%,66%,.04));border:1px solid var(--ds-accent-ring)}
+  .ds-promo-img{width:60px;height:60px;border-radius:var(--ds-radius-lg);object-fit:cover;flex-shrink:0;border:1px solid var(--ds-accent-ring)}
+  .ds-promo-txt{flex:1 1 240px}
   .ds-promo-txt h4{margin:0 0 4px;font-size:15px;font-weight:650;color:var(--ds-text)}
   .ds-promo-txt p{margin:0;font-size:13px;color:var(--ds-text-2);line-height:1.5;max-width:460px}
   .ds-promo-cta{flex-shrink:0;background:var(--ds-accent);color:#fff;text-decoration:none;font-size:14px;font-weight:600;padding:11px 20px;border-radius:var(--ds-radius);white-space:nowrap;transition:background .15s}
@@ -2017,9 +2019,10 @@ const CAL_URL = "https://cal.com/samirh";
 function SamirPromo() {
   return (
     <div className="ds-promo">
+      <img className="ds-promo-img" src="/samirh.png" alt="Samir Haddad" onError={(e) => { e.currentTarget.style.display = "none"; }} />
       <div className="ds-promo-txt">
         <h4>Need it done for you?</h4>
-        <p>I'm SamirH — I design &amp; build high-converting websites and design systems in Bricks. Let's talk about your project.</p>
+        <p>I'm Samir Haddad — I design &amp; build high-converting websites and design systems in Bricks. Let's talk about your project.</p>
       </div>
       <a className="ds-promo-cta" href={CAL_URL} target="_blank" rel="noopener noreferrer">Book a free call →</a>
     </div>
@@ -2203,7 +2206,7 @@ function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, 
         : <div className="ds-dash-grid">
             {systems.map((s) => <SystemCard key={s.id} sys={s} onOpen={onOpen} onDuplicate={onDuplicate} onDelete={onDelete} onRename={onRename} />)}
           </div>}
-      <div className="ds-credit">A free tool by <a href={CAL_URL} target="_blank" rel="noopener noreferrer">SamirH</a> — design &amp; development for Bricks.</div>
+      <div className="ds-credit">A free tool by <a href={CAL_URL} target="_blank" rel="noopener noreferrer">Samir Haddad</a> — design &amp; development for Bricks.</div>
     </div>
   </>);
 }
