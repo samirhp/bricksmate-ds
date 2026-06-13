@@ -702,6 +702,9 @@ const css_styles = `
   .ds-optin{display:flex;align-items:flex-start;gap:8px;margin:12px 0;cursor:pointer}
   .ds-optin input{margin-top:2px;flex-shrink:0;cursor:pointer}
   .ds-optin span{font-size:11.5px;line-height:1.45;color:var(--ds-text-3)}
+  .ds-auth-switch{margin-top:14px;text-align:center;font-size:12px;color:var(--ds-text-3)}
+  .ds-auth-switch button{background:none;border:none;color:var(--ds-accent);font-weight:600;cursor:pointer;font-size:12px;font-family:inherit;padding:0}
+  .ds-auth-switch button:hover{text-decoration:underline}
 
   @media (prefers-reduced-motion:reduce){.ds-step-anim,.ds-step-check,.ds-toast{animation:none}*{transition-duration:.01ms!important}}
 `;
@@ -720,40 +723,77 @@ function ThemeIcon({ dark }) {
         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
       </svg>);
 }
-// Modal de inicio de sesión por magic link
-function SignInModal({ onClose, addToast }) {
+const COUNTRIES = ["Spain","Mexico","Argentina","Colombia","Chile","Peru","Venezuela","Ecuador","Guatemala","Cuba","Bolivia","Dominican Republic","Honduras","Paraguay","El Salvador","Nicaragua","Costa Rica","Panama","Uruguay","Puerto Rico","United States","Canada","United Kingdom","Ireland","Portugal","France","Germany","Italy","Netherlands","Belgium","Switzerland","Austria","Sweden","Norway","Denmark","Finland","Poland","Czechia","Romania","Greece","Hungary","Ukraine","Russia","Turkey","Morocco","Algeria","Tunisia","Egypt","Nigeria","South Africa","Kenya","Ghana","Brazil","Australia","New Zealand","India","Pakistan","Bangladesh","Indonesia","Philippines","Vietnam","Thailand","Malaysia","Singapore","Japan","South Korea","China","Hong Kong","Taiwan","United Arab Emirates","Saudi Arabia","Israel","Qatar","Other"];
+
+// Modal de auth: Sign up (datos básicos) ↔ Sign in (magic link). Ambos usan OTP por email.
+function AuthModal({ onClose, addToast }) {
+  const [mode, setMode] = useState("signup"); // signup | signin
   const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [country, setCountry] = useState("");
   const [optIn, setOptIn] = useState(false);
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
+  const isSignup = mode === "signup";
+
   const submit = async (e) => {
     e.preventDefault();
     if (!email.trim() || busy || !supabase) return;
+    if (isSignup && (!firstName.trim() || !country)) { addToast?.("Please complete name and country", "err"); return; }
     setBusy(true);
     try {
-      // Puente del opt-in a través del round-trip del magic link (se sincroniza tras login)
       try { localStorage.setItem("dsg-optin", optIn ? "1" : "0"); } catch {}
-      const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: window.location.origin, data: { marketing_opt_in: optIn } } });
-      if (error) throw error;
+      const options = { emailRedirectTo: window.location.origin };
+      if (isSignup) options.data = { first_name: firstName.trim(), last_name: lastName.trim(), country, marketing_opt_in: optIn };
+      else options.shouldCreateUser = false; // sign in solo para cuentas existentes
+      const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options });
+      if (error) {
+        if (!isSignup && /signups?\s+not\s+allowed|not\s*found|no\s*user/i.test(error.message || "")) {
+          addToast?.("No account with that email — create one first.", "err");
+          setMode("signup"); setBusy(false); return;
+        }
+        throw error;
+      }
       setSent(true);
     } catch (err) { addToast?.("Could not send link: " + (err.message || "error"), "err"); }
     setBusy(false);
   };
+
   return (
     <div className="ds-modal-overlay" onClick={onClose}>
       <div className="ds-modal" onClick={(e) => e.stopPropagation()}>
         <button className="ds-modal-x" onClick={onClose} aria-label="Close">✕</button>
         {sent ? (<>
           <h3>Check your email</h3>
-          <p>We sent a magic link to <strong>{email}</strong>. Open it on this device to sign in.</p>
+          <p>We sent a magic link to <strong>{email}</strong>. Open it on this device to {isSignup ? "finish creating your account" : "sign in"}.</p>
           <button className="ds-btn ds-btn-primary" style={{ width: "100%" }} onClick={onClose}>Done</button>
         </>) : (
           <form onSubmit={submit}>
-            <h3>Sign in to save in the cloud</h3>
-            <p>Enter your email and we'll send a magic link — no password. Your design systems sync to your account and stay safe across devices.</p>
-            <input className="ds-input" type="email" required placeholder="you@email.com" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
-            <label className="ds-optin"><input type="checkbox" checked={optIn} onChange={(e) => setOptIn(e.target.checked)} /><span>I want to receive occasional tips &amp; updates from Samir Haddad. No spam, unsubscribe anytime.</span></label>
-            <button className="ds-btn ds-btn-primary" type="submit" disabled={busy} style={{ width: "100%", marginTop: 4 }}>{busy ? "Sending…" : "Send magic link"}</button>
+            <h3>{isSignup ? "Create your account" : "Sign in"}</h3>
+            <p>{isSignup
+              ? "Save your design systems in the cloud and keep them safe across devices. No password — we'll email you a magic link."
+              : "Welcome back. Enter your email and we'll send you a magic link."}</p>
+            {isSignup && (
+              <div className="ds-grid-2" style={{ marginBottom: 10 }}>
+                <input className="ds-input" placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} required autoFocus />
+                <input className="ds-input" placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+              </div>
+            )}
+            <input className="ds-input" type="email" required placeholder="you@email.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ marginBottom: isSignup ? 10 : 0 }} autoFocus={!isSignup} />
+            {isSignup && (
+              <select className="ds-input" value={country} onChange={(e) => setCountry(e.target.value)} required>
+                <option value="" disabled>Country…</option>
+                {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            )}
+            {isSignup && <label className="ds-optin"><input type="checkbox" checked={optIn} onChange={(e) => setOptIn(e.target.checked)} /><span>I want to receive occasional tips &amp; updates from Samir Haddad. No spam, unsubscribe anytime.</span></label>}
+            <button className="ds-btn ds-btn-primary" type="submit" disabled={busy} style={{ width: "100%", marginTop: isSignup ? 4 : 10 }}>{busy ? "Sending…" : (isSignup ? "Create account" : "Send magic link")}</button>
+            <div className="ds-auth-switch">
+              {isSignup
+                ? <>Already have an account? <button type="button" onClick={() => setMode("signin")}>Sign in</button></>
+                : <>New here? <button type="button" onClick={() => setMode("signup")}>Create an account</button></>}
+            </div>
           </form>
         )}
       </div>
@@ -805,15 +845,15 @@ function AuthControl({ user, isAdmin, onSignIn, onSignOut }) {
       <button className="ds-auth-out" onClick={onSignOut}>Sign out</button>
     </div>
   );
-  return <button className="ds-btn ds-btn-sm" onClick={onSignIn} data-tip="Save your systems in the cloud">Sign in</button>;
+  return <button className="ds-btn ds-btn-sm" onClick={onSignIn} data-tip="Create an account to save in the cloud">Sign up</button>;
 }
 // Aviso de modo invitado
 function GuestBanner({ onSignIn }) {
   if (!cloudEnabled) return null;
   return (
     <div className="ds-guest-banner">
-      <span><strong>Guest mode</strong> — your systems are saved only in this browser and can be lost. Sign in to keep them safe in the cloud.</span>
-      <button className="ds-btn ds-btn-sm" onClick={onSignIn}>Sign in</button>
+      <span><strong>Guest mode</strong> — your systems are saved only in this browser and can be lost. Create an account to keep them safe in the cloud.</span>
+      <button className="ds-btn ds-btn-sm" onClick={onSignIn}>Sign up</button>
     </div>
   );
 }
@@ -2563,7 +2603,7 @@ export default function App() {
             <div className="ds-main"><Sidebar /><ErrorBoundary resetKey={state.currentStep}><StepContent /></ErrorBoundary></div>
             <Footer />
           </>}
-      {authOpen && <SignInModal onClose={() => setAuthOpen(false)} addToast={addToast} />}
+      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} addToast={addToast} />}
       {migratePrompt && <SelectMigrateModal prompt={migratePrompt} onClose={() => setMigratePrompt(null)} onConfirm={async (sel) => { setMigratePrompt(null); await migrateThese(sel); }} />}
       <ToastHost toasts={toasts} />
     </div>

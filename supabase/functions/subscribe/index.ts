@@ -28,11 +28,15 @@ Deno.serve(async (req) => {
     const listId = Deno.env.get("ACUMBAMAIL_LIST_ID");
     if (!token || !listId) return json({ error: "missing_config" }, 500);
 
-    // Acumbamail API → addSubscriber
+    // Acumbamail API → addSubscriber (con merge fields para personalizar emails)
+    const m = (user.user_metadata ?? {}) as Record<string, string>;
     const body = new URLSearchParams();
     body.set("auth_token", token);
     body.set("list_id", listId);
     body.set("merge_fields[email]", user.email);
+    if (m.first_name) body.set("merge_fields[NOMBRE]", m.first_name);
+    if (m.last_name) body.set("merge_fields[APELLIDOS]", m.last_name);
+    if (m.country) body.set("merge_fields[PAIS]", m.country);
     body.set("double_optin", "0");
     body.set("update_subscriber", "1");
     body.set("response_type", "json");
