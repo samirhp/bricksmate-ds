@@ -649,6 +649,16 @@ const css_styles = `
   .ds-guest-banner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring);border-radius:var(--ds-radius);padding:10px 14px;font-size:12.5px;margin-bottom:16px}
   .ds-guest-banner span{flex:1;min-width:200px;line-height:1.45;color:var(--ds-text-2)}
   .ds-guest-banner .ds-btn{flex-shrink:0}
+  .ds-modal-wide{max-width:460px}
+  .ds-migrate-list{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow:auto;margin:4px 0 14px}
+  .ds-migrate-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--ds-border-light);border-radius:var(--ds-radius);cursor:pointer;transition:all .12s}
+  .ds-migrate-item:hover{border-color:var(--ds-border)}
+  .ds-migrate-item.sel{border-color:var(--ds-accent);background:var(--ds-accent-light)}
+  .ds-migrate-item.dis{opacity:.45;cursor:not-allowed}
+  .ds-migrate-item input{flex-shrink:0;cursor:inherit}
+  .ds-migrate-name{font-size:13px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ds-migrate-meta{font-size:11px;color:var(--ds-text-3);white-space:nowrap}
+  .ds-migrate-foot{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--ds-text-2)}
 
   @media (prefers-reduced-motion:reduce){.ds-step-anim,.ds-step-check,.ds-toast{animation:none}*{transition-duration:.01ms!important}}
 `;
@@ -699,6 +709,41 @@ function SignInModal({ onClose, addToast }) {
             <button className="ds-btn ds-btn-primary" type="submit" disabled={busy} style={{ width: "100%", marginTop: 10 }}>{busy ? "Sending…" : "Send magic link"}</button>
           </form>
         )}
+      </div>
+    </div>
+  );
+}
+// Modal para elegir qué sistemas locales subir a la nube (cuando hay más que huecos)
+function SelectMigrateModal({ prompt, onConfirm, onClose }) {
+  const { candidates, slots } = prompt;
+  const [sel, setSel] = useState([]);
+  const toggle = (id) => setSel((s) => s.includes(id) ? s.filter((x) => x !== id) : (s.length < slots ? [...s, id] : s));
+  return (
+    <div className="ds-modal-overlay" onClick={onClose}>
+      <div className="ds-modal ds-modal-wide" onClick={(e) => e.stopPropagation()}>
+        <button className="ds-modal-x" onClick={onClose} aria-label="Close">✕</button>
+        <h3>Choose what to sync to the cloud</h3>
+        <p>You have {candidates.length} systems on this device but only {slots} cloud slot{slots === 1 ? "" : "s"} free. Pick up to {slots} — the rest stay safe on this device.</p>
+        <div className="ds-migrate-list">
+          {candidates.map((c) => {
+            const checked = sel.includes(c.id);
+            const disabled = !checked && sel.length >= slots;
+            return (
+              <label key={c.id} className={"ds-migrate-item" + (checked ? " sel" : "") + (disabled ? " dis" : "")}>
+                <input type="checkbox" checked={checked} disabled={disabled} onChange={() => toggle(c.id)} />
+                <span className="ds-migrate-name">{c.name}</span>
+                <span className="ds-migrate-meta">{(c.doc?.colors?.palettes?.length) || 0} colors · {fmtDate(c.updatedAt)}</span>
+              </label>
+            );
+          })}
+        </div>
+        <div className="ds-migrate-foot">
+          <span>{sel.length} / {slots} selected</span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="ds-btn ds-btn-sm" onClick={onClose}>Skip for now</button>
+            <button className="ds-btn ds-btn-primary ds-btn-sm" onClick={() => onConfirm(candidates.filter((c) => sel.includes(c.id)))} disabled={!sel.length}>Sync selected</button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -2058,8 +2103,8 @@ function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, 
     <div className="ds-dash">
       {!user && <GuestBanner onSignIn={onSignIn} />}
       <div className="ds-dash-head">
-        <div><h2 className="ds-dash-title">My design systems</h2><p className="ds-dash-sub">{systems.length} / {MAX_SYSTEMS} system{systems.length === 1 ? "" : "s"}</p></div>
-        <button className="ds-btn ds-btn-primary" onClick={onNew} disabled={atMax} data-tip={atMax ? "Limit reached: " + MAX_SYSTEMS + " max" : undefined}>+ New system</button>
+        <div><h2 className="ds-dash-title">My design systems</h2><p className="ds-dash-sub">{user ? systems.length + " / " + MAX_SYSTEMS + " in cloud" : systems.length + " system" + (systems.length === 1 ? "" : "s") + " on this device"}</p></div>
+        <button className="ds-btn ds-btn-primary" onClick={onNew} disabled={!!user && atMax} data-tip={!!user && atMax ? "Cloud limit: " + MAX_SYSTEMS + " max" : undefined}>+ New system</button>
       </div>
       {systems.length === 0
         ? <div className="ds-dash-empty">
@@ -2096,6 +2141,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(!cloudEnabled); // sin nube → listo al instante
   const [authOpen, setAuthOpen] = useState(false);           // modal magic link
+  const [migratePrompt, setMigratePrompt] = useState(null);  // { candidates, slots } → modal de selección
   const cloudMode = !!user;
   const cloudSaveTimer = useRef(null);
   const cloudSavePending = useRef(null);
@@ -2116,35 +2162,47 @@ export default function App() {
     } catch {}
   };
 
-  // Sube sistemas locales a la nube al iniciar sesión (migra los que quepan; conserva el resto en local)
-  const migrateLocalToCloud = async () => {
-    let local = null;
-    try { local = JSON.parse(localStorage.getItem(LIB_KEY) || "null"); } catch {}
-    const localSystems = (local && Array.isArray(local.systems)) ? local.systems : [];
-    if (!localSystems.length) return;
-    const existing = await cloudListSystems();
-    const existingIds = new Set(existing.map((s) => s.id));
-    let slots = MAX_SYSTEMS - existing.length;
-    let migrated = 0, skipped = 0;
-    for (const s of localSystems) {
-      if (existingIds.has(s.id)) continue;
-      if (slots <= 0) { skipped++; continue; }
-      try { await cloudInsertSystem(s); slots--; migrated++; }
-      catch (e) { if (isLimitError(e)) { skipped++; slots = 0; } else throw e; }
+  const readLocalSystems = () => {
+    try { const l = JSON.parse(localStorage.getItem(LIB_KEY) || "null"); return (l && Array.isArray(l.systems)) ? l.systems : []; }
+    catch { return []; }
+  };
+  // Quita de localStorage los sistemas ya migrados (los no elegidos se quedan en el dispositivo)
+  const removeLocalSystems = (ids) => {
+    try {
+      const l = JSON.parse(localStorage.getItem(LIB_KEY) || "null") || { autoSave: true, systems: [] };
+      l.systems = (l.systems || []).filter((s) => !ids.includes(s.id));
+      localStorage.setItem(LIB_KEY, JSON.stringify(l));
+    } catch {}
+  };
+  // Sube una lista concreta de sistemas a la nube, limpia local y refresca la biblioteca
+  const migrateThese = async (list) => {
+    const done = [];
+    for (const s of list) {
+      try { await cloudInsertSystem(s); done.push(s.id); }
+      catch (e) { if (isLimitError(e)) break; }
     }
-    if (migrated && !skipped) { try { localStorage.removeItem(LIB_KEY); } catch {} }
-    if (migrated) addToast(migrated + " system" + (migrated === 1 ? "" : "s") + " synced to your account", "ok");
-    if (skipped) addToast(skipped + " local system(s) kept on this device (5 max in cloud)", "info");
+    if (done.length) {
+      removeLocalSystems(done);
+      addToast(done.length + " system" + (done.length === 1 ? "" : "s") + " synced to your account", "ok");
+      try { const systems = await cloudListSystems(); setLibrary({ autoSave: true, systems }); } catch {}
+    }
   };
 
   const handleSignedIn = async (u) => {
     if (loadedUserRef.current === u.id) return;
     loadedUserRef.current = u.id;
     try {
-      await migrateLocalToCloud();
-      const systems = await cloudListSystems();
-      setLibrary({ autoSave: true, systems });
-      restoreSession(systems);
+      const existing = await cloudListSystems();
+      setLibrary({ autoSave: true, systems: existing });
+      restoreSession(existing);
+      // Migración de locales
+      const existingIds = new Set(existing.map((s) => s.id));
+      const candidates = readLocalSystems().filter((s) => !existingIds.has(s.id));
+      const slots = MAX_SYSTEMS - existing.length;
+      if (!candidates.length) return;
+      if (slots <= 0) { addToast("Cloud is full (" + MAX_SYSTEMS + "/" + MAX_SYSTEMS + ") — local systems kept on this device", "info"); return; }
+      if (candidates.length <= slots) await migrateThese(candidates);
+      else setMigratePrompt({ candidates, slots }); // hay que elegir
     } catch (e) { addToast("Could not load your cloud systems", "err"); }
   };
   const handleSignedOut = () => {
@@ -2226,8 +2284,9 @@ export default function App() {
     try { localStorage.setItem(SESSION_KEY, id); } catch {}
   };
   const atLimit = () => {
-    if (library.systems.length >= MAX_SYSTEMS) {
-      addToast("Limit reached: " + MAX_SYSTEMS + " design systems max" + (cloudMode ? "" : " — sign in doesn't raise it"), "err");
+    // El tope solo aplica en la nube; en local es ilimitado.
+    if (cloudMode && library.systems.length >= MAX_SYSTEMS) {
+      addToast("Cloud limit reached: " + MAX_SYSTEMS + " max. Delete one to add another.", "err");
       return true;
     }
     return false;
@@ -2327,6 +2386,7 @@ export default function App() {
             <Footer />
           </>}
       {authOpen && <SignInModal onClose={() => setAuthOpen(false)} addToast={addToast} />}
+      {migratePrompt && <SelectMigrateModal prompt={migratePrompt} onClose={() => setMigratePrompt(null)} onConfirm={async (sel) => { setMigratePrompt(null); await migrateThese(sel); }} />}
       <ToastHost toasts={toasts} />
     </div>
   </DSContext.Provider>);
