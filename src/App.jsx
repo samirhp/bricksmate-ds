@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useReducer, createContext, useMemo, useRef } from "react";
+import { useState, useEffect, useContext, useReducer, createContext, useMemo, useRef, Component } from "react";
 import { supabase, cloudEnabled } from "./supabase";
 
 const MAX_SYSTEMS = 5; // tope de sistemas por cuenta (también aplicado a invitados, y en la BD via trigger)
@@ -161,7 +161,7 @@ const btnContrast = (l) => (l > 60 ? "#18181b" : "#ffffff");
 // hover=true replica el :hover del CSS exportado (sólido oscurece 10%; outline se rellena).
 function buttonInlineStyle(state, p, sizeKey, outline, hover) {
   const b = state.buttons || { sizes: BTN_SIZE_DEFAULTS, radiusKey: "m" };
-  const sz = (b.sizes && b.sizes[sizeKey]) || BTN_SIZE_DEFAULTS[sizeKey];
+  const sz = (b.sizes && b.sizes[sizeKey]) || BTN_SIZE_DEFAULTS[sizeKey] || BTN_SIZE_DEFAULTS.default;
   const fontKey = TEXT_KEYS.includes(sz.font) ? sz.font : "m"; // tolera claves antiguas (p.ej. "mm")
   const fontPx = state.typography.texts[fontKey]?.desktop || 16;
   const radiusPx = b.radiusKey === "circle" ? state.radius.circle : (state.radius.values[b.radiusKey] || 0);
@@ -1679,6 +1679,9 @@ function LandingPreview({ state }) {
   const maxVp = state.maxViewport;
   // Fixed: contenido centrado con ancho máximo (boxed). Full-width: 100%.
   const container = isFixed ? "min(" + maxVp + "px, 92%)" : "100%";
+  // Breakpoints según el viewport simulado → la landing es responsive de verdad
+  const mobile = simVP < 768;
+  const tablet = simVP < 1024;
 
   // Botones reales del sistema (mismo helper que el paso Buttons) → tamaño, padding em, radius y color configurados
   const linkBtn = { background: "transparent", color: "var(--ctext)", border: "none", fontSize: "var(--ts)", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" };
@@ -1762,35 +1765,36 @@ function LandingPreview({ state }) {
             {logoMark}
             <span style={{ fontWeight: 700, fontSize: "var(--tl)", color: "var(--ctext)" }}>Zephtor</span>
           </div>
-          <nav style={{ display: "flex", gap: "var(--spM)", alignItems: "center" }}>
+          {!mobile && <nav style={{ display: "flex", gap: "var(--spM)", alignItems: "center" }}>
             {["Home", "Features", "Pricing", "About Us", "Contact"].map((x) => <span key={x} style={{ fontSize: "var(--ts)", color: "var(--ctext)", cursor: "pointer", whiteSpace: "nowrap" }}>{x}</span>)}
-          </nav>
+          </nav>}
           <div style={{ display: "flex", alignItems: "center", gap: "var(--spM)" }}>
-            <PreviewButton state={state} palette={p} sizeKey="sm" outline={false}>Sign up</PreviewButton>
-            <button style={linkBtn}>Login</button>
+            {mobile
+              ? <span style={{ fontSize: "var(--tl)", color: "var(--ctext)", cursor: "pointer", lineHeight: 1 }}>☰</span>
+              : <><PreviewButton state={state} palette={p} sizeKey="s" outline={false}>Sign up</PreviewButton><button style={linkBtn}>Login</button></>}
           </div>
         </div>
       </header>
 
       {/* HERO */}
       <section style={{ padding: "var(--secL) var(--gut)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1.05fr 0.95fr", gap: "var(--spXL)", alignItems: "center", maxWidth: container, margin: "0 auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1.05fr 0.95fr", gap: "var(--spXL)", alignItems: "center", maxWidth: container, margin: "0 auto" }}>
           <div>
-            <h1 style={{ fontSize: "var(--h1)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 800, letterSpacing: "-0.02em", margin: "0 0 var(--spM)" }}>Your digital transformation begins here</h1>
+            <h1 style={{ fontSize: "var(--h1)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 800, letterSpacing: "-0.02em", margin: "0 0 var(--spM)", overflowWrap: "break-word" }}>Your digital transformation begins here</h1>
             <p style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)", maxWidth: 420 }}>Unlock the full potential of your business. Start your journey today and watch your operations transform to fit your needs like a glove.</p>
             <div style={{ display: "flex", gap: "var(--spS)", flexWrap: "wrap" }}>
-              <PreviewButton state={state} palette={p} sizeKey="lg" outline={false}>Learn more</PreviewButton>
-              <PreviewButton state={state} palette={p} sizeKey="lg" outline={true}>Watch demo</PreviewButton>
+              <PreviewButton state={state} palette={p} sizeKey="l" outline={false}>Learn more</PreviewButton>
+              <PreviewButton state={state} palette={p} sizeKey="l" outline={true}>Watch demo</PreviewButton>
             </div>
           </div>
-          <div style={{ color: "var(--ctext)", display: "flex", justifyContent: "center" }}>{heroArt}</div>
+          {!mobile && <div style={{ color: "var(--ctext)", display: "flex", justifyContent: "center" }}>{heroArt}</div>}
         </div>
       </section>
 
       {/* SUPPORT — sección alterna (imagen izquierda / texto derecha) */}
       <section style={{ padding: "var(--secM) var(--gut)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "0.95fr 1.05fr", gap: "var(--spXL)", alignItems: "center", maxWidth: container, margin: "0 auto" }}>
-          <div style={{ color: "var(--ctext)", display: "flex", justifyContent: "center" }}>{supportArt}</div>
+        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "0.95fr 1.05fr", gap: "var(--spXL)", alignItems: "center", maxWidth: container, margin: "0 auto" }}>
+          {!mobile && <div style={{ color: "var(--ctext)", display: "flex", justifyContent: "center" }}>{supportArt}</div>}
           <div>
             <h2 style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 var(--spM)" }}>Dedicated support</h2>
             <p style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)" }}>Zephtor provides ongoing support and training to ensure you maximize the value of our software. Our experts are here to assist you at every step of your digital transformation journey.</p>
@@ -1805,7 +1809,7 @@ function LandingPreview({ state }) {
           <h2 style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 var(--spS)" }}>Discover what sets Zephtor apart</h2>
           <p style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>Our suite of SaaS solutions is packed with powerful features.</p>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "var(--spL)", maxWidth: container, margin: "0 auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(" + (mobile ? 1 : tablet ? 2 : 4) + ",1fr)", gap: "var(--spL)", maxWidth: container, margin: "0 auto" }}>
           {features.map((f) => (
             <div key={f.t}>
               <h3 style={{ fontSize: "var(--tl)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: 700, margin: "0 0 var(--spS)" }}>{f.t}</h3>
@@ -1817,7 +1821,7 @@ function LandingPreview({ state }) {
 
       {/* FOOTER */}
       <footer style={{ background: "var(--cfoot)", padding: "var(--spXL) var(--gut)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr 1fr", gap: "var(--spL)", maxWidth: container, margin: "0 auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "1.6fr 1fr 1fr 1fr", gap: "var(--spL)", maxWidth: container, margin: "0 auto" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "var(--spS)" }}>
               {logoMark}
@@ -2067,6 +2071,23 @@ function StepExport() {
 /* ================================================================
    ROUTER + APP
    ================================================================ */
+// Red de seguridad: un fallo de render no deja la app en blanco (ni hace perder datos)
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { err: null }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  componentDidUpdate(prev) { if (prev.resetKey !== this.props.resetKey && this.state.err) this.setState({ err: null }); }
+  render() {
+    if (this.state.err) return (
+      <div className="ds-auth-loading" style={{ flexDirection: "column", gap: 12, textAlign: "center", padding: 24 }}>
+        <div style={{ fontWeight: 600 }}>Something went wrong rendering this view.</div>
+        <div style={{ fontSize: 12, color: "var(--ds-text-3)" }}>Your data is safe. Go to another step or reload.</div>
+        <button className="ds-btn" onClick={() => this.setState({ err: null })}>Try again</button>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
 function StepContent() {
   const { state } = useDSContext();
   const step = STEPS.find((s) => s.id === state.currentStep);
@@ -2482,7 +2503,7 @@ export default function App() {
         : <>
             <EditorHeader name={currentSystem?.name || "Untitled"} onRename={(n) => renameSystem(currentId, n)} onBack={backToDashboard} autoSave={library.autoSave} onToggleAutoSave={toggleAutoSave} dirty={dirty} onSave={() => saveDoc(true)} darkMode={darkMode} toggleDark={toggleDark} user={user} onSignIn={openAuth} onSignOut={signOut} isAdmin={isAdmin} />
             <ProgressBar />
-            <div className="ds-main"><Sidebar /><StepContent /></div>
+            <div className="ds-main"><Sidebar /><ErrorBoundary resetKey={state.currentStep}><StepContent /></ErrorBoundary></div>
             <Footer />
           </>}
       {authOpen && <SignInModal onClose={() => setAuthOpen(false)} addToast={addToast} />}
