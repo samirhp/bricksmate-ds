@@ -1,4 +1,7 @@
 import { useState, useEffect, useContext, useReducer, createContext, useMemo, useRef } from "react";
+import { supabase, cloudEnabled } from "./supabase";
+
+const MAX_SYSTEMS = 5; // tope de sistemas por cuenta (también aplicado a invitados, y en la BD via trigger)
 
 /* ================================================================
    UTILITIES
@@ -256,6 +259,27 @@ function loadLibrary() {
   return { autoSave: true, systems: [] };
 }
 function persistLibrary(lib) { try { localStorage.setItem(LIB_KEY, JSON.stringify(lib)); } catch {} }
+
+// ===== Capa nube (Supabase) — mapea filas ↔ formato de la app =====
+const rowToSys = (r) => ({ id: r.id, name: r.name, doc: r.doc, createdAt: r.created_at, updatedAt: r.updated_at });
+async function cloudListSystems() {
+  const { data, error } = await supabase.from("systems").select("*").order("updated_at", { ascending: false });
+  if (error) throw error;
+  return (data || []).map(rowToSys);
+}
+async function cloudInsertSystem(sys) {
+  const { error } = await supabase.from("systems").insert({ id: sys.id, name: sys.name, doc: sys.doc, created_at: sys.createdAt, updated_at: sys.updatedAt });
+  if (error) throw error;
+}
+async function cloudUpdateSystem(id, fields) {
+  const { error } = await supabase.from("systems").update(fields).eq("id", id);
+  if (error) throw error;
+}
+async function cloudDeleteSystem(id) {
+  const { error } = await supabase.from("systems").delete().eq("id", id);
+  if (error) throw error;
+}
+const isLimitError = (e) => !!e && (e.message || "").includes("SYSTEMS_LIMIT_REACHED");
 
 function reducer(state, action) {
   switch (action.type) {
@@ -610,6 +634,22 @@ const css_styles = `
   .ds-cslider input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid rgba(0,0,0,.3);box-shadow:0 1px 3px rgba(0,0,0,.35);cursor:grab}
   .ds-cslider input[type=range]:focus{outline:none} .ds-cslider input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px var(--ds-accent-ring),0 1px 3px rgba(0,0,0,.35)}
 
+  /* ===== Auth / cuenta ===== */
+  .ds-auth-loading{display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--ds-text-3);font-size:14px}
+  .ds-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:10000;padding:20px;animation:ds-toast-in .2s}
+  .ds-modal{position:relative;width:100%;max-width:380px;background:var(--ds-bg-card);border:1px solid var(--ds-border);border-radius:var(--ds-radius-lg);padding:24px;box-shadow:var(--ds-shadow-md)}
+  .ds-modal h3{font-size:16px;font-weight:650;margin:0 0 8px}
+  .ds-modal p{font-size:13px;color:var(--ds-text-2);line-height:1.5;margin:0 0 14px}
+  .ds-modal-x{position:absolute;top:12px;right:12px;width:26px;height:26px;border:none;background:transparent;color:var(--ds-text-3);font-size:14px;cursor:pointer;border-radius:6px}
+  .ds-modal-x:hover{background:var(--ds-bg);color:var(--ds-text)}
+  .ds-auth-chip{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ds-text-2)}
+  .ds-auth-email{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px}
+  .ds-auth-out{border:1px solid var(--ds-border);background:var(--ds-bg-card);color:var(--ds-text-2);border-radius:var(--ds-radius);font-size:11px;padding:4px 8px;cursor:pointer;font-family:inherit;transition:all .15s;box-shadow:var(--ds-shadow)}
+  .ds-auth-out:hover{background:var(--ds-bg);color:var(--ds-text)}
+  .ds-guest-banner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring);border-radius:var(--ds-radius);padding:10px 14px;font-size:12.5px;margin-bottom:16px}
+  .ds-guest-banner span{flex:1;min-width:200px;line-height:1.45;color:var(--ds-text-2)}
+  .ds-guest-banner .ds-btn{flex-shrink:0}
+
   @media (prefers-reduced-motion:reduce){.ds-step-anim,.ds-step-check,.ds-toast{animation:none}*{transition-duration:.01ms!important}}
 `;
 
@@ -627,7 +667,64 @@ function ThemeIcon({ dark }) {
         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
       </svg>);
 }
-function EditorHeader({ name, onRename, onBack, autoSave, onToggleAutoSave, dirty, onSave, darkMode, toggleDark }) {
+// Modal de inicio de sesión por magic link
+function SignInModal({ onClose, addToast }) {
+  const [email, setEmail] = useState("");
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!email.trim() || busy || !supabase) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: window.location.origin } });
+      if (error) throw error;
+      setSent(true);
+    } catch (err) { addToast?.("Could not send link: " + (err.message || "error"), "err"); }
+    setBusy(false);
+  };
+  return (
+    <div className="ds-modal-overlay" onClick={onClose}>
+      <div className="ds-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="ds-modal-x" onClick={onClose} aria-label="Close">✕</button>
+        {sent ? (<>
+          <h3>Check your email</h3>
+          <p>We sent a magic link to <strong>{email}</strong>. Open it on this device to sign in.</p>
+          <button className="ds-btn ds-btn-primary" style={{ width: "100%" }} onClick={onClose}>Done</button>
+        </>) : (
+          <form onSubmit={submit}>
+            <h3>Sign in to save in the cloud</h3>
+            <p>Enter your email and we'll send a magic link — no password. Your design systems sync to your account and stay safe across devices.</p>
+            <input className="ds-input" type="email" required placeholder="you@email.com" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
+            <button className="ds-btn ds-btn-primary" type="submit" disabled={busy} style={{ width: "100%", marginTop: 10 }}>{busy ? "Sending…" : "Send magic link"}</button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+// Control de cuenta en cabecera
+function AuthControl({ user, onSignIn, onSignOut }) {
+  if (!cloudEnabled) return null;
+  if (user) return (
+    <div className="ds-auth-chip" title={user.email}>
+      <span className="ds-auth-email">{user.email}</span>
+      <button className="ds-auth-out" onClick={onSignOut}>Sign out</button>
+    </div>
+  );
+  return <button className="ds-btn ds-btn-sm" onClick={onSignIn} data-tip="Save your systems in the cloud">Sign in</button>;
+}
+// Aviso de modo invitado
+function GuestBanner({ onSignIn }) {
+  if (!cloudEnabled) return null;
+  return (
+    <div className="ds-guest-banner">
+      <span><strong>Guest mode</strong> — your systems are saved only in this browser and can be lost. Sign in to keep them safe in the cloud.</span>
+      <button className="ds-btn ds-btn-sm" onClick={onSignIn}>Sign in</button>
+    </div>
+  );
+}
+function EditorHeader({ name, onRename, onBack, autoSave, onToggleAutoSave, dirty, onSave, darkMode, toggleDark, user, onSignIn, onSignOut }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(name);
   useEffect(() => { setVal(name); }, [name]);
@@ -646,6 +743,7 @@ function EditorHeader({ name, onRename, onBack, autoSave, onToggleAutoSave, dirt
       <button className="ds-btn ds-btn-primary ds-btn-sm" onClick={onSave} disabled={autoSave || !dirty} data-tip="Save changes (⌘/Ctrl + S)">
         {autoSave ? "✓ Auto-saved" : (dirty ? "Save changes" : "✓ Saved")}
       </button>
+      <AuthControl user={user} onSignIn={onSignIn} onSignOut={onSignOut} />
       <button className="ds-header-theme" onClick={toggleDark} data-tip="Toggle light / dark theme"><ThemeIcon dark={darkMode} /></button>
     </div>
   </header>);
@@ -1817,7 +1915,7 @@ function StepPreview() {
    STEP 9: EXPORT
    ================================================================ */
 function StepExport() {
-  const { state, dispatch, addToast, systemName } = useDSContext();
+  const { state, dispatch, addToast, systemName, user, openAuth } = useDSContext();
   const [status, setStatus] = useState(null);
   const [done, setDone] = useState(null);
   const warnings = [];
@@ -1869,6 +1967,7 @@ function StepExport() {
   ];
 
   return (<div>
+    {!user && <GuestBanner onSignIn={openAuth} />}
     {warnings.map((w, i) => <div key={i} className="ds-warning" onClick={() => dispatch({ type: "SET_STEP", payload: w.step })}>⚠ {w.msg}</div>)}
     <div className="ds-form-group" style={{ marginBottom: 20 }}>
       <label>Variable prefix <span style={{ fontWeight: 400, color: "var(--ds-text-3)" }}>(optional)</span></label>
@@ -1945,18 +2044,22 @@ function SystemCard({ sys, onOpen, onDuplicate, onDelete, onRename }) {
   </div>);
 }
 
-function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, onDelete, onRename }) {
+function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, onDelete, onRename, user, onSignIn, onSignOut, atMax }) {
   const systems = library.systems;
   return (<>
     <header className="ds-header">
       <BrandMark />
       <div><h1>Design System Generator for Bricks Builder</h1><p>Your saved design systems</p></div>
-      <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode" style={{ marginLeft: "auto" }}><ThemeIcon dark={darkMode} /></button>
+      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+        <AuthControl user={user} onSignIn={onSignIn} onSignOut={onSignOut} />
+        <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode"><ThemeIcon dark={darkMode} /></button>
+      </div>
     </header>
     <div className="ds-dash">
+      {!user && <GuestBanner onSignIn={onSignIn} />}
       <div className="ds-dash-head">
-        <div><h2 className="ds-dash-title">My design systems</h2><p className="ds-dash-sub">{systems.length} saved system{systems.length === 1 ? "" : "s"}</p></div>
-        <button className="ds-btn ds-btn-primary" onClick={onNew}>+ New system</button>
+        <div><h2 className="ds-dash-title">My design systems</h2><p className="ds-dash-sub">{systems.length} / {MAX_SYSTEMS} system{systems.length === 1 ? "" : "s"}</p></div>
+        <button className="ds-btn ds-btn-primary" onClick={onNew} disabled={atMax} data-tip={atMax ? "Limit reached: " + MAX_SYSTEMS + " max" : undefined}>+ New system</button>
       </div>
       {systems.length === 0
         ? <div className="ds-dash-empty">
@@ -1989,31 +2092,111 @@ export default function App() {
     setToasts((ts) => [...ts, { id, msg, type }]);
     setTimeout(() => setToasts((ts) => ts.filter((t) => t.id !== id)), 2800);
   };
+  // ── Auth / nube ──
+  const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(!cloudEnabled); // sin nube → listo al instante
+  const [authOpen, setAuthOpen] = useState(false);           // modal magic link
+  const cloudMode = !!user;
+  const cloudSaveTimer = useRef(null);
+  const cloudSavePending = useRef(null);
+  const restoredRef = useRef(false);
+  const loadedUserRef = useRef(null);
+  const openAuth = () => setAuthOpen(true);
+
+  // Reabre el último sistema editado (una vez por carga)
+  const restoreSession = (systems) => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    try {
+      const sid = localStorage.getItem(SESSION_KEY);
+      if (!sid) return;
+      const sys = systems.find((s) => s.id === sid);
+      if (sys) { skipSave.current = true; dispatch({ type: "LOAD_DOC", payload: { ...initialState, ...sys.doc } }); setCurrentId(sid); setView("editor"); setDirty(false); }
+      else localStorage.removeItem(SESSION_KEY);
+    } catch {}
+  };
+
+  // Sube sistemas locales a la nube al iniciar sesión (migra los que quepan; conserva el resto en local)
+  const migrateLocalToCloud = async () => {
+    let local = null;
+    try { local = JSON.parse(localStorage.getItem(LIB_KEY) || "null"); } catch {}
+    const localSystems = (local && Array.isArray(local.systems)) ? local.systems : [];
+    if (!localSystems.length) return;
+    const existing = await cloudListSystems();
+    const existingIds = new Set(existing.map((s) => s.id));
+    let slots = MAX_SYSTEMS - existing.length;
+    let migrated = 0, skipped = 0;
+    for (const s of localSystems) {
+      if (existingIds.has(s.id)) continue;
+      if (slots <= 0) { skipped++; continue; }
+      try { await cloudInsertSystem(s); slots--; migrated++; }
+      catch (e) { if (isLimitError(e)) { skipped++; slots = 0; } else throw e; }
+    }
+    if (migrated && !skipped) { try { localStorage.removeItem(LIB_KEY); } catch {} }
+    if (migrated) addToast(migrated + " system" + (migrated === 1 ? "" : "s") + " synced to your account", "ok");
+    if (skipped) addToast(skipped + " local system(s) kept on this device (5 max in cloud)", "info");
+  };
+
+  const handleSignedIn = async (u) => {
+    if (loadedUserRef.current === u.id) return;
+    loadedUserRef.current = u.id;
+    try {
+      await migrateLocalToCloud();
+      const systems = await cloudListSystems();
+      setLibrary({ autoSave: true, systems });
+      restoreSession(systems);
+    } catch (e) { addToast("Could not load your cloud systems", "err"); }
+  };
+  const handleSignedOut = () => {
+    loadedUserRef.current = null;
+    setLibrary(loadLibrary());
+    setView("dashboard"); setCurrentId(null); setDirty(false);
+    try { localStorage.removeItem(SESSION_KEY); } catch {}
+  };
+
+  const scheduleCloudSave = (id, fields, immediate) => {
+    cloudSavePending.current = { id, fields };
+    const flush = () => { const p = cloudSavePending.current; cloudSavePending.current = null; if (p && supabase) cloudUpdateSystem(p.id, p.fields).catch(() => addToast("Cloud save failed", "err")); };
+    if (cloudSaveTimer.current) clearTimeout(cloudSaveTimer.current);
+    if (immediate) flush(); else cloudSaveTimer.current = setTimeout(flush, 800);
+  };
+
+  // Suscripción a la sesión de Supabase
+  useEffect(() => {
+    if (!supabase) return;
+    let active = true;
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!active) return;
+      const u = data.session?.user ?? null;
+      setUser(u);
+      if (u) await handleSignedIn(u);
+      else restoreSession(library.systems);
+      setAuthReady(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      const u = session?.user ?? null;
+      setUser(u);
+      if (u) handleSignedIn(u);
+      else handleSignedOut();
+    });
+    return () => { active = false; sub.subscription.unsubscribe(); };
+  }, []);
+
+  const signOut = async () => { try { await supabase?.auth.signOut(); } catch {} };
 
   useEffect(() => { document.documentElement.setAttribute("data-theme", darkMode ? "dark" : "light"); }, [darkMode]);
 
-  // Al montar: restaura la sesión (sistema que estaba abierto antes de refrescar)
-  useEffect(() => {
-    try {
-      const sid = localStorage.getItem(SESSION_KEY);
-      if (sid) {
-        const sys = library.systems.find((s) => s.id === sid);
-        if (sys) {
-          skipSave.current = true;
-          dispatch({ type: "LOAD_DOC", payload: { ...initialState, ...sys.doc } });
-          setCurrentId(sid); setView("editor"); setDirty(false);
-        } else {
-          localStorage.removeItem(SESSION_KEY);
-        }
-      }
-    } catch {}
-  }, []);
+  // Al montar (solo build sin nube): restaura la sesión local. Con nube lo hace el efecto de auth.
+  useEffect(() => { if (!cloudEnabled) restoreSession(library.systems); }, []);
 
   // Guardado del documento activo en su entrada de la biblioteca
   const saveDoc = (announce) => {
+    const updatedAt = nowISO();
     setLibrary((prev) => {
-      const lib = { ...prev, systems: prev.systems.map((s) => s.id === currentId ? { ...s, doc: state, updatedAt: nowISO() } : s) };
-      persistLibrary(lib); return lib;
+      const lib = { ...prev, systems: prev.systems.map((s) => s.id === currentId ? { ...s, doc: state, updatedAt } : s) };
+      if (cloudMode) scheduleCloudSave(currentId, { doc: state, updated_at: updatedAt }, announce);
+      else persistLibrary(lib);
+      return lib;
     });
     setDirty(false);
     if (announce) addToast("Changes saved", "ok");
@@ -2042,43 +2225,60 @@ export default function App() {
     setCurrentId(id); setView("editor"); setDirty(false);
     try { localStorage.setItem(SESSION_KEY, id); } catch {}
   };
-  const createSystem = () => {
+  const atLimit = () => {
+    if (library.systems.length >= MAX_SYSTEMS) {
+      addToast("Limit reached: " + MAX_SYSTEMS + " design systems max" + (cloudMode ? "" : " — sign in doesn't raise it"), "err");
+      return true;
+    }
+    return false;
+  };
+  const createSystem = async () => {
+    if (atLimit()) return;
     const doc = JSON.parse(JSON.stringify(initialState));
     const sys = { id: "sys_" + randId(), name: "Design system " + (library.systems.length + 1), createdAt: nowISO(), updatedAt: nowISO(), doc };
+    if (cloudMode) {
+      try { await cloudInsertSystem(sys); }
+      catch (e) { addToast(isLimitError(e) ? "Limit reached: " + MAX_SYSTEMS + " max" : "Could not create system", "err"); return; }
+    }
     const lib = { ...library, systems: [...library.systems, sys] };
-    setLibrary(lib); persistLibrary(lib);
+    setLibrary(lib); if (!cloudMode) persistLibrary(lib);
     skipSave.current = true;
     dispatch({ type: "LOAD_DOC", payload: doc });
     setCurrentId(sys.id); setView("editor"); setDirty(false);
     try { localStorage.setItem(SESSION_KEY, sys.id); } catch {}
   };
-  const duplicateSystem = (id) => {
+  const duplicateSystem = async (id) => {
     const sys = library.systems.find((s) => s.id === id);
     if (!sys) return;
+    if (atLimit()) return;
     const copy = { id: "sys_" + randId(), name: sys.name + " (copy)", createdAt: nowISO(), updatedAt: nowISO(), doc: JSON.parse(JSON.stringify(sys.doc)) };
+    if (cloudMode) {
+      try { await cloudInsertSystem(copy); }
+      catch (e) { addToast(isLimitError(e) ? "Limit reached: " + MAX_SYSTEMS + " max" : "Could not duplicate", "err"); return; }
+    }
     const lib = { ...library, systems: [...library.systems, copy] };
-    setLibrary(lib); persistLibrary(lib);
+    setLibrary(lib); if (!cloudMode) persistLibrary(lib);
     addToast("System duplicated", "ok");
   };
-  const deleteSystem = (id) => {
+  const deleteSystem = async (id) => {
     const sys = library.systems.find((s) => s.id === id);
     if (!sys || !window.confirm('Delete "' + sys.name + '"? This cannot be undone.')) return;
+    if (cloudMode) { try { await cloudDeleteSystem(id); } catch { addToast("Could not delete", "err"); return; } }
     const lib = { ...library, systems: library.systems.filter((s) => s.id !== id) };
-    setLibrary(lib); persistLibrary(lib);
+    setLibrary(lib); if (!cloudMode) persistLibrary(lib);
     addToast("System deleted", "info");
   };
   const renameSystem = (id, name) => {
-    const lib = { ...library, systems: library.systems.map((s) => s.id === id ? { ...s, name, updatedAt: nowISO() } : s) };
-    setLibrary(lib); persistLibrary(lib);
+    const updatedAt = nowISO();
+    const lib = { ...library, systems: library.systems.map((s) => s.id === id ? { ...s, name, updatedAt } : s) };
+    setLibrary(lib);
+    if (cloudMode) cloudUpdateSystem(id, { name, updated_at: updatedAt }).catch(() => addToast("Rename not synced", "err"));
+    else persistLibrary(lib);
   };
   const toggleAutoSave = () => {
     const next = !library.autoSave;
-    const lib = { ...library, autoSave: next };
-    setLibrary(lib); persistLibrary(lib);
-    if (next && dirty) { // al activar, guarda lo pendiente
-      setLibrary((prev) => { const l = { ...prev, systems: prev.systems.map((s) => s.id === currentId ? { ...s, doc: state, updatedAt: nowISO() } : s) }; persistLibrary(l); return l; });
-      setDirty(false);
-    }
+    setLibrary((prev) => { const lib = { ...prev, autoSave: next }; if (!cloudMode) persistLibrary(lib); return lib; });
+    if (next && dirty) saveDoc(); // al activar, guarda lo pendiente
   };
   const backToDashboard = () => {
     if (!library.autoSave && dirty) {
@@ -2110,19 +2310,23 @@ export default function App() {
 
   const currentSystem = library.systems.find((s) => s.id === currentId);
   const systemName = currentSystem?.name;
-  const value = useMemo(() => ({ state, dispatch, darkMode, toggleDark, addToast, systemName }), [state, darkMode, systemName]);
+  const atMax = library.systems.length >= MAX_SYSTEMS;
+  const value = useMemo(() => ({ state, dispatch, darkMode, toggleDark, addToast, systemName, user, openAuth }), [state, darkMode, systemName, user]);
 
   return (<DSContext.Provider value={value}>
     <style>{css_styles}</style>
     <div className="ds-app" data-theme={darkMode ? "dark" : "light"}>
-      {view === "dashboard"
-        ? <Dashboard library={library} darkMode={darkMode} toggleDark={toggleDark} onOpen={openSystem} onNew={createSystem} onDuplicate={duplicateSystem} onDelete={deleteSystem} onRename={renameSystem} />
+      {!authReady
+        ? <div className="ds-auth-loading">Loading…</div>
+        : view === "dashboard"
+        ? <Dashboard library={library} darkMode={darkMode} toggleDark={toggleDark} onOpen={openSystem} onNew={createSystem} onDuplicate={duplicateSystem} onDelete={deleteSystem} onRename={renameSystem} user={user} onSignIn={openAuth} onSignOut={signOut} atMax={atMax} />
         : <>
-            <EditorHeader name={currentSystem?.name || "Untitled"} onRename={(n) => renameSystem(currentId, n)} onBack={backToDashboard} autoSave={library.autoSave} onToggleAutoSave={toggleAutoSave} dirty={dirty} onSave={() => saveDoc(true)} darkMode={darkMode} toggleDark={toggleDark} />
+            <EditorHeader name={currentSystem?.name || "Untitled"} onRename={(n) => renameSystem(currentId, n)} onBack={backToDashboard} autoSave={library.autoSave} onToggleAutoSave={toggleAutoSave} dirty={dirty} onSave={() => saveDoc(true)} darkMode={darkMode} toggleDark={toggleDark} user={user} onSignIn={openAuth} onSignOut={signOut} />
             <ProgressBar />
             <div className="ds-main"><Sidebar /><StepContent /></div>
             <Footer />
           </>}
+      {authOpen && <SignInModal onClose={() => setAuthOpen(false)} addToast={addToast} />}
       <ToastHost toasts={toasts} />
     </div>
   </DSContext.Provider>);
