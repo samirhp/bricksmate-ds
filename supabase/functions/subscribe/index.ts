@@ -35,8 +35,8 @@ Deno.serve(async (req) => {
     body.set("list_id", listId);
     body.set("merge_fields[email]", user.email);
     if (m.first_name) body.set("merge_fields[NOMBRE]", m.first_name);
-    if (m.last_name) body.set("merge_fields[APELLIDOS]", m.last_name);
-    if (m.country) body.set("merge_fields[PAIS]", m.country);
+    if (m.last_name) body.set("merge_fields[LASTNAME]", m.last_name);
+    if (m.country) body.set("merge_fields[COUNTRY]", m.country);
     body.set("double_optin", "0");
     body.set("update_subscriber", "1");
     body.set("response_type", "json");
