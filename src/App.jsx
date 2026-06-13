@@ -1819,7 +1819,20 @@ function LandingPreview({ state }) {
     if (!el) { setHl(null); return; }
     const wr = wrapRef.current.getBoundingClientRect();
     const r = el.getBoundingClientRect();
-    setHl({ top: r.top - wr.top, left: r.left - wr.left, width: r.width, height: r.height, label: el.getAttribute("data-var") });
+    const cs = getComputedStyle(el);
+    const box = (t, rt, b, l) => (t === rt && rt === b && b === l) ? t : (t === b && rt === l) ? t + " " + rt : t + " " + rt + " " + b + " " + l;
+    const css = [];
+    const add = (label, val, skip) => { if (val && val !== "normal" && val !== skip) css.push(label + ": " + val); };
+    add("font-size", cs.fontSize);
+    add("line-height", cs.lineHeight);
+    add("font-weight", cs.fontWeight, "400");
+    add("color", cs.color, "rgba(0, 0, 0, 0)");
+    const pad = box(cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft);
+    if (pad !== "0px") css.push("padding: " + pad);
+    if (cs.borderTopLeftRadius !== "0px") css.push("border-radius: " + cs.borderTopLeftRadius);
+    if (cs.backgroundColor && cs.backgroundColor !== "rgba(0, 0, 0, 0)") css.push("background: " + cs.backgroundColor);
+    if (cs.columnGap && cs.columnGap !== "normal") css.push("gap: " + cs.columnGap);
+    setHl({ top: r.top - wr.top, left: r.left - wr.left, width: r.width, height: r.height, label: el.getAttribute("data-var"), css, cx: e.clientX - wr.left, cy: e.clientY - wr.top, wrapW: wr.width, wrapH: wr.height });
   };
   useEffect(() => {
     const el = wrapRef.current?.parentElement;
@@ -1953,12 +1966,20 @@ function LandingPreview({ state }) {
     {/* Área redimensionable (cqw responde a este contenedor) */}
     <div style={{ position: "relative", paddingRight: 18 }}>
       <div ref={wrapRef} style={{ ...vars, position: "relative", width: width ? width + "px" : "100%", maxWidth: "100%", containerType: "inline-size" }}>
-        {inspect && hl && (
-          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 6 }}>
-            <div style={{ position: "absolute", top: hl.top, left: hl.left, width: hl.width, height: hl.height, outline: "2px solid var(--ds-accent)", outlineOffset: "-1px", background: "hsla(250,88%,66%,.08)", borderRadius: 3, boxSizing: "border-box" }} />
-            <div style={{ position: "absolute", top: Math.max(2, hl.top - 23), left: Math.max(2, hl.left), background: "var(--ds-accent)", color: "#fff", fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 5, whiteSpace: "nowrap", fontFamily: "'SF Mono',Consolas,monospace", boxShadow: "var(--ds-shadow-md)" }}>{hl.label}</div>
-          </div>
-        )}
+        {inspect && hl && (() => {
+          const estH = 30 + (hl.css?.length || 0) * 17;
+          const flipX = hl.cx + 256 > hl.wrapW;
+          const flipY = hl.cy + estH + 22 > hl.wrapH;
+          return (
+            <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 6 }}>
+              <div style={{ position: "absolute", top: hl.top, left: hl.left, width: hl.width, height: hl.height, outline: "2px solid var(--ds-accent)", outlineOffset: "-1px", background: "hsla(250,88%,66%,.07)", borderRadius: 3, boxSizing: "border-box" }} />
+              <div style={{ position: "absolute", left: flipX ? Math.max(2, hl.cx - 250) : hl.cx + 16, top: flipY ? Math.max(2, hl.cy - estH - 8) : hl.cy + 16, width: 234, background: "#0e0e0e", color: "#e5e5e5", border: "1px solid #2c2c2c", borderRadius: 8, padding: "9px 11px", boxShadow: "0 8px 28px rgba(0,0,0,.45)", fontFamily: "'SF Mono',Consolas,monospace", fontSize: 11, lineHeight: 1.55 }}>
+                <div style={{ color: "var(--ds-accent)", fontWeight: 700, marginBottom: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hl.label}</div>
+                {(hl.css || []).map((line, i) => <div key={i} style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "#cfcfcf" }}>{line}</div>)}
+              </div>
+            </div>
+          );
+        })()}
         <div onMouseMove={onInspectMove} onMouseLeave={() => setHl(null)} style={{ background: "var(--cbg)", color: "var(--ctext)", fontFamily: "'Inter',system-ui,sans-serif", borderRadius: "var(--ds-radius-lg)", overflow: "hidden", border: "1px solid var(--ds-border-light)", cursor: inspect ? "crosshair" : "default" }}>
 
       {/* NAV */}
@@ -1974,7 +1995,7 @@ function LandingPreview({ state }) {
           <div style={{ display: "flex", alignItems: "center", gap: "var(--spM)" }}>
             {mobile
               ? <span style={{ fontSize: "var(--tl)", color: "var(--ctext)", cursor: "pointer", lineHeight: 1 }}>☰</span>
-              : <><PreviewButton state={state} palette={p} sizeKey="s" outline={false} dataVar=".btn--s · var(--primary)">Sign up</PreviewButton><button style={linkBtn}>Login</button></>}
+              : <><PreviewButton state={state} palette={p} sizeKey="s" outline={false} dataVar=".btn--s · var(--primary)">Sign up</PreviewButton><button data-var="font-size: var(--text-s)" style={linkBtn}>Login</button></>}
           </div>
         </div>
       </header>
@@ -2023,20 +2044,20 @@ function LandingPreview({ state }) {
       </section>
 
       {/* FOOTER */}
-      <footer style={{ background: "var(--cfoot)", padding: "var(--spXL) var(--gut)" }}>
+      <footer data-var="padding: var(--space-xl) var(--gutter)" style={{ background: "var(--cfoot)", padding: "var(--spXL) var(--gut)" }}>
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "1.6fr 1fr 1fr 1fr", gap: "var(--spL)", maxWidth: container, margin: "0 auto" }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "var(--spS)" }}>
               {logoMark}
-              <span style={{ fontWeight: 700, fontSize: "var(--tl)", color: "var(--ctext)" }}>Zephtor</span>
+              <span data-var="font-size: var(--text-l)" style={{ fontWeight: 700, fontSize: "var(--tl)", color: "var(--ctext)" }}>Zephtor</span>
             </div>
-            <p style={{ fontSize: "var(--ts)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>Your digital transformation partner.</p>
+            <p data-var="font-size: var(--text-s)" style={{ fontSize: "var(--ts)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>Your digital transformation partner.</p>
           </div>
           {footerCols.map((col) => (
             <div key={col.h} style={{ minWidth: 0 }}>
-              <div style={{ fontSize: "var(--ts)", fontWeight: 700, color: "var(--ctext)", marginBottom: "var(--spM)" }}>{col.h}</div>
+              <div data-var="font-size: var(--text-s)" style={{ fontSize: "var(--ts)", fontWeight: 700, color: "var(--ctext)", marginBottom: "var(--spM)" }}>{col.h}</div>
               {col.links.map((l) => (
-                <div key={l} style={{ fontSize: "var(--ts)", lineHeight: 1.4, color: "var(--cmut)", marginBottom: "var(--spS)", textDecoration: "underline", cursor: "pointer" }}>{l}</div>
+                <div key={l} data-var="font-size: var(--text-s)" style={{ fontSize: "var(--ts)", lineHeight: 1.4, color: "var(--cmut)", marginBottom: "var(--spS)", textDecoration: "underline", cursor: "pointer" }}>{l}</div>
               ))}
             </div>
           ))}
