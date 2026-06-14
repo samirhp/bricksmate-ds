@@ -2611,8 +2611,8 @@ function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, 
   return (<>
     <header className="ds-header">
       <BrandMark />
+      <span className="ds-wordmark">BricksMate DS</span>
       <span className="ds-ver-pill">{APP_VERSION}</span>
-      <div><h1>Design System Generator for Bricks Builder</h1><p>Your saved design systems</p></div>
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
         {isAdmin && <button className="ds-btn ds-btn-sm" onClick={onOpenAdmin} data-tip="Manage users">Users</button>}
         <AuthControl user={user} isAdmin={isAdmin} onAuth={onAuth} onAccount={onAccount} onSignOut={onSignOut} />
