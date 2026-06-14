@@ -244,6 +244,7 @@ const initialState = {
     textScale: 1.25, textBaseMob: 16, textBaseDesk: 18,
     texts: initTexts(16, 18, 1.25),
     lineHeightHeading: 1.2, lineHeightBody: 1.6,
+    lsHeading: -0.02, lsHeadingUnit: "em", lsBody: 0, lsBodyUnit: "em",
   },
   colors: {
     palettes: [
@@ -1489,6 +1490,19 @@ function StepTypography() {
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Body line height</label><NumStepper value={t.lineHeightBody} set={(n) => dispatch({ type: "SET_TYPO", payload: { lineHeightBody: n || 1 } })} min={0.8} step={0.05} /></div>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Heading line height</label><NumStepper value={t.lineHeightHeading} set={(n) => dispatch({ type: "SET_TYPO", payload: { lineHeightHeading: n || 1 } })} min={0.8} step={0.05} /></div>
       </div>
+      <div className="ds-grid-2" style={{ marginBottom: 6 }}>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Body letter spacing</label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ flex: 1, minWidth: 0 }}><NumStepper value={t.lsBody ?? 0} set={(n) => dispatch({ type: "SET_TYPO", payload: { lsBody: n } })} min={-2} step={(t.lsBodyUnit || "em") === "px" ? 0.5 : 0.01} /></div>
+            <select className="ds-input" style={{ width: 68, flexShrink: 0 }} value={t.lsBodyUnit || "em"} onChange={(e) => dispatch({ type: "SET_TYPO", payload: { lsBodyUnit: e.target.value } })}>{["em", "rem", "px"].map((u) => <option key={u} value={u}>{u}</option>)}</select>
+          </div></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Heading letter spacing</label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ flex: 1, minWidth: 0 }}><NumStepper value={t.lsHeading ?? 0} set={(n) => dispatch({ type: "SET_TYPO", payload: { lsHeading: n } })} min={-2} step={(t.lsHeadingUnit || "em") === "px" ? 0.5 : 0.01} /></div>
+            <select className="ds-input" style={{ width: 68, flexShrink: 0 }} value={t.lsHeadingUnit || "em"} onChange={(e) => dispatch({ type: "SET_TYPO", payload: { lsHeadingUnit: e.target.value } })}>{["em", "rem", "px"].map((u) => <option key={u} value={u}>{u}</option>)}</select>
+          </div></div>
+      </div>
+      <div className="ds-helper" style={{ marginBottom: 14 }}><code>em</code> scales with font size (like a %): <code>0.05em</code> ≈ 5%. Headings often use a small negative value.</div>
       <div className="ds-grid-2" style={{ marginBottom: 14 }}>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Text weight</label>
           <select className="ds-input" value={st.textWeight} onChange={(e) => dispatch({ type: "SET_STYLE", field: "textWeight", value: parseInt(e.target.value) })}>{WEIGHTS.map((w) => <option key={w} value={w}>{w}</option>)}</select></div>
@@ -1848,6 +1862,9 @@ function generateVariablesJSON(state) {
   // Styles
   vars.push(mk('line-height-heading', String(state.typography.lineHeightHeading), 'Styles'));
   vars.push(mk('line-height-body', String(state.typography.lineHeightBody), 'Styles'));
+  { const ty = state.typography;
+    vars.push(mk('letter-spacing-heading', (ty.lsHeading ?? 0) + (ty.lsHeadingUnit || 'em'), 'Styles'));
+    vars.push(mk('letter-spacing-body', (ty.lsBody ?? 0) + (ty.lsBodyUnit || 'em'), 'Styles')); }
   { const st = state.styles || {};
     vars.push(mk('text-color', st.textColor || '#1f2937', 'Styles'));
     vars.push(mk('heading-color', st.headingColor || '#111827', 'Styles'));
@@ -2032,9 +2049,9 @@ function generateFrameworkCSS(state, systemName) {
   css += "body.bricks-is-frontend :focus-visible {\n  outline: 2px solid " + primary + ";\n  outline-offset: 4px;\n  transition: outline-color .2s;\n}\n\n";
 
   css += "/* — Text ———————————————————————————————— */\n";
-  css += "body {\n  font-size: " + v('text-m') + ";\n  line-height: " + v('line-height-body') + ";\n  color: " + v('text-color') + ";\n  font-weight: " + v('text-weight') + ";\n}\n\n";
+  css += "body {\n  font-size: " + v('text-m') + ";\n  line-height: " + v('line-height-body') + ";\n  letter-spacing: " + v('letter-spacing-body') + ";\n  color: " + v('text-color') + ";\n  font-weight: " + v('text-weight') + ";\n}\n\n";
   css += "/* — Headings —————————————————————————————— */\n";
-  css += "h1, h2, h3, h4, h5, h6 {\n  line-height: " + v('line-height-heading') + ";\n  color: " + v('heading-color') + ";\n  font-weight: " + v('heading-weight') + ";\n}\n";
+  css += "h1, h2, h3, h4, h5, h6 {\n  line-height: " + v('line-height-heading') + ";\n  letter-spacing: " + v('letter-spacing-heading') + ";\n  color: " + v('heading-color') + ";\n  font-weight: " + v('heading-weight') + ";\n}\n";
   ['h1','h2','h3','h4','h5','h6'].forEach(h => { css += h + " { font-size: " + v(h) + "; }\n"; });
 
   css += "\n/* — Sections —————————————————————————————— */\n";
@@ -2139,6 +2156,7 @@ function LandingPreview({ state }) {
     "--spS": spc("s"), "--spM": spc("m"), "--spL": spc("l"), "--spXL": spc("xl"),
     "--rm": (r.values.m || 8) + "px", "--rl": (r.values.l || 12) + "px", "--rc": (r.circle || 999) + "px",
     "--lhh": t.lineHeightHeading, "--lhb": t.lineHeightBody,
+    "--lsh": (t.lsHeading ?? 0) + (t.lsHeadingUnit || "em"), "--lsb": (t.lsBody ?? 0) + (t.lsBodyUnit || "em"),
     "--hw": st.headingWeight ?? 700, "--tw": st.textWeight ?? 400,
     "--cp": primary, "--cpt": primaryTint, "--cop": onPrimary,
     "--cbg": "#ffffff", "--ctext": "#1a1a1a", "--cmut": "#5f6b7a", "--cbd": "#e5e7eb", "--cfoot": "#f3f4f6",
@@ -2275,8 +2293,8 @@ function LandingPreview({ state }) {
       <section data-var="padding: var(--section-space-l) var(--gutter)" style={{ padding: "var(--secL) var(--gut)" }}>
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1.05fr 0.95fr", gap: "var(--spXL)", alignItems: "center", maxWidth: container, margin: "0 auto" }}>
           <div style={{ minWidth: 0 }}>
-            <h1 data-var="var(--h1) · var(--line-height-heading) · var(--heading-weight)" style={{ fontSize: "var(--h1)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: "var(--hw)", letterSpacing: "-0.02em", margin: "0 0 var(--spM)", overflowWrap: "break-word" }}>Your digital transformation begins here</h1>
-            <p data-var="var(--text-m) · var(--line-height-body) · var(--text-weight)" style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)", maxWidth: "min(420px, 100%)" }}>Unlock the full potential of your business. Start your journey today and watch your operations transform to fit your needs like a glove.</p>
+            <h1 data-var="var(--h1) · var(--line-height-heading) · var(--heading-weight) · var(--letter-spacing-heading)" style={{ fontSize: "var(--h1)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: "var(--hw)", letterSpacing: "var(--lsh)", margin: "0 0 var(--spM)", overflowWrap: "break-word" }}>Your digital transformation begins here</h1>
+            <p data-var="var(--text-m) · var(--line-height-body) · var(--text-weight) · var(--letter-spacing-body)" style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", letterSpacing: "var(--lsb)", color: "var(--cmut)", margin: "0 0 var(--spL)", maxWidth: "min(420px, 100%)" }}>Unlock the full potential of your business. Start your journey today and watch your operations transform to fit your needs like a glove.</p>
             <div style={{ display: "flex", gap: "var(--spS)", flexWrap: "wrap" }} data-var="gap: var(--space-s)">
               <PreviewButton state={state} palette={p} sizeKey="l" outline={false} dataVar=".btn--l" colorVar={primaryVar}>Learn more</PreviewButton>
               <PreviewButton state={state} palette={p} sizeKey="l" outline={true} dataVar=".btn--l.btn--outline" colorVar={primaryVar}>Watch demo</PreviewButton>
@@ -2291,8 +2309,8 @@ function LandingPreview({ state }) {
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "0.95fr 1.05fr", gap: "var(--spXL)", alignItems: "center", maxWidth: container, margin: "0 auto" }}>
           {!mobile && <div style={{ color: "var(--ctext)", display: "flex", justifyContent: "center" }}>{supportArt}</div>}
           <div style={{ minWidth: 0 }}>
-            <h2 data-var="var(--h2) · var(--line-height-heading) · var(--heading-weight)" style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: "var(--hw)", letterSpacing: "-0.02em", margin: "0 0 var(--spM)", overflowWrap: "break-word" }}>Dedicated support</h2>
-            <p data-var="var(--text-m) · var(--line-height-body) · var(--text-weight)" style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: "0 0 var(--spL)" }}>Zephtor provides ongoing support and training to ensure you maximize the value of our software. Our experts are here to assist you at every step of your digital transformation journey.</p>
+            <h2 data-var="var(--h2) · var(--line-height-heading) · var(--heading-weight) · var(--letter-spacing-heading)" style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: "var(--hw)", letterSpacing: "var(--lsh)", margin: "0 0 var(--spM)", overflowWrap: "break-word" }}>Dedicated support</h2>
+            <p data-var="var(--text-m) · var(--line-height-body) · var(--text-weight) · var(--letter-spacing-body)" style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", letterSpacing: "var(--lsb)", color: "var(--cmut)", margin: "0 0 var(--spL)" }}>Zephtor provides ongoing support and training to ensure you maximize the value of our software. Our experts are here to assist you at every step of your digital transformation journey.</p>
             <PreviewButton state={state} palette={p} sizeKey="default" outline={false} dataVar=".btn" colorVar={primaryVar}>Learn more</PreviewButton>
           </div>
         </div>
@@ -2301,14 +2319,14 @@ function LandingPreview({ state }) {
       {/* FEATURES */}
       <section data-var="padding: var(--section-space-m) var(--gutter)" style={{ padding: "var(--secM) var(--gut)" }}>
         <div style={{ textAlign: "center", maxWidth: "min(640px, 100%)", margin: "0 auto var(--spXL)" }}>
-          <h2 data-var="var(--h2) · var(--line-height-heading) · var(--heading-weight)" style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: "var(--hw)", letterSpacing: "-0.02em", margin: "0 0 var(--spS)", overflowWrap: "break-word" }}>Discover what sets Zephtor apart</h2>
-          <p data-var="var(--text-m) · var(--line-height-body) · var(--text-weight)" style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>Our suite of SaaS solutions is packed with powerful features.</p>
+          <h2 data-var="var(--h2) · var(--line-height-heading) · var(--heading-weight) · var(--letter-spacing-heading)" style={{ fontSize: "var(--h2)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: "var(--hw)", letterSpacing: "var(--lsh)", margin: "0 0 var(--spS)", overflowWrap: "break-word" }}>Discover what sets Zephtor apart</h2>
+          <p data-var="var(--text-m) · var(--line-height-body) · var(--text-weight) · var(--letter-spacing-body)" style={{ fontSize: "var(--tm)", lineHeight: "var(--lhb)", letterSpacing: "var(--lsb)", color: "var(--cmut)", margin: 0 }}>Our suite of SaaS solutions is packed with powerful features.</p>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(" + (mobile ? 1 : tablet ? 2 : 4) + ",1fr)", gap: "var(--spL)", maxWidth: container, margin: "0 auto" }} data-var="gap: var(--space-l)">
           {features.map((f) => (
             <div key={f.t} style={{ minWidth: 0 }}>
-              <h3 data-var="var(--text-l) · var(--line-height-heading) · var(--heading-weight)" style={{ fontSize: "var(--tl)", lineHeight: "var(--lhh)", color: "var(--ctext)", fontWeight: "var(--hw)", margin: "0 0 var(--spS)", overflowWrap: "break-word" }}>{f.t}</h3>
-              <p data-var="var(--text-s) · var(--line-height-body) · var(--text-weight)" style={{ fontSize: "var(--ts)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>{f.d}</p>
+              <h3 data-var="var(--text-l) · var(--line-height-heading) · var(--heading-weight) · var(--letter-spacing-heading)" style={{ fontSize: "var(--tl)", lineHeight: "var(--lhh)", letterSpacing: "var(--lsh)", color: "var(--ctext)", fontWeight: "var(--hw)", margin: "0 0 var(--spS)", overflowWrap: "break-word" }}>{f.t}</h3>
+              <p data-var="var(--text-s) · var(--line-height-body) · var(--text-weight) · var(--letter-spacing-body)" style={{ fontSize: "var(--ts)", lineHeight: "var(--lhb)", letterSpacing: "var(--lsb)", color: "var(--cmut)", margin: 0 }}>{f.d}</p>
             </div>
           ))}
         </div>
@@ -2322,7 +2340,7 @@ function LandingPreview({ state }) {
               {logoMark}
               <span data-var="font-size: var(--text-l)" style={{ fontWeight: 700, fontSize: "var(--tl)", color: "var(--ctext)" }}>Zephtor</span>
             </div>
-            <p data-var="font-size: var(--text-s)" style={{ fontSize: "var(--ts)", lineHeight: "var(--lhb)", color: "var(--cmut)", margin: 0 }}>Your digital transformation partner.</p>
+            <p data-var="font-size: var(--text-s)" style={{ fontSize: "var(--ts)", lineHeight: "var(--lhb)", letterSpacing: "var(--lsb)", color: "var(--cmut)", margin: 0 }}>Your digital transformation partner.</p>
           </div>
           {footerCols.map((col) => (
             <div key={col.h} style={{ minWidth: 0 }}>
