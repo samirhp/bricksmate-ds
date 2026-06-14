@@ -479,14 +479,24 @@ const css_styles = `
   .ds-main{display:flex;flex:1;overflow:hidden}
   .ds-sidebar{width:200px;background:var(--ds-bg-card);border-right:1px solid var(--ds-border-light);padding:12px 8px;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column}
   .ds-sidebar-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:var(--ds-text-3);padding:0 10px;margin-bottom:6px}
-  .ds-step-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:var(--ds-radius);cursor:pointer;transition:all .15s;margin-bottom:1px;position:relative}
-  .ds-step-item::before{content:'';position:absolute;left:0;top:18%;bottom:18%;width:2px;border-radius:2px;background:transparent;transition:background .15s}
+  .ds-steps-head{display:flex;align-items:center;gap:8px;padding:0 8px 12px}
+  .ds-steps-head .ds-steps-lbl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:var(--ds-text-3);flex-shrink:0}
+  .ds-progress-track{flex:1;height:5px;border-radius:3px;background:var(--ds-border);overflow:hidden}
+  .ds-progress-fill{height:100%;background:var(--ds-accent);border-radius:3px;transition:width .4s cubic-bezier(.16,1,.3,1)}
+  .ds-progress-pct{font-size:11px;font-weight:600;color:var(--ds-text-2);flex-shrink:0;min-width:26px;text-align:right}
+  .ds-steprail{position:relative}
+  .ds-steprail::before{content:'';position:absolute;left:16px;top:16px;bottom:16px;width:2px;background:var(--ds-border);border-radius:2px}
+  .ds-step-item{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:var(--ds-radius);cursor:pointer;margin-bottom:1px;position:relative}
   .ds-step-item:hover{background:var(--ds-bg)}
-  .ds-step-item.active{background:var(--ds-bg)} .ds-step-item.active::before{background:var(--ds-primary)}
-  .ds-step-num{font-size:12px;font-weight:500;color:var(--ds-text-3);width:16px;flex-shrink:0;text-align:center}
-  .ds-step-item.active .ds-step-num{color:var(--ds-primary)}
-  .ds-step-label{font-size:13px;font-weight:400;flex:1;color:var(--ds-text-2)} .ds-step-item.active .ds-step-label{color:var(--ds-text);font-weight:500}
-  .ds-step-check{width:14px;height:14px;border-radius:50%;background:var(--ds-success);color:var(--ds-bg);font-size:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .ds-step-node{width:19px;height:19px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;flex-shrink:0;z-index:1;background:var(--ds-bg-card);border:2px solid var(--ds-border);color:var(--ds-text-3);transition:border-color .15s,background .15s,color .15s}
+  .ds-step-item:hover .ds-step-node{border-color:var(--ds-text-3)}
+  .ds-step-node.done{background:var(--ds-success);border-color:var(--ds-success);color:#fff}
+  .ds-step-node.active{border-color:var(--ds-accent);color:var(--ds-accent);background:var(--ds-bg-card)}
+  .ds-step-label{font-size:13px;font-weight:400;flex:1;color:var(--ds-text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ds-step-active-wrap{background:var(--ds-accent-light);border-radius:var(--ds-radius);margin:1px 0}
+  .ds-step-active-wrap .ds-step-item:hover{background:transparent}
+  .ds-step-active-wrap .ds-step-label{color:var(--ds-text);font-weight:500}
+  .ds-step-desc{font-size:11px;color:var(--ds-accent);padding:0 10px 6px 36px;line-height:1.4}
   .ds-content{flex:1;display:flex;flex-direction:column;overflow:hidden}
   .ds-content-header{background:var(--ds-bg-card);padding:14px 24px;border-bottom:1px solid var(--ds-border-light)}
   .ds-content-header h2{font-size:17px;font-weight:600;letter-spacing:-.02em} .ds-content-header p{font-size:13px;color:var(--ds-text-2);margin-top:3px}
@@ -618,8 +628,6 @@ const css_styles = `
   ::-webkit-scrollbar{width:5px} ::-webkit-scrollbar-track{background:transparent} ::-webkit-scrollbar-thumb{background:var(--ds-border-light);border-radius:3px}
 
   /* ===== Accent (violeta, contenido) ===== */
-  .ds-step-item.active::before{background:var(--ds-accent)}
-  .ds-step-item.active .ds-step-num{color:var(--ds-accent)}
   .ds-input:focus,.ds-space-input:focus,.ds-variant-input:focus{border-color:var(--ds-accent);box-shadow:0 0 0 3px var(--ds-accent-ring)}
   [data-theme="dark"] .ds-input:focus,[data-theme="dark"] .ds-space-input:focus{box-shadow:0 0 0 3px var(--ds-accent-ring)}
   .ds-input-error:focus{border-color:var(--ds-error)!important;box-shadow:0 0 0 3px rgba(239,68,68,.18)!important}
@@ -630,7 +638,7 @@ const css_styles = `
   @keyframes ds-step-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
   .ds-step-anim{animation:ds-step-in .3s cubic-bezier(.16,1,.3,1)}
   @keyframes ds-check-pop{0%{transform:scale(0);opacity:0}60%{transform:scale(1.25)}100%{transform:scale(1);opacity:1}}
-  .ds-step-check{animation:ds-check-pop .32s cubic-bezier(.34,1.56,.64,1)}
+  .ds-step-node.done{animation:ds-check-pop .32s cubic-bezier(.34,1.56,.64,1)}
   .ds-mode-card,.ds-export-file-card,.ds-sys-card{transition:transform .18s cubic-bezier(.16,1,.3,1),box-shadow .18s,border-color .18s}
   .ds-mode-card:hover,.ds-export-file-card:hover,.ds-sys-card:hover{transform:translateY(-3px)}
   .ds-grid-chip{transition:transform .15s,border-color .15s,color .15s}
@@ -1030,10 +1038,26 @@ function EditorHeader({ name, onRename, onBack, autoSave, onToggleAutoSave, dirt
 }
 function Sidebar() {
   const { state, dispatch } = useDSContext();
-  return (<nav className="ds-sidebar"><div className="ds-sidebar-title">Steps</div>{STEPS.map((s) => (
-    <div key={s.id} className={"ds-step-item" + (state.currentStep === s.id ? " active" : "")} onClick={() => dispatch({ type: "SET_STEP", payload: s.id })}>
-      <div className="ds-step-num">{s.id}</div><span className="ds-step-label">{s.label}</span>{s.check(state) && <div className="ds-step-check">✓</div>}
-    </div>))}
+  const pct = Math.round((state.currentStep / STEPS.length) * 100);
+  return (<nav className="ds-sidebar">
+    <div className="ds-steps-head">
+      <span className="ds-steps-lbl">Steps</span>
+      <div className="ds-progress-track"><div className="ds-progress-fill" style={{ width: pct + "%" }} /></div>
+      <span className="ds-progress-pct">{pct}%</span>
+    </div>
+    <div className="ds-steprail">{STEPS.map((s) => {
+      const active = state.currentStep === s.id;
+      const done = !active && s.check(state);
+      const row = (
+        <div key={s.id} className="ds-step-item" onClick={() => dispatch({ type: "SET_STEP", payload: s.id })}>
+          <div className={"ds-step-node" + (done ? " done" : active ? " active" : "")}>{done ? "✓" : s.id}</div>
+          <span className="ds-step-label">{s.label}</span>
+        </div>
+      );
+      return active
+        ? <div key={s.id} className="ds-step-active-wrap">{row}<div className="ds-step-desc">{DESCS[s.id]}</div></div>
+        : row;
+    })}</div>
     <SidebarPromo />
   </nav>);
 }
