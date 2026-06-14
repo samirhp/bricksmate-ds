@@ -455,7 +455,7 @@ const css_styles = `
     --ds-border:hsl(240,5.9%,90%); --ds-border-light:hsl(240,4.8%,95.5%);
     --ds-success:hsl(142,71%,38%); --ds-error:hsl(0,84%,55%);
     --ds-accent:hsl(250,88%,66%); --ds-accent-hover:hsl(250,88%,58%); --ds-accent-light:hsl(250,100%,97%); --ds-accent-ring:hsla(250,88%,66%,.20);
-    --ds-radius:8px; --ds-radius-lg:12px;
+    --ds-radius:4px; --ds-radius-lg:5px;
     --ds-shadow:0 1px 2px rgba(0,0,0,.05);
     --ds-shadow-md:0 1px 3px rgba(0,0,0,.08),0 1px 2px -1px rgba(0,0,0,.05);
   }
@@ -475,9 +475,9 @@ const css_styles = `
   .ds-app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
   .ds-header{background:var(--ds-bg-card);border-bottom:1px solid var(--ds-border-light);padding:0 24px;height:54px;display:flex;align-items:center;gap:12px;box-shadow:var(--ds-shadow)}
   .ds-header-icon{width:30px;height:30px;border-radius:var(--ds-radius);flex-shrink:0;display:block}
-  .ds-ver-pill{font-size:10px;font-weight:600;color:var(--ds-accent);background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring);border-radius:6px;padding:2px 7px;letter-spacing:.3px;flex-shrink:0;font-family:'SF Mono',Consolas,monospace}
+  .ds-ver-pill{font-size:10px;font-weight:600;color:var(--ds-accent);background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring);border-radius:4px;padding:2px 7px;letter-spacing:.3px;flex-shrink:0;font-family:'SF Mono',Consolas,monospace}
   .ds-wordmark{font-size:14px;font-weight:600;letter-spacing:-.01em;flex-shrink:0}
-  .ds-saved-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--ds-success);background:hsla(142,64%,46%,.1);border:1px solid hsla(142,64%,46%,.45);border-radius:7px;padding:5px 11px;white-space:nowrap}
+  .ds-saved-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--ds-success);background:hsla(142,64%,46%,.1);border:1px solid hsla(142,64%,46%,.45);border-radius:5px;padding:5px 11px;white-space:nowrap}
   .ds-dsname{margin:0 2px 12px;padding-bottom:12px;border-bottom:1px solid var(--ds-border-light)}
   .ds-dsname-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:var(--ds-text-3);padding:0 6px;margin-bottom:5px;display:block}
   .ds-dsname-field{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:var(--ds-radius);cursor:text;border:1px solid var(--ds-border-light);background:var(--ds-bg);transition:border-color .15s}
