@@ -157,6 +157,13 @@ function normalizeButtons(buttons) {
 }
 const btnEnabled = (state, id) => state.buttons?.enabled?.[id] !== false; // por defecto activado
 const btnContrast = (l) => (l > 60 ? "#18181b" : "#ffffff");
+// Resuelve un var(--…) del DS a un color concreto (para los previews); hex y vacíos pasan tal cual / fallback
+function resolveDsColor(state, v, fallback) {
+  if (!v) return fallback;
+  if (v.startsWith("#")) return v;
+  const o = buildColorVarOptions(state).find((x) => x.value === v);
+  return o ? o.color : fallback;
+}
 // Estilo inline de botón compartido (paso Buttons + Landing) → ambos previews idénticos.
 // hover=true replica el :hover del CSS exportado (sólido oscurece 10%; outline se rellena).
 function buttonInlineStyle(state, p, sizeKey, outline, hover) {
@@ -169,13 +176,18 @@ function buttonInlineStyle(state, p, sizeKey, outline, hover) {
   const col = "hsl(" + p.hue + "," + p.saturation + "%," + p.lightness + "%)";
   const dark = "hsl(" + p.hue + "," + p.saturation + "%," + Math.max(0, p.lightness - 10) + "%)";
   const onCol = btnContrast(p.lightness);
-  const base = { fontSize: fontPx, padding: sz.py + "em " + sz.px + "em", borderRadius: radiusPx, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", lineHeight: 1.2, whiteSpace: "nowrap", transition: "all " + ms + "ms" };
+  // Overrides por paleta (default = auto)
+  const bc = (b.colors && b.colors[p.id]) || {};
+  const text = bc.text ? resolveDsColor(state, bc.text, onCol) : onCol;
+  const hoverBg = bc.hoverBg ? resolveDsColor(state, bc.hoverBg, dark) : dark;
+  const hoverText = bc.textHover ? resolveDsColor(state, bc.textHover, text) : text;
+  const base = { fontSize: fontPx, padding: sz.py + "em " + sz.px + "em", borderRadius: radiusPx, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", lineHeight: b.lineHeight ?? 1.2, whiteSpace: "nowrap", transition: "all " + ms + "ms" };
   if (outline) return hover
-    ? { ...base, border: "1.5px solid " + col, background: col, color: onCol }
+    ? { ...base, border: "1.5px solid " + hoverBg, background: hoverBg, color: hoverText }
     : { ...base, border: "1.5px solid " + col, background: "transparent", color: col };
   return hover
-    ? { ...base, border: "1.5px solid " + dark, background: dark, color: onCol }
-    : { ...base, border: "1.5px solid " + col, background: col, color: onCol };
+    ? { ...base, border: "1.5px solid " + hoverBg, background: hoverBg, color: hoverText }
+    : { ...base, border: "1.5px solid " + col, background: col, color: text };
 }
 
 // Botón de preview con hover real (los estilos inline no soportan :hover)
@@ -209,6 +221,7 @@ const initialState = {
     values: initSpaceVals(100, 120, 1.5),
   },
   gutter: { mobile: 16, desktop: 64 },
+  sectionPadding: { y: "section-space-l", x: "gutter" },
   offset: 80,
   styles: { textColor: "var(--black)", headingColor: "var(--black)", textWeight: 400, headingWeight: 700 },
   typography: {
@@ -230,7 +243,9 @@ const initialState = {
     outline: true,
     radiusKey: "m",
     transitionMs: 150,
+    lineHeight: 1.2,
     enabled: {},
+    colors: {}, // { [paletteId]: { text, textHover, hoverBg } } — "" = auto
     sizes: JSON.parse(JSON.stringify(BTN_SIZE_DEFAULTS)),
   },
   radius: { base: 8, values: {}, circle: 999 },
@@ -353,6 +368,7 @@ function reducer(state, action) {
     case "REMOVE_PALETTE": return { ...state, colors: { ...state.colors, palettes: state.colors.palettes.filter((p) => p.id !== action.id) } };
     case "SET_COLORS": return { ...state, colors: { ...state.colors, ...action.payload } };
     case "SET_GUTTER": return { ...state, gutter: { ...state.gutter, [action.side]: action.value } };
+    case "SET_SECTION_PADDING": return { ...state, sectionPadding: { ...(state.sectionPadding || { y: "section-space-l", x: "gutter" }), [action.axis]: action.value } };
     case "SET_STYLE": return { ...state, styles: { ...state.styles, [action.field]: action.value } };
     case "SET_GAPS": return { ...state, gaps: { ...state.gaps, [action.field]: action.value } };
     case "SET_RADIUS": return { ...state, radius: { ...state.radius, ...action.payload } };
@@ -371,6 +387,11 @@ function reducer(state, action) {
     case "TOGGLE_BTN_COLOR": {
       const cur = state.buttons.enabled?.[action.id] !== false;
       return { ...state, buttons: { ...state.buttons, enabled: { ...state.buttons.enabled, [action.id]: !cur } } };
+    }
+    case "SET_BTN_COLOR": {
+      const colors = { ...(state.buttons.colors || {}) };
+      colors[action.id] = { ...(colors[action.id] || {}), [action.field]: action.value };
+      return { ...state, buttons: { ...state.buttons, colors } };
     }
     default: return state;
   }
@@ -1177,6 +1198,24 @@ function StepSectionSpacing() {
       </div>
       <div style={{ marginTop: 12, padding: "9px 12px", background: "var(--ds-bg)", border: "1px solid var(--ds-border-light)", borderRadius: "var(--ds-radius)", fontFamily: "'SF Mono',Consolas,monospace", fontSize: 12, color: "var(--ds-text-2)", overflowX: "auto", whiteSpace: "nowrap" }}>--gutter: {flRem(gut.mobile, gut.desktop, state)};</div>
     </div>
+    {(() => { const sp = state.sectionPadding || { y: "section-space-l", x: "gutter" }; return (
+    <div className="ds-card" style={{ marginTop: 16 }}>
+      <h4>Section padding <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— :where(section) padding</span></h4>
+      <div className="ds-helper" style={{ marginBottom: 14 }}>Padding applied to top-level sections in the Framework CSS. Vertical (top/bottom) and horizontal (left/right), both as design-system tokens.</div>
+      <div className="ds-grid-2">
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Top / Bottom</label>
+          <select className="ds-input" value={sp.y} onChange={(e) => dispatch({ type: "SET_SECTION_PADDING", axis: "y", value: e.target.value })}>
+            {SPACE_KEYS.map(k => <option key={k} value={"section-space-" + k}>--section-space-{k}</option>)}
+          </select></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Left / Right</label>
+          <select className="ds-input" value={sp.x} onChange={(e) => dispatch({ type: "SET_SECTION_PADDING", axis: "x", value: e.target.value })}>
+            <option value="gutter">--gutter</option>
+            {SPACE_KEYS.map(k => <option key={"sp" + k} value={"space-" + k}>--space-{k}</option>)}
+            {SPACE_KEYS.map(k => <option key={"ss" + k} value={"section-space-" + k}>--section-space-{k}</option>)}
+          </select></div>
+      </div>
+      <div style={{ marginTop: 12, padding: "9px 12px", background: "var(--ds-bg)", border: "1px solid var(--ds-border-light)", borderRadius: "var(--ds-radius)", fontFamily: "'SF Mono',Consolas,monospace", fontSize: 12, color: "var(--ds-text-2)", overflowX: "auto", whiteSpace: "nowrap" }}>section padding: var(--{sp.y}) var(--{sp.x});</div>
+    </div>); })()}
   </div>);
 }
 
@@ -1209,18 +1248,21 @@ function buildColorVarOptions(state) {
   return opts;
 }
 
-function ColorVarPicker({ value, onChange, opts }) {
+function ColorVarPicker({ value, onChange, opts, auto }) {
+  const isAuto = auto != null && (value == null || value === "");
   const known = opts.find((o) => o.value === value);
   const swatch = known ? known.color : (value && value.startsWith("#") ? value : null);
   const groups = [];
   opts.forEach((o) => { let g = groups.find((x) => x.name === o.group); if (!g) { g = { name: o.group, items: [] }; groups.push(g); } g.items.push(o); });
+  const selVal = isAuto ? "" : (known ? value : "__custom");
   return (
     <div className="ds-cvar">
-      <span className="ds-cvar-sw" style={swatch
+      <span className="ds-cvar-sw" style={swatch && !isAuto
         ? { backgroundImage: `linear-gradient(${swatch},${swatch}), conic-gradient(#c4c4c4 0 25%, #fff 0 50%, #c4c4c4 0 75%, #fff 0)`, backgroundSize: "100% 100%, 9px 9px" }
         : { background: "var(--ds-border)" }} />
-      <select className="ds-input" value={known ? value : "__custom"} onChange={(e) => onChange(e.target.value)}>
-        {!known && <option value="__custom">Custom: {value}</option>}
+      <select className="ds-input" value={selVal} onChange={(e) => onChange(e.target.value)}>
+        {auto != null && <option value="">{auto}</option>}
+        {!known && !isAuto && <option value="__custom">Custom: {value}</option>}
         {groups.map((g) => (
           <optgroup key={g.name} label={g.name}>
             {g.items.map((o) => <option key={o.value} value={o.value}>{o.label} · {o.value}</option>)}
@@ -1470,6 +1512,7 @@ function StepButtons() {
   const b = state.buttons;
   const palettes = state.colors.palettes;
   const enabledPalettes = palettes.filter((p) => btnEnabled(state, p.id));
+  const colorOpts = buildColorVarOptions(state);
 
   return (<div>
     {/* SIZES */}
@@ -1512,18 +1555,31 @@ function StepButtons() {
           <label style={{ fontSize: 12 }}>Hover transition (ms) <span style={{ fontWeight: 400, color: "var(--ds-text-3)" }}>— --btn-transition</span></label>
           <NumStepper value={b.transitionMs ?? 150} set={(n) => dispatch({ type: "SET_BTN", payload: { transitionMs: Math.max(0, n) } })} min={0} step={25} />
         </div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}>
+          <label style={{ fontSize: 12 }}>Line height <span style={{ fontWeight: 400, color: "var(--ds-text-3)" }}>— --btn-line-height</span></label>
+          <NumStepper value={b.lineHeight ?? 1.2} set={(n) => dispatch({ type: "SET_BTN", payload: { lineHeight: n || 1 } })} min={0.8} step={0.05} />
+        </div>
       </div>
       <div className="ds-helper" style={{ marginTop: 8 }}>Hover a button in the preview below to see the transition.</div>
     </div>
 
     {/* COLORS */}
     <div className="ds-card">
-      <h4>Colors <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— choose which palette colors generate button styles</span></h4>
-      {palettes.map((p) => { const on = btnEnabled(state, p.id); const slug = slugify(p.name); return (
-        <div key={p.id} className="ds-toggle-row" onClick={() => dispatch({ type: "TOGGLE_BTN_COLOR", id: p.id })}>
-          <div className={"ds-toggle-track" + (on ? " on" : "")}><div className="ds-toggle-thumb" /></div>
-          <div style={{ width: 18, height: 18, borderRadius: 4, flexShrink: 0, background: "hsl(" + p.hue + "," + p.saturation + "%," + p.lightness + "%)", border: "1px solid var(--ds-border)" }} />
-          <div className="ds-toggle-text"><strong>{p.name}</strong><span style={{ fontFamily: "monospace" }}>.btn--{slug}{b.outline ? " · .btn--" + slug + ".btn--outline" : ""}</span></div>
+      <h4>Colors <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— enable palette colors &amp; customize each button's states</span></h4>
+      {palettes.map((p) => { const on = btnEnabled(state, p.id); const slug = slugify(p.name); const bc = (b.colors && b.colors[p.id]) || {}; return (
+        <div key={p.id} style={{ marginBottom: on ? 10 : 1 }}>
+          <div className="ds-toggle-row" style={{ marginBottom: on ? 8 : 0 }} onClick={() => dispatch({ type: "TOGGLE_BTN_COLOR", id: p.id })}>
+            <div className={"ds-toggle-track" + (on ? " on" : "")}><div className="ds-toggle-thumb" /></div>
+            <div style={{ width: 18, height: 18, borderRadius: 4, flexShrink: 0, background: "hsl(" + p.hue + "," + p.saturation + "%," + p.lightness + "%)", border: "1px solid var(--ds-border)" }} />
+            <div className="ds-toggle-text"><strong>{p.name}</strong><span style={{ fontFamily: "monospace" }}>.btn--{slug}{b.outline ? " · .btn--" + slug + ".btn--outline" : ""}</span></div>
+          </div>
+          {on && (
+            <div className="ds-grid-3" style={{ paddingLeft: 46 }}>
+              <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 11 }}>Text color</label><ColorVarPicker value={bc.text} opts={colorOpts} auto="Auto (contrast)" onChange={(v) => dispatch({ type: "SET_BTN_COLOR", id: p.id, field: "text", value: v })} /></div>
+              <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 11 }}>Text · hover</label><ColorVarPicker value={bc.textHover} opts={colorOpts} auto="Auto (= text)" onChange={(v) => dispatch({ type: "SET_BTN_COLOR", id: p.id, field: "textHover", value: v })} /></div>
+              <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 11 }}>Hover background</label><ColorVarPicker value={bc.hoverBg} opts={colorOpts} auto="Auto (darken 10%)" onChange={(v) => dispatch({ type: "SET_BTN_COLOR", id: p.id, field: "hoverBg", value: v })} /></div>
+            </div>
+          )}
         </div>
       ); })}
     </div>
@@ -1593,6 +1649,18 @@ function generateVariablesJSON(state) {
       vars.push({ name: pn('pad-btn-x-' + s.key), value: sz.px + 'em', id: randId(), category: catIds['Buttons'] });
     });
     vars.push({ name: pn('btn-transition'), value: (state.buttons.transitionMs ?? 150) + 'ms', id: randId(), category: catIds['Buttons'] });
+    vars.push({ name: pn('btn-line-height'), value: String(state.buttons.lineHeight ?? 1.2), id: randId(), category: catIds['Buttons'] });
+    // Colores de botón por paleta (override del usuario o auto por defecto)
+    state.colors.palettes.filter((pl) => btnEnabled(state, pl.id)).forEach((pl) => {
+      const slug = slugify(pl.name);
+      const bc = (state.buttons.colors && state.buttons.colors[pl.id]) || {};
+      const textVal = bc.text || btnContrast(pl.lightness);
+      const hoverBgVal = bc.hoverBg || ("hsl(" + pl.hue + ", " + pl.saturation + "%, " + Math.max(0, pl.lightness - 10) + "%)");
+      const textHoverVal = bc.textHover || textVal;
+      vars.push(mk('btn-' + slug + '-text', textVal, 'Buttons'));
+      vars.push(mk('btn-' + slug + '-hover-bg', hoverBgVal, 'Buttons'));
+      vars.push(mk('btn-' + slug + '-text-hover', textHoverVal, 'Buttons'));
+    });
   }
   // Radius
   RADIUS_KEYS.forEach(k => { vars.push(mk('radius-' + k, (state.radius.values[k] || 0) + 'px', 'Radius')); });
@@ -1710,7 +1778,7 @@ function generateClassesJSON(state, systemName) {
   return JSON.stringify(classes, null, 2);
 }
 
-function generateColorPaletteJSON(state) {
+function generateColorPaletteJSON(state, systemName) {
   const prefix = state.varPrefix ? state.varPrefix + '-' : '';
   const vr = (n) => 'var(--' + prefix + n + ')';
   const colors = [];
@@ -1727,7 +1795,7 @@ function generateColorPaletteJSON(state) {
   });
   if (state.colors.whiteTransparency) { const wId = randId(); colors.push({ raw: vr('white'), id: wId, name: 'White', light: '#ffffff' }); [90,80,70,60,50,40,30,20,10].forEach((o, idx) => colors.push({ id: randId(), type: 'transparent', raw: vr('white-trans-' + o), index: idx, parent: wId, light: 'rgba(255, 255, 255, ' + (o/100) + ')' })); }
   if (state.colors.blackTransparency) { const bId = randId(); colors.push({ raw: vr('black'), id: bId, name: 'Black', light: '#000000' }); [90,80,70,60,50,40,30,20,10].forEach((o, idx) => colors.push({ id: randId(), type: 'transparent', raw: vr('black-trans-' + o), index: idx, parent: bId, light: 'rgba(0, 0, 0, ' + (o/100) + ')' })); }
-  return JSON.stringify({ id: randId(), name: 'BricksMate', colors, default: true }, null, 2);
+  return JSON.stringify({ id: randId(), name: (systemName && systemName.trim()) || 'Design system', colors, default: true }, null, 2);
 }
 
 // Botones en BEM. Compose: <a class="btn btn--primary btn--lg">
@@ -1741,7 +1809,7 @@ function generateButtonsCSS(state, v) {
   let css = "\n/* ================================================\n * BUTTONS (BEM) — compose: class=\"btn btn--primary btn--lg\"\n * ================================================ */\n";
   css += ".btn {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  gap: 0.5em;\n";
   css += "  padding: " + v("pad-btn-y-default") + " " + v("pad-btn-x-default") + ";\n";
-  css += "  font-size: " + v("text-" + fk(d.font)) + ";\n  font-weight: 600;\n  line-height: 1.2;\n  text-decoration: none;\n  cursor: pointer;\n  border: 1.5px solid transparent;\n";
+  css += "  font-size: " + v("text-" + fk(d.font)) + ";\n  font-weight: 600;\n  line-height: " + v("btn-line-height") + ";\n  text-decoration: none;\n  cursor: pointer;\n  border: 1.5px solid transparent;\n";
   css += "  border-radius: " + rad + ";\n  transition: background-color " + v("btn-transition") + ", color " + v("btn-transition") + ", border-color " + v("btn-transition") + ";\n}\n";
   BTN_SIZES.filter((s) => s.cls).forEach((s) => {
     const sz = b.sizes[s.key];
@@ -1750,24 +1818,26 @@ function generateButtonsCSS(state, v) {
   palettes.forEach((pl) => {
     const slug = slugify(pl.name);
     const col = v(slug);
-    const dark = "hsl(" + pl.hue + ", " + pl.saturation + "%, " + Math.max(0, pl.lightness - 10) + "%)";
-    const onCol = btnContrast(pl.lightness);
-    css += "\n.btn--" + slug + " {\n  background-color: " + col + ";\n  border-color: " + col + ";\n  color: " + onCol + ";\n}\n";
-    css += ".btn--" + slug + ":hover {\n  background-color: " + dark + ";\n  border-color: " + dark + ";\n}\n";
+    const text = v("btn-" + slug + "-text");
+    const hoverBg = v("btn-" + slug + "-hover-bg");
+    const textHover = v("btn-" + slug + "-text-hover");
+    css += "\n.btn--" + slug + " {\n  background-color: " + col + ";\n  border-color: " + col + ";\n  color: " + text + ";\n}\n";
+    css += ".btn--" + slug + ":hover {\n  background-color: " + hoverBg + ";\n  border-color: " + hoverBg + ";\n  color: " + textHover + ";\n}\n";
     if (b.outline) {
       css += ".btn--" + slug + ".btn--outline {\n  background-color: transparent;\n  border-color: " + col + ";\n  color: " + col + ";\n}\n";
-      css += ".btn--" + slug + ".btn--outline:hover {\n  background-color: " + col + ";\n  color: " + onCol + ";\n}\n";
+      css += ".btn--" + slug + ".btn--outline:hover {\n  background-color: " + hoverBg + ";\n  border-color: " + hoverBg + ";\n  color: " + textHover + ";\n}\n";
     }
   });
   return css;
 }
 
-function generateFrameworkCSS(state) {
+function generateFrameworkCSS(state, systemName) {
   const p = state.varPrefix ? '--' + state.varPrefix + '-' : '--';
   const v = (n) => 'var(' + p + n + ')';
   const ts = new Date().toLocaleString();
+  const dsName = ((systemName && systemName.trim()) || 'Design system').toUpperCase();
   const primary = v(slugify(state.colors.palettes[0]?.name || 'primary'));
-  let css = "/* ================================================\n * BRICKSMATE FRAMEWORK BASE CSS\n * Apply tokens to HTML elements globally\n * Paste into: Bricks → Settings → Custom Code → CSS\n * Generated: " + ts + "\n * ================================================ */\n\n";
+  let css = "/* ================================================\n * " + dsName + " — FRAMEWORK BASE CSS\n * Apply tokens to HTML elements globally\n * Paste into: Bricks → Settings → Custom Code → CSS\n * Generated: " + ts + "\n * ================================================ */\n\n";
 
   css += "/* — Base & smooth scroll ————————————————— */\n";
   css += "html {\n  scroll-behavior: smooth;\n}\n";
@@ -1785,7 +1855,8 @@ function generateFrameworkCSS(state) {
   ['h1','h2','h3','h4','h5','h6'].forEach(h => { css += h + " { font-size: " + v(h) + "; }\n"; });
 
   css += "\n/* — Sections —————————————————————————————— */\n";
-  css += ":where(section:not(section section)) {\n  padding: " + v('section-space-m') + " " + v('gutter') + ";\n}\n";
+  { const sp = state.sectionPadding || { y: 'section-space-l', x: 'gutter' };
+    css += ":where(section:not(section section)) {\n  padding: " + v(sp.y) + " " + v(sp.x) + ";\n}\n"; }
   css += "section:where(:not(.bricks-shape-divider)) {\n  gap: " + v('container-gap') + ";\n}\n";
   css += ":where(.brxe-container) > .brxe-block,\n:where(.brxe-container) {\n  gap: " + v('content-gap') + ";\n}\n\n";
 
@@ -2280,7 +2351,7 @@ function StepExport() {
       id: "palette", suffix: "palette.json", title: "Color Palette JSON",
       desc: "Swatches de color para el selector de colores del editor.",
       sub: "Bricks → Style Manager → Color Palettes → Import",
-      gen: generateColorPaletteJSON, mime: "application/json", label: "↓ Palette JSON",
+      gen: (s) => generateColorPaletteJSON(s, systemName), mime: "application/json", label: "↓ Palette JSON",
       disabled: !state.colors.palettes.length,
     },
     {
@@ -2293,7 +2364,7 @@ function StepExport() {
       id: "framework", suffix: "framework.css", title: "Framework CSS",
       desc: "CSS base: aplica variables a body, headings y sections.",
       sub: "Bricks → Settings → Custom Code → CSS (head)",
-      gen: generateFrameworkCSS, mime: "text/css", label: "↓ Framework CSS",
+      gen: (s) => generateFrameworkCSS(s, systemName), mime: "text/css", label: "↓ Framework CSS",
     },
   ];
 
