@@ -178,7 +178,7 @@ function buttonInlineStyle(state, p, sizeKey, outline, hover) {
   const sz = (b.sizes && b.sizes[sizeKey]) || BTN_SIZE_DEFAULTS[sizeKey] || BTN_SIZE_DEFAULTS.default;
   const fontKey = TEXT_KEYS.includes(sz.font) ? sz.font : "m"; // tolera claves antiguas (p.ej. "mm")
   const fontPx = state.typography.texts[fontKey]?.desktop || 16;
-  const radiusPx = b.radiusKey === "circle" ? state.radius.circle : (state.radius.values[b.radiusKey] || 0);
+  const radiusPx = b.radiusKey === "none" ? 0 : b.radiusKey === "circle" ? state.radius.circle : (state.radius.values[b.radiusKey] || 0);
   const ms = b.transitionMs ?? 150;
   const col = "hsl(" + p.hue + "," + p.saturation + "%," + p.lightness + "%)";
   const dark = "hsl(" + p.hue + "," + p.saturation + "%," + Math.max(0, p.lightness - 10) + "%)";
@@ -1564,6 +1564,7 @@ function StepButtons() {
         <div className="ds-form-group" style={{ marginBottom: 0 }}>
           <label style={{ fontSize: 12 }}>Border radius</label>
           <select className="ds-input" value={b.radiusKey} onChange={(e) => dispatch({ type: "SET_BTN", payload: { radiusKey: e.target.value } })}>
+            <option value="none">No radius (0)</option>
             {RADIUS_KEYS.map((k) => <option key={k} value={k}>--radius-{k}</option>)}
             <option value="circle">--radius-circle</option>
           </select>
@@ -1845,7 +1846,7 @@ function generateButtonsCSS(state, v) {
   const b = state.buttons;
   if (!b) return "";
   const palettes = state.colors.palettes.filter((pl) => btnEnabled(state, pl.id));
-  const rad = b.radiusKey === "circle" ? v("radius-circle") : v("radius-" + b.radiusKey);
+  const rad = b.radiusKey === "none" ? "0" : b.radiusKey === "circle" ? v("radius-circle") : v("radius-" + b.radiusKey);
   const d = b.sizes.default;
   const fk = (f) => TEXT_KEYS.includes(f) ? f : "m"; // tolera claves antiguas (p.ej. "mm")
   let css = "\n/* ================================================\n * BUTTONS (BEM) — compose: class=\"btn btn--primary btn--lg\"\n * ================================================ */\n";
