@@ -1742,7 +1742,7 @@ function generateVariablesJSON(state) {
       }
     },
     {
-      id: catIds['SectionSpacing'], name: 'SectionSpacing',
+      id: catIds['SectionSpacing'], name: 'Section Spacing',
       scale: {
         scaleScope: 'spacing', scaleType: 'custom',
         scaleNames: ['xs','s','m','l','xl','xxl'],
