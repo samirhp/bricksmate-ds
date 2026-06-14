@@ -719,10 +719,6 @@ const css_styles = `
   .ds-modal p{font-size:13px;color:var(--ds-text-2);line-height:1.5;margin:0 0 14px}
   .ds-modal-x{position:absolute;top:12px;right:12px;width:26px;height:26px;border:none;background:transparent;color:var(--ds-text-3);font-size:14px;cursor:pointer;border-radius:6px}
   .ds-modal-x:hover{background:var(--ds-bg);color:var(--ds-text)}
-  .ds-auth-chip{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ds-text-2)}
-  .ds-auth-email{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px}
-  .ds-auth-out{border:1px solid var(--ds-border);background:var(--ds-bg-card);color:var(--ds-text-2);border-radius:var(--ds-radius);font-size:11px;padding:4px 8px;cursor:pointer;font-family:inherit;transition:all .15s;box-shadow:var(--ds-shadow)}
-  .ds-auth-out:hover{background:var(--ds-bg);color:var(--ds-text)}
   .ds-guest-banner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring);border-radius:var(--ds-radius);padding:10px 14px;font-size:12.5px;margin-bottom:16px}
   .ds-guest-banner span{flex:1;min-width:200px;line-height:1.45;color:var(--ds-text-2)}
   .ds-guest-banner .ds-btn{flex-shrink:0}
@@ -765,11 +761,25 @@ const css_styles = `
   .ds-auth-actions{display:flex;align-items:center;gap:8px}
   .ds-auth-link{background:none;border:none;color:var(--ds-text-2);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;padding:6px 4px}
   .ds-auth-link:hover{color:var(--ds-text)}
-  .ds-auth-user{display:flex;align-items:center;gap:7px;background:none;border:none;cursor:pointer;font-family:inherit;padding:3px 6px;border-radius:var(--ds-radius)}
-  .ds-auth-user:hover{background:var(--ds-bg)}
-  .ds-auth-name{font-size:12.5px;color:var(--ds-text);font-weight:500;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .ds-avatar{border-radius:50%;object-fit:cover;display:inline-block;flex-shrink:0}
   .ds-avatar-ini{display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:600;line-height:1}
+  .ds-avatar-admin{box-shadow:0 0 0 2px var(--ds-bg-card),0 0 0 3.5px var(--ds-accent)}
+  /* Menú de perfil (dropdown) */
+  .ds-profile{position:relative}
+  .ds-profile-trigger{display:flex;align-items:center;gap:8px;background:none;border:1px solid transparent;cursor:pointer;font-family:inherit;padding:4px 8px 4px 5px;border-radius:var(--ds-radius);transition:background .15s,border-color .15s}
+  .ds-profile-trigger:hover{background:var(--ds-bg);border-color:var(--ds-border-light)}
+  .ds-profile.open .ds-profile-trigger{background:var(--ds-bg);border-color:var(--ds-border-light)}
+  .ds-profile-name{font-size:12.5px;color:var(--ds-text);font-weight:500;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ds-profile-chev{color:var(--ds-text-3);font-size:10px;transition:transform .15s} .ds-profile.open .ds-profile-chev{transform:rotate(180deg)}
+  .ds-profile-menu{position:absolute;top:calc(100% + 8px);right:0;width:236px;background:var(--ds-bg-card);border:1px solid var(--ds-border);border-radius:var(--ds-radius-lg);padding:6px;box-shadow:0 8px 28px rgba(0,0,0,.45);z-index:60;animation:ds-pop .14s ease}
+  @keyframes ds-pop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+  .ds-profile-head{display:flex;align-items:center;gap:10px;padding:8px 8px 10px}
+  .ds-profile-head-name{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--ds-text)}
+  .ds-profile-head-email{font-size:11px;color:var(--ds-text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px;margin-top:1px}
+  .ds-admin-pill{font-size:9px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--ds-accent);background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring);border-radius:4px;padding:1px 6px}
+  .ds-profile-div{height:1px;background:var(--ds-border-light);margin:4px 6px}
+  .ds-profile-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:none;background:none;cursor:pointer;font-family:inherit;font-size:13px;color:var(--ds-text-2);border-radius:var(--ds-radius);transition:background .12s,color .12s;text-align:left}
+  .ds-profile-item:hover{background:var(--ds-bg);color:var(--ds-text)} .ds-profile-item svg{color:var(--ds-text-3);flex-shrink:0} .ds-profile-item:hover svg{color:var(--ds-accent)}
   /* Selector de país (dropdown con buscador + banderas) */
   .ds-cs{position:relative}
   .ds-cs-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;cursor:pointer;text-align:left}
@@ -870,6 +880,9 @@ function Ico({ name, size = 16 }) {
     check: <path d="M5 12.5 10 17.5 20 6.5" />,
     upload: <path d="M12 19V8M7 12l5-5 5 5M5 21h14" />,
     edit: <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3zM13.5 6.5l3 3" />,
+    settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></>,
+    users: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>,
+    logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></>,
   }[name];
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true">{inner}</svg>
@@ -995,7 +1008,7 @@ function avatarColor(str) {
   return "hsl(" + (h % 360) + ",52%,45%)";
 }
 // Avatar: Gravatar si existe (por el email), si no iniciales sobre color determinista
-function Avatar({ user, size = 32 }) {
+function Avatar({ user, size = 32, admin = false }) {
   const m = user?.user_metadata || {};
   const initials = (((m.first_name || "")[0] || "") + ((m.last_name || "")[0] || "") || (user?.email || "?")[0] || "?").toUpperCase();
   const [src, setSrc] = useState(null);
@@ -1004,18 +1017,47 @@ function Avatar({ user, size = 32 }) {
     if (user?.email && crypto?.subtle) emailHash(user.email).then((h) => { if (active) setSrc("https://gravatar.com/avatar/" + h + "?d=404&s=" + (size * 2)); }).catch(() => {});
     return () => { active = false; };
   }, [user?.email, size]);
-  if (src) return <img className="ds-avatar" src={src} width={size} height={size} alt="" onError={() => setSrc(null)} />;
-  return <span className="ds-avatar ds-avatar-ini" style={{ width: size, height: size, background: avatarColor((m.first_name || "") + (m.last_name || "") + (user?.email || "")), fontSize: Math.round(size * 0.42) }}>{initials}</span>;
+  const cls = "ds-avatar" + (admin ? " ds-avatar-admin" : "");
+  if (src) return <img className={cls} src={src} width={size} height={size} alt="" onError={() => setSrc(null)} />;
+  return <span className={cls + " ds-avatar-ini"} style={{ width: size, height: size, background: avatarColor((m.first_name || "") + (m.last_name || "") + (user?.email || "")), fontSize: Math.round(size * 0.42) }}>{initials}</span>;
 }
 
-// Control de cuenta en cabecera
-function AuthControl({ user, isAdmin, onAuth, onSignOut, onAccount }) {
+// Control de cuenta en cabecera (menú de perfil desplegable)
+function AuthControl({ user, isAdmin, onAuth, onSignOut, onAccount, onOpenAdmin }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
+  }, [open]);
   if (!cloudEnabled) return null;
   if (user) return (
-    <div className="ds-auth-chip">
-      {isAdmin && <span className="ds-admin-badge">Admin</span>}
-      <button className="ds-auth-user" onClick={onAccount} title="Account settings"><Avatar user={user} size={24} /><span className="ds-auth-name">{userDisplayName(user)}</span></button>
-      <button className="ds-auth-out" onClick={onSignOut}>Sign out</button>
+    <div className={"ds-profile" + (open ? " open" : "")} ref={ref}>
+      <button className="ds-profile-trigger" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open} title="Account menu">
+        <Avatar user={user} size={26} admin={isAdmin} />
+        <span className="ds-profile-name">{userDisplayName(user)}</span>
+        <span className="ds-profile-chev">▾</span>
+      </button>
+      {open && (
+        <div className="ds-profile-menu" role="menu">
+          <div className="ds-profile-head">
+            <Avatar user={user} size={34} admin={isAdmin} />
+            <div style={{ minWidth: 0 }}>
+              <div className="ds-profile-head-name">{userDisplayName(user)}{isAdmin && <span className="ds-admin-pill">Admin</span>}</div>
+              <div className="ds-profile-head-email">{user.email}</div>
+            </div>
+          </div>
+          <div className="ds-profile-div" />
+          <button className="ds-profile-item" role="menuitem" onClick={() => { setOpen(false); onAccount(); }}><Ico name="settings" size={16} />Account settings</button>
+          {isAdmin && onOpenAdmin && <button className="ds-profile-item" role="menuitem" onClick={() => { setOpen(false); onOpenAdmin(); }}><Ico name="users" size={16} />Users</button>}
+          <div className="ds-profile-div" />
+          <button className="ds-profile-item" role="menuitem" onClick={() => { setOpen(false); onSignOut(); }}><Ico name="logout" size={16} />Sign out</button>
+        </div>
+      )}
     </div>
   );
   return (
@@ -1036,7 +1078,7 @@ function GuestBanner({ onSignIn }) {
   );
 }
 const APP_VERSION = "v1.0";
-function EditorHeader({ onBack, autoSave, onToggleAutoSave, dirty, onSave, darkMode, toggleDark, user, onAuth, onAccount, onSignOut, isAdmin }) {
+function EditorHeader({ onBack, autoSave, onToggleAutoSave, dirty, onSave, darkMode, toggleDark, user, onAuth, onAccount, onSignOut, isAdmin, onOpenAdmin }) {
   return (<header className="ds-header">
     <button className="ds-header-back" onClick={onBack} data-tip="Back to my systems">←</button>
     <BrandMark />
@@ -1050,7 +1092,7 @@ function EditorHeader({ onBack, autoSave, onToggleAutoSave, dirty, onSave, darkM
       {(autoSave || !dirty)
         ? <span className="ds-saved-pill" data-tip={autoSave ? "Changes are saved automatically" : "All changes saved"}><Ico name="check" size={14} />{autoSave ? "Auto-saved" : "Saved"}</span>
         : <button className="ds-btn ds-btn-primary ds-btn-sm" onClick={onSave} data-tip="Save changes (⌘/Ctrl + S)"><Ico name="check" size={14} />Save changes</button>}
-      <AuthControl user={user} isAdmin={isAdmin} onAuth={onAuth} onAccount={onAccount} onSignOut={onSignOut} />
+      <AuthControl user={user} isAdmin={isAdmin} onAuth={onAuth} onAccount={onAccount} onSignOut={onSignOut} onOpenAdmin={onOpenAdmin} />
       <button className="ds-header-theme" onClick={toggleDark} data-tip="Toggle light / dark theme"><ThemeIcon dark={darkMode} /></button>
     </div>
   </header>);
@@ -2614,8 +2656,7 @@ function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, 
       <span className="ds-wordmark">BricksMate DS</span>
       <span className="ds-ver-pill">{APP_VERSION}</span>
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
-        {isAdmin && <button className="ds-btn ds-btn-sm" onClick={onOpenAdmin} data-tip="Manage users">Users</button>}
-        <AuthControl user={user} isAdmin={isAdmin} onAuth={onAuth} onAccount={onAccount} onSignOut={onSignOut} />
+        <AuthControl user={user} isAdmin={isAdmin} onAuth={onAuth} onAccount={onAccount} onSignOut={onSignOut} onOpenAdmin={onOpenAdmin} />
         <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode"><ThemeIcon dark={darkMode} /></button>
       </div>
     </header>
@@ -2641,7 +2682,7 @@ function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, 
 }
 
 // Página de administración: listado de usuarios + límite editable (solo admin; gate real en la BD)
-function AdminUsers({ onBack, darkMode, toggleDark, addToast, selfId, crossPromo, onSaveCrossPromo }) {
+function AdminUsers({ onBack, darkMode, toggleDark, addToast, selfId, crossPromo, onSaveCrossPromo, user, isAdmin, onAccount, onSignOut }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState(null);
   useEffect(() => {
@@ -2673,10 +2714,15 @@ function AdminUsers({ onBack, darkMode, toggleDark, addToast, selfId, crossPromo
     <header className="ds-header">
       <button className="ds-header-back" onClick={onBack} data-tip="Back to my systems">←</button>
       <BrandMark />
-      <div><h1>Users</h1><p>Admin · manage limits &amp; accounts</p></div>
-      <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode" style={{ marginLeft: "auto" }}><ThemeIcon dark={darkMode} /></button>
+      <span className="ds-wordmark">BricksMate DS</span>
+      <span className="ds-ver-pill">{APP_VERSION}</span>
+      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+        <AuthControl user={user} isAdmin={isAdmin} onAccount={onAccount} onSignOut={onSignOut} />
+        <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode"><ThemeIcon dark={darkMode} /></button>
+      </div>
     </header>
     <div className="ds-dash">
+      <div className="ds-dash-head"><div><h2 className="ds-dash-title">Users</h2><p className="ds-dash-sub">Admin · manage limits &amp; accounts</p></div></div>
       <CrossPromoEditor value={crossPromo} onSave={onSaveCrossPromo} />
       {err ? <div className="ds-warning">⚠ {err}</div>
         : rows == null ? <div className="ds-auth-loading">Loading users…</div>
@@ -2720,7 +2766,7 @@ function AdminUserRow({ row, onSetLimit, onDelete, isSelf }) {
 }
 
 // Panel de usuario: editar nombre/apellidos/país (vía updateUser → solo el propio usuario)
-function AccountView({ user, onBack, darkMode, toggleDark, addToast, onSignOut }) {
+function AccountView({ user, onBack, darkMode, toggleDark, addToast, onSignOut, isAdmin, onAccount, onOpenAdmin }) {
   const m = user?.user_metadata || {};
   const [firstName, setFirstName] = useState(m.first_name || "");
   const [lastName, setLastName] = useState(m.last_name || "");
@@ -2739,12 +2785,17 @@ function AccountView({ user, onBack, darkMode, toggleDark, addToast, onSignOut }
     <header className="ds-header">
       <button className="ds-header-back" onClick={onBack} data-tip="Back to my systems">←</button>
       <BrandMark />
-      <div><h1>Account</h1><p>Your profile</p></div>
-      <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode" style={{ marginLeft: "auto" }}><ThemeIcon dark={darkMode} /></button>
+      <span className="ds-wordmark">BricksMate DS</span>
+      <span className="ds-ver-pill">{APP_VERSION}</span>
+      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+        <AuthControl user={user} isAdmin={isAdmin} onAccount={onAccount} onSignOut={onSignOut} onOpenAdmin={onOpenAdmin} />
+        <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode"><ThemeIcon dark={darkMode} /></button>
+      </div>
     </header>
     <div className="ds-dash">
+      <div className="ds-dash-head"><div><h2 className="ds-dash-title">Account</h2><p className="ds-dash-sub">Your profile</p></div></div>
       <div className="ds-account">
-        <div className="ds-account-head"><Avatar user={user} size={64} /><div><div className="ds-account-name">{userDisplayName(user)}</div><div className="ds-account-email">{user.email}</div></div></div>
+        <div className="ds-account-head"><Avatar user={user} size={64} admin={isAdmin} /><div><div className="ds-account-name">{userDisplayName(user)}</div><div className="ds-account-email">{user.email}</div></div></div>
         <div className="ds-grid-2">
           <div className="ds-form-group"><label>First name</label><input className="ds-input" value={firstName} onChange={(e) => setFirstName(e.target.value)} /></div>
           <div className="ds-form-group"><label>Last name</label><input className="ds-input" value={lastName} onChange={(e) => setLastName(e.target.value)} /></div>
@@ -3058,13 +3109,13 @@ export default function App() {
       {!authReady
         ? <div className="ds-auth-loading">Loading…</div>
         : view === "admin"
-        ? <AdminUsers onBack={() => setView("dashboard")} darkMode={darkMode} toggleDark={toggleDark} addToast={addToast} myLimit={userLimit} selfId={user?.id} crossPromo={crossPromo} onSaveCrossPromo={saveCrossPromo} />
+        ? <AdminUsers onBack={() => setView("dashboard")} darkMode={darkMode} toggleDark={toggleDark} addToast={addToast} myLimit={userLimit} selfId={user?.id} crossPromo={crossPromo} onSaveCrossPromo={saveCrossPromo} user={user} isAdmin={isAdmin} onAccount={() => setView("account")} onSignOut={signOut} />
         : view === "account"
-        ? <AccountView user={user} onBack={() => setView("dashboard")} darkMode={darkMode} toggleDark={toggleDark} addToast={addToast} onSignOut={signOut} />
+        ? <AccountView user={user} onBack={() => setView("dashboard")} darkMode={darkMode} toggleDark={toggleDark} addToast={addToast} onSignOut={signOut} isAdmin={isAdmin} onAccount={() => setView("account")} onOpenAdmin={() => setView("admin")} />
         : view === "dashboard"
         ? <Dashboard library={library} darkMode={darkMode} toggleDark={toggleDark} onOpen={openSystem} onNew={createSystem} onDuplicate={duplicateSystem} onDelete={deleteSystem} onRename={renameSystem} user={user} onAuth={openAuth} onAccount={() => setView("account")} onSignOut={signOut} limit={userLimit} isAdmin={isAdmin} onOpenAdmin={() => setView("admin")} />
         : <>
-            <EditorHeader onBack={backToDashboard} autoSave={library.autoSave} onToggleAutoSave={toggleAutoSave} dirty={dirty} onSave={() => saveDoc(true)} darkMode={darkMode} toggleDark={toggleDark} user={user} onAuth={openAuth} onAccount={() => setView("account")} onSignOut={signOut} isAdmin={isAdmin} />
+            <EditorHeader onBack={backToDashboard} autoSave={library.autoSave} onToggleAutoSave={toggleAutoSave} dirty={dirty} onSave={() => saveDoc(true)} darkMode={darkMode} toggleDark={toggleDark} user={user} onAuth={openAuth} onAccount={() => setView("account")} onSignOut={signOut} isAdmin={isAdmin} onOpenAdmin={() => setView("admin")} />
             <div className="ds-main"><Sidebar name={currentSystem?.name || "Untitled"} onRename={(n) => renameSystem(currentId, n)} /><ErrorBoundary resetKey={state.currentStep}><StepContent /></ErrorBoundary></div>
             <Footer />
           </>}
