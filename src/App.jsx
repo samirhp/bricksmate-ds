@@ -157,6 +157,13 @@ function normalizeButtons(buttons) {
 }
 const btnEnabled = (state, id) => state.buttons?.enabled?.[id] !== false; // por defecto activado
 const btnContrast = (l) => (l > 60 ? "#18181b" : "#ffffff");
+// Overrides de color por paleta, separados para fill y outline.
+// Compat: el esquema antiguo {text, textHover, hoverBg} se interpreta como fill.
+function btnColorCfg(b, id) {
+  const raw = (b && b.colors && b.colors[id]) || {};
+  if (raw.fill || raw.outline) return { fill: raw.fill || {}, outline: raw.outline || {} };
+  return { fill: { text: raw.text, textHover: raw.textHover, hoverBg: raw.hoverBg }, outline: {} };
+}
 // Resuelve un var(--…) del DS a un color concreto (para los previews); hex y vacíos pasan tal cual / fallback
 function resolveDsColor(state, v, fallback) {
   if (!v) return fallback;
@@ -176,18 +183,24 @@ function buttonInlineStyle(state, p, sizeKey, outline, hover) {
   const col = "hsl(" + p.hue + "," + p.saturation + "%," + p.lightness + "%)";
   const dark = "hsl(" + p.hue + "," + p.saturation + "%," + Math.max(0, p.lightness - 10) + "%)";
   const onCol = btnContrast(p.lightness);
-  // Overrides por paleta (default = auto)
-  const bc = (b.colors && b.colors[p.id]) || {};
-  const text = bc.text ? resolveDsColor(state, bc.text, onCol) : onCol;
-  const hoverBg = bc.hoverBg ? resolveDsColor(state, bc.hoverBg, dark) : dark;
-  const hoverText = bc.textHover ? resolveDsColor(state, bc.textHover, text) : text;
+  // Overrides por paleta (default = auto), separados para fill y outline
+  const cfg = btnColorCfg(b, p.id)[outline ? "outline" : "fill"];
   const base = { fontSize: fontPx, padding: sz.py + "em " + sz.px + "em", borderRadius: radiusPx, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", lineHeight: b.lineHeight ?? 1.2, whiteSpace: "nowrap", transition: "all " + ms + "ms" };
-  if (outline) return hover
-    ? { ...base, border: "1.5px solid " + hoverBg, background: hoverBg, color: hoverText }
-    : { ...base, border: "1.5px solid " + col, background: "transparent", color: col };
+  const hoverBg = cfg.hoverBg ? resolveDsColor(state, cfg.hoverBg, dark) : dark;
+  if (outline) {
+    // Outline: texto/borde normal = color de paleta; al hover se rellena. Texto hover por defecto = contraste.
+    const textN = cfg.text ? resolveDsColor(state, cfg.text, col) : col;
+    const hoverText = cfg.textHover ? resolveDsColor(state, cfg.textHover, onCol) : onCol;
+    return hover
+      ? { ...base, border: "1.5px solid " + hoverBg, background: hoverBg, color: hoverText }
+      : { ...base, border: "1.5px solid " + textN, background: "transparent", color: textN };
+  }
+  // Fill: fondo = color de paleta; texto por defecto = contraste; texto hover por defecto = texto normal.
+  const textN = cfg.text ? resolveDsColor(state, cfg.text, onCol) : onCol;
+  const hoverText = cfg.textHover ? resolveDsColor(state, cfg.textHover, textN) : textN;
   return hover
     ? { ...base, border: "1.5px solid " + hoverBg, background: hoverBg, color: hoverText }
-    : { ...base, border: "1.5px solid " + col, background: col, color: text };
+    : { ...base, border: "1.5px solid " + col, background: col, color: textN };
 }
 
 // Botón de preview con hover real (los estilos inline no soportan :hover)
@@ -390,7 +403,9 @@ function reducer(state, action) {
     }
     case "SET_BTN_COLOR": {
       const colors = { ...(state.buttons.colors || {}) };
-      colors[action.id] = { ...(colors[action.id] || {}), [action.field]: action.value };
+      const cur = btnColorCfg(state.buttons, action.id); // normaliza esquema antiguo → { fill, outline }
+      const variant = { ...cur[action.variant], [action.field]: action.value };
+      colors[action.id] = { ...cur, [action.variant]: variant };
       return { ...state, buttons: { ...state.buttons, colors } };
     }
     default: return state;
@@ -1149,14 +1164,15 @@ function StepSpacing() {
       </div>
     </div>
     <ValidationAlert items={warns} />
-    {SPACE_KEYS.filter(k => k !== "section").map((k, i) => (<div key={k} className={"ds-space-row" + (i % 2 ? " alt" : "")}>
+    {(() => { const keys = SPACE_KEYS.filter(k => k !== "section"); const maxV = Math.max(1, ...keys.map(k => sp.values[k]?.desktop || 0));
+      return keys.map((k, i) => (<div key={k} className={"ds-space-row" + (i % 2 ? " alt" : "")}>
       <div className="ds-space-name">--space-{k}</div>
       <div className="ds-space-inputs">
         <div><input className="ds-space-input" type="number" value={sp.values[k]?.mobile || 0} onChange={(e) => dispatch({ type: "SET_SPACE_VALUE", key: k, side: "mobile", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Mobile</div></div>
         <div><input className="ds-space-input" type="number" value={sp.values[k]?.desktop || 0} onChange={(e) => dispatch({ type: "SET_SPACE_VALUE", key: k, side: "desktop", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Desktop</div></div>
       </div>
-      <div className="ds-space-bar" style={{ width: Math.min(120, (sp.values[k]?.desktop || 0) * 1.2) }} />
-    </div>))}
+      <div className="ds-space-bar" style={{ width: Math.round(6 + (sp.values[k]?.desktop || 0) / maxV * 134) }} />
+    </div>)); })()}
   </div>);
 }
 
@@ -1181,14 +1197,15 @@ function StepSectionSpacing() {
       </div>
     </div>
     <ValidationAlert items={warns} />
-    {SPACE_KEYS.map((k, i) => (<div key={k} className={"ds-space-row" + (i % 2 ? " alt" : "")}>
+    {(() => { const maxV = Math.max(1, ...SPACE_KEYS.map(k => ss.values[k]?.desktop || 0));
+      return SPACE_KEYS.map((k, i) => (<div key={k} className={"ds-space-row" + (i % 2 ? " alt" : "")}>
       <div className="ds-space-name">--section-space-{k}</div>
       <div className="ds-space-inputs">
         <div><input className="ds-space-input" type="number" value={ss.values[k]?.mobile || 0} onChange={(e) => dispatch({ type: "SET_SECTION_SPACE_VALUE", key: k, side: "mobile", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Mobile</div></div>
         <div><input className="ds-space-input" type="number" value={ss.values[k]?.desktop || 0} onChange={(e) => dispatch({ type: "SET_SECTION_SPACE_VALUE", key: k, side: "desktop", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Desktop</div></div>
       </div>
-      <div className="ds-space-bar" style={{ width: Math.min(120, (ss.values[k]?.desktop || 0) * 1.2) }} />
-    </div>))}
+      <div className="ds-space-bar" style={{ width: Math.round(6 + (ss.values[k]?.desktop || 0) / maxV * 134) }} />
+    </div>)); })()}
     <div className="ds-card" style={{ marginTop: 16 }}>
       <h4>Gutter <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— --gutter</span></h4>
       <div className="ds-helper" style={{ marginBottom: 14 }}>Horizontal padding that keeps content off the screen edges. Fluid between viewports, so it adapts to the selected layout ({state.layoutMode === "fixed" ? "fixed, max " + state.maxViewport + "px" : "full-width"}).</div>
@@ -1566,7 +1583,7 @@ function StepButtons() {
     {/* COLORS */}
     <div className="ds-card">
       <h4>Colors <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— enable palette colors &amp; customize each button's states</span></h4>
-      {palettes.map((p) => { const on = btnEnabled(state, p.id); const slug = slugify(p.name); const bc = (b.colors && b.colors[p.id]) || {}; return (
+      {palettes.map((p) => { const on = btnEnabled(state, p.id); const slug = slugify(p.name); const cfg = btnColorCfg(b, p.id); return (
         <div key={p.id} style={{ marginBottom: on ? 10 : 1 }}>
           <div className="ds-toggle-row" style={{ marginBottom: on ? 8 : 0 }} onClick={() => dispatch({ type: "TOGGLE_BTN_COLOR", id: p.id })}>
             <div className={"ds-toggle-track" + (on ? " on" : "")}><div className="ds-toggle-thumb" /></div>
@@ -1574,10 +1591,25 @@ function StepButtons() {
             <div className="ds-toggle-text"><strong>{p.name}</strong><span style={{ fontFamily: "monospace" }}>.btn--{slug}{b.outline ? " · .btn--" + slug + ".btn--outline" : ""}</span></div>
           </div>
           {on && (
-            <div className="ds-grid-3" style={{ paddingLeft: 46 }}>
-              <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 11 }}>Text color</label><ColorVarPicker value={bc.text} opts={colorOpts} auto="Auto (contrast)" onChange={(v) => dispatch({ type: "SET_BTN_COLOR", id: p.id, field: "text", value: v })} /></div>
-              <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 11 }}>Text · hover</label><ColorVarPicker value={bc.textHover} opts={colorOpts} auto="Auto (= text)" onChange={(v) => dispatch({ type: "SET_BTN_COLOR", id: p.id, field: "textHover", value: v })} /></div>
-              <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 11 }}>Hover background</label><ColorVarPicker value={bc.hoverBg} opts={colorOpts} auto="Auto (darken 10%)" onChange={(v) => dispatch({ type: "SET_BTN_COLOR", id: p.id, field: "hoverBg", value: v })} /></div>
+            <div style={{ paddingLeft: 46, display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-text-2)", marginBottom: 6, fontFamily: "monospace" }}>Fill <span style={{ fontWeight: 400, color: "var(--ds-text-3)" }}>.btn--{slug}</span></div>
+                <div className="ds-grid-3">
+                  <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 11 }}>Text color</label><ColorVarPicker value={cfg.fill.text} opts={colorOpts} auto="Auto (contrast)" onChange={(v) => dispatch({ type: "SET_BTN_COLOR", id: p.id, variant: "fill", field: "text", value: v })} /></div>
+                  <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 11 }}>Text · hover</label><ColorVarPicker value={cfg.fill.textHover} opts={colorOpts} auto="Auto (= text)" onChange={(v) => dispatch({ type: "SET_BTN_COLOR", id: p.id, variant: "fill", field: "textHover", value: v })} /></div>
+                  <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 11 }}>Hover background</label><ColorVarPicker value={cfg.fill.hoverBg} opts={colorOpts} auto="Auto (darken 10%)" onChange={(v) => dispatch({ type: "SET_BTN_COLOR", id: p.id, variant: "fill", field: "hoverBg", value: v })} /></div>
+                </div>
+              </div>
+              {b.outline && (
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-text-2)", marginBottom: 6, fontFamily: "monospace" }}>Outline <span style={{ fontWeight: 400, color: "var(--ds-text-3)" }}>.btn--{slug}.btn--outline</span></div>
+                  <div className="ds-grid-3">
+                    <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 11 }}>Text · border</label><ColorVarPicker value={cfg.outline.text} opts={colorOpts} auto="Auto (palette)" onChange={(v) => dispatch({ type: "SET_BTN_COLOR", id: p.id, variant: "outline", field: "text", value: v })} /></div>
+                    <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 11 }}>Text · hover</label><ColorVarPicker value={cfg.outline.textHover} opts={colorOpts} auto="Auto (contrast)" onChange={(v) => dispatch({ type: "SET_BTN_COLOR", id: p.id, variant: "outline", field: "textHover", value: v })} /></div>
+                    <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 11 }}>Hover background</label><ColorVarPicker value={cfg.outline.hoverBg} opts={colorOpts} auto="Auto (darken 10%)" onChange={(v) => dispatch({ type: "SET_BTN_COLOR", id: p.id, variant: "outline", field: "hoverBg", value: v })} /></div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1653,13 +1685,23 @@ function generateVariablesJSON(state) {
     // Colores de botón por paleta (override del usuario o auto por defecto)
     state.colors.palettes.filter((pl) => btnEnabled(state, pl.id)).forEach((pl) => {
       const slug = slugify(pl.name);
-      const bc = (state.buttons.colors && state.buttons.colors[pl.id]) || {};
-      const textVal = bc.text || btnContrast(pl.lightness);
-      const hoverBgVal = bc.hoverBg || ("hsl(" + pl.hue + ", " + pl.saturation + "%, " + Math.max(0, pl.lightness - 10) + "%)");
-      const textHoverVal = bc.textHover || textVal;
-      vars.push(mk('btn-' + slug + '-text', textVal, 'Buttons'));
-      vars.push(mk('btn-' + slug + '-hover-bg', hoverBgVal, 'Buttons'));
-      vars.push(mk('btn-' + slug + '-text-hover', textHoverVal, 'Buttons'));
+      const cfg = btnColorCfg(state.buttons, pl.id);
+      const contrast = btnContrast(pl.lightness);
+      const darken = "hsl(" + pl.hue + ", " + pl.saturation + "%, " + Math.max(0, pl.lightness - 10) + "%)";
+      const paletteVal = "var(" + (state.varPrefix ? '--' + state.varPrefix + '-' : '--') + slug + ")";
+      // Fill: texto=contraste, hover bg=oscurecer 10%, texto hover=texto
+      const fillText = cfg.fill.text || contrast;
+      const fillHoverBg = cfg.fill.hoverBg || darken;
+      const fillTextHover = cfg.fill.textHover || fillText;
+      vars.push(mk('btn-' + slug + '-text', fillText, 'Buttons'));
+      vars.push(mk('btn-' + slug + '-hover-bg', fillHoverBg, 'Buttons'));
+      vars.push(mk('btn-' + slug + '-text-hover', fillTextHover, 'Buttons'));
+      // Outline: texto/borde=paleta, hover bg=oscurecer 10%, texto hover=contraste
+      if (state.buttons.outline) {
+        vars.push(mk('btn-' + slug + '-outline-text', cfg.outline.text || paletteVal, 'Buttons'));
+        vars.push(mk('btn-' + slug + '-outline-hover-bg', cfg.outline.hoverBg || darken, 'Buttons'));
+        vars.push(mk('btn-' + slug + '-outline-text-hover', cfg.outline.textHover || contrast, 'Buttons'));
+      }
     });
   }
   // Radius
@@ -1824,8 +1866,11 @@ function generateButtonsCSS(state, v) {
     css += "\n.btn--" + slug + " {\n  background-color: " + col + ";\n  border-color: " + col + ";\n  color: " + text + ";\n}\n";
     css += ".btn--" + slug + ":hover {\n  background-color: " + hoverBg + ";\n  border-color: " + hoverBg + ";\n  color: " + textHover + ";\n}\n";
     if (b.outline) {
-      css += ".btn--" + slug + ".btn--outline {\n  background-color: transparent;\n  border-color: " + col + ";\n  color: " + col + ";\n}\n";
-      css += ".btn--" + slug + ".btn--outline:hover {\n  background-color: " + hoverBg + ";\n  border-color: " + hoverBg + ";\n  color: " + textHover + ";\n}\n";
+      const oText = v("btn-" + slug + "-outline-text");
+      const oHoverBg = v("btn-" + slug + "-outline-hover-bg");
+      const oTextHover = v("btn-" + slug + "-outline-text-hover");
+      css += ".btn--" + slug + ".btn--outline {\n  background-color: transparent;\n  border-color: " + oText + ";\n  color: " + oText + ";\n}\n";
+      css += ".btn--" + slug + ".btn--outline:hover {\n  background-color: " + oHoverBg + ";\n  border-color: " + oHoverBg + ";\n  color: " + oTextHover + ";\n}\n";
     }
   });
   return css;
@@ -2343,26 +2388,26 @@ function StepExport() {
   const CARDS = [
     {
       id: "variables", suffix: "variables.json", title: "Variables JSON",
-      desc: "Todos los tokens: spacing, tipografía, gaps y radius.",
+      desc: "All tokens: spacing, typography, gaps and radius.",
       sub: "Bricks → Style Manager → Variables → Import",
       gen: generateVariablesJSON, mime: "application/json", label: "↓ Variables JSON",
     },
     {
       id: "palette", suffix: "palette.json", title: "Color Palette JSON",
-      desc: "Swatches de color para el selector de colores del editor.",
+      desc: "Color swatches for the editor's color picker.",
       sub: "Bricks → Style Manager → Color Palettes → Import",
       gen: (s) => generateColorPaletteJSON(s, systemName), mime: "application/json", label: "↓ Palette JSON",
       disabled: !state.colors.palettes.length,
     },
     {
       id: "classes", suffix: "classes.json", title: "Bricks Classes JSON",
-      desc: "Clases (.btn, .btn--s, .btn--l…) para que aparezcan en el editor. Categoría = nombre del sistema.",
+      desc: "Classes (.btn, .btn--s, .btn--l…) so they show up in the editor. Category = system name.",
       sub: "Bricks → Style Manager → Classes → Import",
       gen: (s) => generateClassesJSON(s, systemName), mime: "application/json", label: "↓ Classes JSON",
     },
     {
       id: "framework", suffix: "framework.css", title: "Framework CSS",
-      desc: "CSS base: aplica variables a body, headings y sections.",
+      desc: "Base CSS: applies variables to body, headings and sections.",
       sub: "Bricks → Settings → Custom Code → CSS (head)",
       gen: (s) => generateFrameworkCSS(s, systemName), mime: "text/css", label: "↓ Framework CSS",
     },
@@ -2390,7 +2435,7 @@ function StepExport() {
         );
       })}
     </div>
-    {status?.type === "ok"    && <div className="ds-status ok">✓ {status.file} descargado correctamente</div>}
+    {status?.type === "ok"    && <div className="ds-status ok">✓ {status.file} downloaded successfully</div>}
     {status?.type === "error" && <div className="ds-status" style={{ background: "rgba(220,53,69,.08)", color: "var(--ds-error)", border: "1px solid var(--ds-error)" }}>⚠ Error: {status.msg}</div>}
   </div>);
 }
