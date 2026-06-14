@@ -505,8 +505,9 @@ const css_styles = `
   .ds-footer-info{font-size:12px;color:var(--ds-text-3)} .ds-footer-actions{display:flex;gap:8px}
   .ds-btn{padding:7px 14px;border:1px solid var(--ds-border);background:var(--ds-bg-card);color:var(--ds-text);border-radius:var(--ds-radius);font-size:13px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;font-family:inherit;box-shadow:var(--ds-shadow)}
   .ds-btn:hover:not(:disabled){background:var(--ds-bg)} .ds-btn:active:not(:disabled){transform:scale(.99)} .ds-btn:disabled{opacity:.45;cursor:not-allowed}
-  .ds-btn-primary{background:var(--ds-primary);color:hsl(0,0%,98%);border-color:var(--ds-primary);box-shadow:0 1px 2px rgba(0,0,0,.1)} .ds-btn-primary:hover:not(:disabled){background:var(--ds-primary-hover);border-color:var(--ds-primary-hover)}
-  [data-theme="dark"] .ds-btn-primary,[data-theme="dark"] .ds-download-btn{color:hsl(0,0%,4%)}
+  .ds-btn-primary{background:var(--ds-accent);color:#fff;border-color:var(--ds-accent);box-shadow:0 1px 2px var(--ds-accent-ring)} .ds-btn-primary:hover:not(:disabled){background:var(--ds-accent-hover);border-color:var(--ds-accent-hover)}
+  .ds-btn-primary:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ds-accent-ring)}
+  [data-theme="dark"] .ds-download-btn{color:hsl(0,0%,4%)}
   [data-theme="dark"] .ds-input:focus{box-shadow:0 0 0 3px rgba(255,255,255,.1)}
   [data-theme="dark"] .ds-space-input:focus{box-shadow:0 0 0 3px rgba(255,255,255,.1)}
   [data-theme="dark"] .ds-input-error{box-shadow:0 0 0 3px rgba(239,68,68,.2)!important}
@@ -647,8 +648,6 @@ const css_styles = `
   .ds-step-item{transition:background .15s,transform .12s} .ds-step-item:active{transform:translateX(1px)}
 
   /* ===== Progress bar ===== */
-  .ds-progress{height:3px;background:var(--ds-border-light);flex-shrink:0;overflow:hidden}
-  .ds-progress-bar{height:100%;background:var(--ds-accent);border-radius:0 3px 3px 0;transition:width .4s cubic-bezier(.16,1,.3,1)}
 
   /* ===== Toasts ===== */
   .ds-toasts{position:fixed;top:72px;right:18px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
@@ -2534,12 +2533,6 @@ function StepContent() {
   </div>);
 }
 
-function ProgressBar() {
-  const { state } = useDSContext();
-  const pct = Math.round((state.currentStep / STEPS.length) * 100);
-  return (<div className="ds-progress" title={"Step " + state.currentStep + " of " + STEPS.length}><div className="ds-progress-bar" style={{ width: pct + "%" }} /></div>);
-}
-
 function ToastHost({ toasts }) {
   if (!toasts.length) return null;
   return (<div className="ds-toasts">
@@ -3031,7 +3024,6 @@ export default function App() {
         ? <Dashboard library={library} darkMode={darkMode} toggleDark={toggleDark} onOpen={openSystem} onNew={createSystem} onDuplicate={duplicateSystem} onDelete={deleteSystem} onRename={renameSystem} user={user} onAuth={openAuth} onAccount={() => setView("account")} onSignOut={signOut} limit={userLimit} isAdmin={isAdmin} onOpenAdmin={() => setView("admin")} />
         : <>
             <EditorHeader name={currentSystem?.name || "Untitled"} onRename={(n) => renameSystem(currentId, n)} onBack={backToDashboard} autoSave={library.autoSave} onToggleAutoSave={toggleAutoSave} dirty={dirty} onSave={() => saveDoc(true)} darkMode={darkMode} toggleDark={toggleDark} user={user} onAuth={openAuth} onAccount={() => setView("account")} onSignOut={signOut} isAdmin={isAdmin} />
-            <ProgressBar />
             <div className="ds-main"><Sidebar /><ErrorBoundary resetKey={state.currentStep}><StepContent /></ErrorBoundary></div>
             <Footer />
           </>}
