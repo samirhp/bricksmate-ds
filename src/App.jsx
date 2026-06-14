@@ -2371,17 +2371,56 @@ function StepPreview() {
 /* ================================================================
    STEP 9: EXPORT
    ================================================================ */
-// Cross-promo de marca personal (Samir Haddad) → genera leads de servicios
+// Cross-promo de marca personal (Samir Haddad) → genera leads de servicios.
+// Config global editable por el admin (tabla app_settings → key 'cross_promo'); default si no hay nube.
 const CAL_URL = "https://cal.com/samirh";
+const CROSS_PROMO_DEFAULT = {
+  visible: true,
+  image: "/samirh.png",
+  aspect: "1",
+  title: "Websites that sell",
+  description: "Custom Bricks sites & design systems.",
+  buttonText: "Work with me",
+  link: "https://cal.com/samirh",
+};
+const PROMO_ASPECTS = [["1", "Square (1:1)"], ["4 / 3", "Landscape (4:3)"], ["3 / 4", "Portrait (3:4)"], ["16 / 9", "Wide (16:9)"]];
 function SidebarPromo() {
+  const { crossPromo } = useDSContext();
+  const p = { ...CROSS_PROMO_DEFAULT, ...(crossPromo || {}) };
+  if (!p.visible) return null;
   return (
     <div className="ds-spromo">
-      <img className="ds-spromo-img" src="/samirh.png" alt="Samir Haddad" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-      <div className="ds-spromo-txt"><strong>Websites that sell</strong>Custom Bricks sites &amp; design systems.</div>
-      <a className="ds-spromo-cta" href={CAL_URL} target="_blank" rel="noopener noreferrer">
-        <span className="ds-spromo-label">Work with me</span>
+      {p.image && <img className="ds-spromo-img" style={{ aspectRatio: p.aspect || "1" }} src={p.image} alt={p.title || ""} onError={(e) => { e.currentTarget.style.display = "none"; }} />}
+      {(p.title || p.description) && <div className="ds-spromo-txt"><strong>{p.title}</strong>{p.description}</div>}
+      {p.link && <a className="ds-spromo-cta" href={p.link} target="_blank" rel="noopener noreferrer">
+        <span className="ds-spromo-label">{p.buttonText || "Learn more"}</span>
         <span className="ds-spromo-arrow">→</span>
-      </a>
+      </a>}
+    </div>
+  );
+}
+// Editor del cross-promo (solo admin, en la página de administración)
+function CrossPromoEditor({ value, onSave }) {
+  const [draft, setDraft] = useState({ ...CROSS_PROMO_DEFAULT, ...(value || {}) });
+  useEffect(() => { setDraft({ ...CROSS_PROMO_DEFAULT, ...(value || {}) }); }, [value]);
+  const set = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
+  const changed = JSON.stringify(draft) !== JSON.stringify({ ...CROSS_PROMO_DEFAULT, ...(value || {}) });
+  return (
+    <div className="ds-card" style={{ marginBottom: 18 }}>
+      <h4 style={{ marginTop: 0 }}>Cross-promo <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— shown in the editor sidebar to every user</span></h4>
+      <div className="ds-toggle-row" onClick={() => set("visible", !draft.visible)}>
+        <div className={"ds-toggle-track" + (draft.visible ? " on" : "")}><div className="ds-toggle-thumb" /></div>
+        <div className="ds-toggle-text"><strong>Visible</strong><span>Show the cross-promo card in the step sidebar</span></div>
+      </div>
+      <div className="ds-grid-2" style={{ marginTop: 12 }}>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Title</label><input className="ds-input" value={draft.title} onChange={(e) => set("title", e.target.value)} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Button text</label><input className="ds-input" value={draft.buttonText} onChange={(e) => set("buttonText", e.target.value)} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Image URL</label><input className="ds-input" value={draft.image} onChange={(e) => set("image", e.target.value)} placeholder="/samirh.png or https://…" /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Image aspect</label><select className="ds-input" value={draft.aspect} onChange={(e) => set("aspect", e.target.value)}>{PROMO_ASPECTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Link (URL)</label><input className="ds-input" value={draft.link} onChange={(e) => set("link", e.target.value)} placeholder="https://…" /></div>
+      </div>
+      <div className="ds-form-group" style={{ marginTop: 12, marginBottom: 0 }}><label style={{ fontSize: 12 }}>Description</label><textarea className="ds-input" rows={2} style={{ resize: "vertical" }} value={draft.description} onChange={(e) => set("description", e.target.value)} /></div>
+      <button className="ds-btn ds-btn-primary" style={{ marginTop: 14 }} disabled={!changed} onClick={() => onSave(draft)}>Save cross-promo</button>
     </div>
   );
 }
@@ -2568,7 +2607,7 @@ function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, 
 }
 
 // Página de administración: listado de usuarios + límite editable (solo admin; gate real en la BD)
-function AdminUsers({ onBack, darkMode, toggleDark, addToast, selfId }) {
+function AdminUsers({ onBack, darkMode, toggleDark, addToast, selfId, crossPromo, onSaveCrossPromo }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState(null);
   useEffect(() => {
@@ -2604,6 +2643,7 @@ function AdminUsers({ onBack, darkMode, toggleDark, addToast, selfId }) {
       <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode" style={{ marginLeft: "auto" }}><ThemeIcon dark={darkMode} /></button>
     </header>
     <div className="ds-dash">
+      <CrossPromoEditor value={crossPromo} onSave={onSaveCrossPromo} />
       {err ? <div className="ds-warning">⚠ {err}</div>
         : rows == null ? <div className="ds-auth-loading">Loading users…</div>
         : rows.length === 0 ? <p className="ds-dash-sub">No users yet.</p>
@@ -2712,12 +2752,36 @@ export default function App() {
   const [migratePrompt, setMigratePrompt] = useState(null);  // { candidates, slots } → modal de selección
   const [isAdmin, setIsAdmin] = useState(false);
   const [userLimit, setUserLimit] = useState(MAX_SYSTEMS);   // null = ilimitado
+  const [crossPromo, setCrossPromo] = useState(CROSS_PROMO_DEFAULT); // config global del cross-promo (admin)
   const cloudMode = !!user;
   const cloudSaveTimer = useRef(null);
   const cloudSavePending = useRef(null);
   const restoredRef = useRef(false);
   const loadedUserRef = useRef(null);
   const openAuth = (mode = "signup") => { setAuthMode(mode); setAuthOpen(true); };
+
+  // Cross-promo global: se lee de Supabase (lectura pública); el admin lo edita (escritura RLS).
+  useEffect(() => {
+    if (!supabase) return;
+    let active = true;
+    (async () => {
+      try {
+        const { data } = await supabase.from("app_settings").select("value").eq("key", "cross_promo").maybeSingle();
+        if (active && data?.value) setCrossPromo({ ...CROSS_PROMO_DEFAULT, ...data.value });
+      } catch {}
+    })();
+    return () => { active = false; };
+  }, []);
+  const saveCrossPromo = async (next) => {
+    const prev = crossPromo;
+    setCrossPromo(next); // optimista
+    if (!supabase) { addToast("Cloud not configured", "err"); return; }
+    try {
+      const { error } = await supabase.from("app_settings").upsert({ key: "cross_promo", value: next, updated_at: nowISO() });
+      if (error) throw error;
+      addToast("Cross-promo saved", "ok");
+    } catch (e) { setCrossPromo(prev); addToast("Could not save cross-promo", "err"); }
+  };
 
   // Reabre el último sistema editado (una vez por carga)
   const restoreSession = (systems) => {
@@ -2952,7 +3016,7 @@ export default function App() {
 
   const currentSystem = library.systems.find((s) => s.id === currentId);
   const systemName = currentSystem?.name;
-  const value = useMemo(() => ({ state, dispatch, darkMode, toggleDark, addToast, systemName, user, openAuth }), [state, darkMode, systemName, user]);
+  const value = useMemo(() => ({ state, dispatch, darkMode, toggleDark, addToast, systemName, user, openAuth, crossPromo }), [state, darkMode, systemName, user, crossPromo]);
 
   return (<DSContext.Provider value={value}>
     <style>{css_styles}</style>
@@ -2960,7 +3024,7 @@ export default function App() {
       {!authReady
         ? <div className="ds-auth-loading">Loading…</div>
         : view === "admin"
-        ? <AdminUsers onBack={() => setView("dashboard")} darkMode={darkMode} toggleDark={toggleDark} addToast={addToast} myLimit={userLimit} selfId={user?.id} />
+        ? <AdminUsers onBack={() => setView("dashboard")} darkMode={darkMode} toggleDark={toggleDark} addToast={addToast} myLimit={userLimit} selfId={user?.id} crossPromo={crossPromo} onSaveCrossPromo={saveCrossPromo} />
         : view === "account"
         ? <AccountView user={user} onBack={() => setView("dashboard")} darkMode={darkMode} toggleDark={toggleDark} addToast={addToast} onSignOut={signOut} />
         : view === "dashboard"
