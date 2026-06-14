@@ -476,6 +476,15 @@ const css_styles = `
   .ds-header{background:var(--ds-bg-card);border-bottom:1px solid var(--ds-border-light);padding:0 24px;height:54px;display:flex;align-items:center;gap:12px;box-shadow:var(--ds-shadow)}
   .ds-header-icon{width:30px;height:30px;border-radius:var(--ds-radius);flex-shrink:0;display:block}
   .ds-ver-pill{font-size:10px;font-weight:600;color:var(--ds-accent);background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring);border-radius:6px;padding:2px 7px;letter-spacing:.3px;flex-shrink:0;font-family:'SF Mono',Consolas,monospace}
+  .ds-wordmark{font-size:14px;font-weight:600;letter-spacing:-.01em;flex-shrink:0}
+  .ds-saved-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--ds-success);background:hsla(142,64%,46%,.1);border:1px solid hsla(142,64%,46%,.45);border-radius:7px;padding:5px 11px;white-space:nowrap}
+  .ds-dsname{margin:0 2px 12px;padding-bottom:12px;border-bottom:1px solid var(--ds-border-light)}
+  .ds-dsname-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:var(--ds-text-3);padding:0 6px;margin-bottom:5px;display:block}
+  .ds-dsname-field{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:var(--ds-radius);cursor:text;border:1px solid var(--ds-border-light);background:var(--ds-bg);transition:border-color .15s}
+  .ds-dsname-field:hover{border-color:var(--ds-accent)}
+  .ds-dsname-text{font-size:13.5px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ds-dsname-field .ds-dsname-pencil{color:var(--ds-text-3);flex-shrink:0;display:flex} .ds-dsname-field:hover .ds-dsname-pencil{color:var(--ds-accent)}
+  .ds-dsname-input{flex:1;min-width:0;border:none;background:transparent;font-family:inherit;font-size:13.5px;font-weight:600;color:var(--ds-text);outline:none;padding:0}
   .ds-header h1{font-size:14px;font-weight:600;letter-spacing:-.01em} .ds-header p{font-size:11px;color:var(--ds-text-2);margin-top:1px}
   .ds-main{display:flex;flex:1;overflow:hidden}
   .ds-sidebar{width:200px;background:var(--ds-bg-card);border-right:1px solid var(--ds-border-light);padding:12px 8px;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column}
@@ -860,6 +869,7 @@ function Ico({ name, size = 16 }) {
     mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></>,
     check: <path d="M5 12.5 10 17.5 20 6.5" />,
     upload: <path d="M12 19V8M7 12l5-5 5 5M5 21h14" />,
+    edit: <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3zM13.5 6.5l3 3" />,
   }[name];
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true">{inner}</svg>
@@ -1026,35 +1036,49 @@ function GuestBanner({ onSignIn }) {
   );
 }
 const APP_VERSION = "v1.0";
-function EditorHeader({ name, onRename, onBack, autoSave, onToggleAutoSave, dirty, onSave, darkMode, toggleDark, user, onAuth, onAccount, onSignOut, isAdmin }) {
-  const [editing, setEditing] = useState(false);
-  const [val, setVal] = useState(name);
-  useEffect(() => { setVal(name); }, [name]);
-  const commit = () => { const n = val.trim() || name; setEditing(false); if (n !== name) onRename(n); };
+function EditorHeader({ onBack, autoSave, onToggleAutoSave, dirty, onSave, darkMode, toggleDark, user, onAuth, onAccount, onSignOut, isAdmin }) {
   return (<header className="ds-header">
     <button className="ds-header-back" onClick={onBack} data-tip="Back to my systems">←</button>
     <BrandMark />
+    <span className="ds-wordmark">BricksMate DS</span>
     <span className="ds-ver-pill">{APP_VERSION}</span>
-    {editing
-      ? <input className="ds-input ds-input-sm" style={{ maxWidth: 240 }} autoFocus value={val} onChange={(e) => setVal(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setVal(name); setEditing(false); } }} />
-      : <div><h1 onClick={() => setEditing(true)} style={{ cursor: "text" }} data-tip="Click to rename">{name}</h1><p>Design system editor</p></div>}
     <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
       <div className="ds-autosave" onClick={onToggleAutoSave} data-tip="Save changes automatically on every edit">
         <div className={"ds-toggle-track" + (autoSave ? " on" : "")}><div className="ds-toggle-thumb" /></div>
         <span>Auto-save</span>
       </div>
-      <button className="ds-btn ds-btn-primary ds-btn-sm" onClick={onSave} disabled={autoSave || !dirty} data-tip="Save changes (⌘/Ctrl + S)">
-        {autoSave ? "✓ Auto-saved" : (dirty ? "Save changes" : "✓ Saved")}
-      </button>
+      {(autoSave || !dirty)
+        ? <span className="ds-saved-pill" data-tip={autoSave ? "Changes are saved automatically" : "All changes saved"}><Ico name="check" size={14} />{autoSave ? "Auto-saved" : "Saved"}</span>
+        : <button className="ds-btn ds-btn-primary ds-btn-sm" onClick={onSave} data-tip="Save changes (⌘/Ctrl + S)"><Ico name="check" size={14} />Save changes</button>}
       <AuthControl user={user} isAdmin={isAdmin} onAuth={onAuth} onAccount={onAccount} onSignOut={onSignOut} />
       <button className="ds-header-theme" onClick={toggleDark} data-tip="Toggle light / dark theme"><ThemeIcon dark={darkMode} /></button>
     </div>
   </header>);
 }
-function Sidebar() {
+function SystemNameField({ name, onRename }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(name);
+  useEffect(() => { setVal(name); }, [name]);
+  const commit = () => { const n = val.trim() || name; setEditing(false); if (n !== name) onRename(n); };
+  return (
+    <div className="ds-dsname">
+      <span className="ds-dsname-lbl">Design system</span>
+      {editing
+        ? <div className="ds-dsname-field" style={{ borderColor: "var(--ds-accent)" }}>
+            <input className="ds-dsname-input" autoFocus value={val} onChange={(e) => setVal(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setVal(name); setEditing(false); } }} />
+          </div>
+        : <div className="ds-dsname-field" onClick={() => setEditing(true)} data-tip="Click to rename your design system">
+            <span className="ds-dsname-text">{name}</span>
+            <span className="ds-dsname-pencil"><Ico name="edit" size={14} /></span>
+          </div>}
+    </div>
+  );
+}
+function Sidebar({ name, onRename }) {
   const { state, dispatch } = useDSContext();
   const pct = Math.round((state.currentStep / STEPS.length) * 100);
   return (<nav className="ds-sidebar">
+    {name != null && <SystemNameField name={name} onRename={onRename} />}
     <div className="ds-steps-head">
       <span className="ds-steps-lbl">Steps</span>
       <div className="ds-progress-track"><div className="ds-progress-fill" style={{ width: pct + "%" }} /></div>
@@ -3040,8 +3064,8 @@ export default function App() {
         : view === "dashboard"
         ? <Dashboard library={library} darkMode={darkMode} toggleDark={toggleDark} onOpen={openSystem} onNew={createSystem} onDuplicate={duplicateSystem} onDelete={deleteSystem} onRename={renameSystem} user={user} onAuth={openAuth} onAccount={() => setView("account")} onSignOut={signOut} limit={userLimit} isAdmin={isAdmin} onOpenAdmin={() => setView("admin")} />
         : <>
-            <EditorHeader name={currentSystem?.name || "Untitled"} onRename={(n) => renameSystem(currentId, n)} onBack={backToDashboard} autoSave={library.autoSave} onToggleAutoSave={toggleAutoSave} dirty={dirty} onSave={() => saveDoc(true)} darkMode={darkMode} toggleDark={toggleDark} user={user} onAuth={openAuth} onAccount={() => setView("account")} onSignOut={signOut} isAdmin={isAdmin} />
-            <div className="ds-main"><Sidebar /><ErrorBoundary resetKey={state.currentStep}><StepContent /></ErrorBoundary></div>
+            <EditorHeader onBack={backToDashboard} autoSave={library.autoSave} onToggleAutoSave={toggleAutoSave} dirty={dirty} onSave={() => saveDoc(true)} darkMode={darkMode} toggleDark={toggleDark} user={user} onAuth={openAuth} onAccount={() => setView("account")} onSignOut={signOut} isAdmin={isAdmin} />
+            <div className="ds-main"><Sidebar name={currentSystem?.name || "Untitled"} onRename={(n) => renameSystem(currentId, n)} /><ErrorBoundary resetKey={state.currentStep}><StepContent /></ErrorBoundary></div>
             <Footer />
           </>}
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} addToast={addToast} initialMode={authMode} />}
