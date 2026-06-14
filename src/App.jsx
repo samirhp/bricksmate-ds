@@ -505,7 +505,7 @@ const css_styles = `
   .ds-footer-info{font-size:12px;color:var(--ds-text-3)} .ds-footer-actions{display:flex;gap:8px}
   .ds-btn{padding:7px 14px;border:1px solid var(--ds-border);background:var(--ds-bg-card);color:var(--ds-text);border-radius:var(--ds-radius);font-size:13px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;font-family:inherit;box-shadow:var(--ds-shadow)}
   .ds-btn:hover:not(:disabled){background:var(--ds-bg)} .ds-btn:active:not(:disabled){transform:scale(.99)} .ds-btn:disabled{opacity:.45;cursor:not-allowed}
-  .ds-btn-primary{background:var(--ds-accent);color:#fff;border-color:var(--ds-accent);box-shadow:0 1px 2px var(--ds-accent-ring)} .ds-btn-primary:hover:not(:disabled){background:var(--ds-accent-hover);border-color:var(--ds-accent-hover)}
+  .ds-btn-primary{justify-content:center;background:var(--ds-accent);color:#fff;border-color:var(--ds-accent);box-shadow:0 1px 2px var(--ds-accent-ring)} .ds-btn-primary:hover:not(:disabled){background:var(--ds-accent-hover);border-color:var(--ds-accent-hover)}
   .ds-btn-primary:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ds-accent-ring)}
   [data-theme="dark"] .ds-download-btn{color:hsl(0,0%,4%)}
   [data-theme="dark"] .ds-input:focus{box-shadow:0 0 0 3px rgba(255,255,255,.1)}
@@ -851,6 +851,19 @@ function CountrySelect({ value, onChange }) {
 }
 
 // Modal de auth: Sign up (datos básicos) ↔ Sign in (magic link). Ambos usan OTP por email.
+// Iconos SVG inline (la app no usa librería de iconos): trazo currentColor, hereda color del botón
+function Ico({ name, size = 16 }) {
+  const inner = {
+    plus: <path d="M12 5v14M5 12h14" />,
+    open: <path d="M3 8a2 2 0 0 1 2-2h3l2 2h7a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Z" />,
+    mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></>,
+    check: <path d="M5 12.5 10 17.5 20 6.5" />,
+    upload: <path d="M12 19V8M7 12l5-5 5 5M5 21h14" />,
+  }[name];
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true">{inner}</svg>
+  );
+}
 function AuthModal({ onClose, addToast, initialMode }) {
   const [mode, setMode] = useState(initialMode || "signup"); // signup | signin
   const [email, setEmail] = useState("");
@@ -892,7 +905,7 @@ function AuthModal({ onClose, addToast, initialMode }) {
         {sent ? (<>
           <h3>Check your email</h3>
           <p>We sent a magic link to <strong>{email}</strong>. Open it on this device to {isSignup ? "finish creating your account" : "sign in"}.</p>
-          <button className="ds-btn ds-btn-primary" style={{ width: "100%" }} onClick={onClose}>Done</button>
+          <button className="ds-btn ds-btn-primary" style={{ width: "100%" }} onClick={onClose}><Ico name="check" />Done</button>
         </>) : (
           <form onSubmit={submit}>
             <h3>{isSignup ? "Create your account" : "Sign in"}</h3>
@@ -908,7 +921,7 @@ function AuthModal({ onClose, addToast, initialMode }) {
             <input className="ds-input" type="email" required placeholder="you@email.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ marginBottom: isSignup ? 10 : 0 }} autoFocus={!isSignup} />
             {isSignup && <CountrySelect value={country} onChange={setCountry} />}
             {isSignup && <label className="ds-optin"><input type="checkbox" checked={optIn} onChange={(e) => setOptIn(e.target.checked)} /><span>I want to receive occasional tips &amp; updates from Samir Haddad. No spam, unsubscribe anytime.</span></label>}
-            <button className="ds-btn ds-btn-primary" type="submit" disabled={busy} style={{ width: "100%", marginTop: isSignup ? 4 : 10 }}>{busy ? "Sending…" : (isSignup ? "Create account" : "Send magic link")}</button>
+            <button className="ds-btn ds-btn-primary" type="submit" disabled={busy} style={{ width: "100%", marginTop: isSignup ? 4 : 10 }}><Ico name="mail" />{busy ? "Sending…" : (isSignup ? "Create account" : "Send magic link")}</button>
             <div className="ds-auth-switch">
               {isSignup
                 ? <>Already have an account? <button type="button" onClick={() => setMode("signin")}>Sign in</button></>
@@ -948,7 +961,7 @@ function SelectMigrateModal({ prompt, onConfirm, onClose }) {
           <span>{sel.length} / {slots} selected</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button className="ds-btn ds-btn-sm" onClick={onClose}>Skip for now</button>
-            <button className="ds-btn ds-btn-primary ds-btn-sm" onClick={() => onConfirm(candidates.filter((c) => sel.includes(c.id)))} disabled={!sel.length}>Sync selected</button>
+            <button className="ds-btn ds-btn-primary ds-btn-sm" onClick={() => onConfirm(candidates.filter((c) => sel.includes(c.id)))} disabled={!sel.length}><Ico name="upload" />Sync selected</button>
           </div>
         </div>
       </div>
@@ -1475,7 +1488,7 @@ function TransparencySection({ label, color, bgColor, field }) {
 function StepColors() {
   const { state, dispatch } = useDSContext();
   return (<div>
-    <div style={{ marginBottom: 16 }}><button className="ds-btn ds-btn-primary" onClick={() => dispatch({ type: "ADD_PALETTE" })}>+ Add palette</button></div>
+    <div style={{ marginBottom: 16 }}><button className="ds-btn ds-btn-primary" onClick={() => dispatch({ type: "ADD_PALETTE" })}><Ico name="plus" />Add palette</button></div>
     {state.colors.palettes.map((p) => <PaletteCard key={p.id} palette={p} />)}
     <TransparencySection label="White" color="#ffffff" bgColor="#ffffff" field="whiteTransparency" />
     <TransparencySection label="Black" color="#000000" bgColor="#000000" field="blackTransparency" />
@@ -2419,7 +2432,7 @@ function CrossPromoEditor({ value, onSave }) {
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Link (URL)</label><input className="ds-input" value={draft.link} onChange={(e) => set("link", e.target.value)} placeholder="https://…" /></div>
       </div>
       <div className="ds-form-group" style={{ marginTop: 12, marginBottom: 0 }}><label style={{ fontSize: 12 }}>Description</label><textarea className="ds-input" rows={2} style={{ resize: "vertical" }} value={draft.description} onChange={(e) => set("description", e.target.value)} /></div>
-      <button className="ds-btn ds-btn-primary" style={{ marginTop: 14 }} disabled={!changed} onClick={() => onSave(draft)}>Save cross-promo</button>
+      <button className="ds-btn ds-btn-primary" style={{ marginTop: 14 }} disabled={!changed} onClick={() => onSave(draft)}><Ico name="check" />Save cross-promo</button>
     </div>
   );
 }
@@ -2558,7 +2571,7 @@ function SystemCard({ sys, onOpen, onDuplicate, onDelete, onRename }) {
       <div className="ds-sys-meta">{palettes.length} color{palettes.length === 1 ? "" : "s"} · scale {doc.typography?.headingScale ?? "—"} · {fmtDate(sys.updatedAt)}</div>
     </div>
     <div className="ds-sys-actions">
-      <button className="ds-btn ds-btn-primary ds-btn-sm" onClick={() => onOpen(sys.id)}>Open</button>
+      <button className="ds-btn ds-btn-primary ds-btn-sm" onClick={() => onOpen(sys.id)}><Ico name="open" />Open</button>
       <button className="ds-btn ds-btn-sm" onClick={() => onDuplicate(sys.id)}>Duplicate</button>
       <button className="ds-btn ds-btn-sm ds-btn-danger" onClick={() => onDelete(sys.id)} title="Delete">✕</button>
     </div>
@@ -2582,14 +2595,14 @@ function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, 
       {!user && <GuestBanner onSignIn={() => onAuth("signup")} />}
       <div className="ds-dash-head">
         <div><h2 className="ds-dash-title">My design systems</h2><p className="ds-dash-sub">{user ? systems.length + " / " + (limit == null ? "∞" : limit) + " in cloud" : systems.length + " system" + (systems.length === 1 ? "" : "s") + " on this device"}</p></div>
-        <button className="ds-btn ds-btn-primary" onClick={onNew} disabled={atMax} data-tip={atMax ? "Cloud limit reached (" + limit + ")" : undefined}>+ New system</button>
+        <button className="ds-btn ds-btn-primary" onClick={onNew} disabled={atMax} data-tip={atMax ? "Cloud limit reached (" + limit + ")" : undefined}><Ico name="plus" />New system</button>
       </div>
       {systems.length === 0
         ? <div className="ds-dash-empty">
             <div style={{ fontSize: 34, marginBottom: 10, color: "var(--ds-text-3)" }}>✦</div>
             <h3 style={{ fontSize: 16, marginBottom: 4 }}>No systems yet</h3>
             <p style={{ fontSize: 13, color: "var(--ds-text-2)", marginBottom: 16 }}>Create your first design system to get started.</p>
-            <button className="ds-btn ds-btn-primary" onClick={onNew}>+ New system</button>
+            <button className="ds-btn ds-btn-primary" onClick={onNew}><Ico name="plus" />New system</button>
           </div>
         : <div className="ds-dash-grid">
             {systems.map((s) => <SystemCard key={s.id} sys={s} onOpen={onOpen} onDuplicate={onDuplicate} onDelete={onDelete} onRename={onRename} />)}
@@ -2711,7 +2724,7 @@ function AccountView({ user, onBack, darkMode, toggleDark, addToast, onSignOut }
         <div className="ds-form-group"><label>Country</label><CountrySelect value={country} onChange={setCountry} /></div>
         <div className="ds-form-group"><label>Email</label><input className="ds-input" value={user.email} disabled /><div className="ds-helper">This is your login email address.</div></div>
         <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
-          <button className="ds-btn ds-btn-primary" onClick={save} disabled={busy}>{busy ? "Saving…" : "Save changes"}</button>
+          <button className="ds-btn ds-btn-primary" onClick={save} disabled={busy}><Ico name="check" />{busy ? "Saving…" : "Save changes"}</button>
           <button className="ds-btn" onClick={onSignOut}>Sign out</button>
         </div>
         <div className="ds-helper" style={{ marginTop: 16 }}>Profile photo: we use your <a href="https://gravatar.com" target="_blank" rel="noopener noreferrer" style={{ color: "var(--ds-accent)" }}>Gravatar</a> if you have one, otherwise your initials.</div>
