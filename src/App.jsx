@@ -801,6 +801,25 @@ const css_styles = `
   .ds-account-email{font-size:13px;color:var(--ds-text-3)}
 
   @media (prefers-reduced-motion:reduce){.ds-step-anim,.ds-step-check,.ds-toast{animation:none}*{transition-duration:.01ms!important}}
+
+  /* ===== Responsive (≤767px): stack entry surfaces; the editor shows a notice ===== */
+  .ds-mobile-notice{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;padding:32px 24px;overflow:auto}
+  .ds-mobile-notice .ds-header-icon{width:48px;height:48px;margin-bottom:2px}
+  .ds-mobile-notice h2{font-size:20px;font-weight:700;letter-spacing:-.02em}
+  .ds-mobile-notice p{font-size:14px;color:var(--ds-text-2);max-width:340px;line-height:1.6}
+  @media (max-width:767px){
+    .ds-header{padding:0 14px;gap:8px}
+    .ds-wordmark{display:none}
+    .ds-profile-name{display:none}
+    .ds-dash{padding:18px 14px}
+    .ds-dash-head{flex-direction:column;align-items:flex-start;gap:12px}
+    .ds-dash-head .ds-btn,.ds-dash-head .ds-btn-primary{width:100%;justify-content:center}
+    .ds-grid-2,.ds-grid-3{grid-template-columns:1fr}
+    .ds-footer{padding:10px 14px}
+    .ds-table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .ds-admin-table{min-width:640px}
+    .ds-modal{padding:20px 18px}
+  }
 `;
 
 /* ================================================================
@@ -1097,6 +1116,18 @@ function EditorHeader({ onBack, autoSave, onToggleAutoSave, dirty, onSave, darkM
       <button className="ds-header-theme" onClick={toggleDark} data-tip="Toggle light / dark theme"><ThemeIcon dark={darkMode} /></button>
     </div>
   </header>);
+}
+// Aviso para móvil: el editor necesita más espacio (Fase 2a)
+function EditorMobileNotice({ onBack, darkMode, toggleDark }) {
+  return (
+    <div className="ds-mobile-notice">
+      <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode" style={{ position: "absolute", top: 14, right: 14 }}><ThemeIcon dark={darkMode} /></button>
+      <BrandMark />
+      <h2>Best on a larger screen</h2>
+      <p>The design system editor needs more room than a phone. Open BricksMate DS on a tablet or desktop to build and export your tokens.</p>
+      <button className="ds-btn ds-btn-primary" onClick={onBack}><Ico name="open" />Back to my systems</button>
+    </div>
+  );
 }
 function SystemNameField({ name, onRename }) {
   const [editing, setEditing] = useState(false);
@@ -2729,10 +2760,10 @@ function AdminUsers({ onBack, darkMode, toggleDark, addToast, selfId, crossPromo
         {err ? <div className="ds-warning">⚠ {err}</div>
           : rows == null ? <div className="ds-auth-loading">Loading users…</div>
           : rows.length === 0 ? <p className="ds-dash-sub">No users yet.</p>
-          : (<table className="ds-admin-table">
+          : (<div className="ds-table-scroll"><table className="ds-admin-table">
               <thead><tr><th>Name</th><th>Email</th><th>Country</th><th>Systems</th><th>Cloud limit</th><th></th></tr></thead>
               <tbody>{rows.map((r) => <AdminUserRow key={r.id} row={r} onSetLimit={setLimit} onDelete={removeUser} isSelf={r.id === selfId} />)}</tbody>
-            </table>)}
+            </table></div>)}
       </div>
     </div>
   </>);
@@ -2818,6 +2849,13 @@ function AccountView({ user, onBack, darkMode, toggleDark, addToast, onSignOut, 
 export default function App() {
   const [darkMode, setDarkMode] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches);
   const toggleDark = () => setDarkMode((d) => !d);
+  // El editor necesita espacio: bajo 768px mostramos un aviso (Fase 2a)
+  const [isNarrow, setIsNarrow] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
+  useEffect(() => {
+    const onResize = () => setIsNarrow(window.innerWidth < 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   const [library, setLibrary] = useState(loadLibrary);
   const [view, setView] = useState("dashboard");
   const [currentId, setCurrentId] = useState(null);
@@ -3117,6 +3155,8 @@ export default function App() {
         ? <AccountView user={user} onBack={() => setView("dashboard")} darkMode={darkMode} toggleDark={toggleDark} addToast={addToast} onSignOut={signOut} isAdmin={isAdmin} onAccount={() => setView("account")} onOpenAdmin={() => setView("admin")} />
         : view === "dashboard"
         ? <Dashboard library={library} darkMode={darkMode} toggleDark={toggleDark} onOpen={openSystem} onNew={createSystem} onDuplicate={duplicateSystem} onDelete={deleteSystem} onRename={renameSystem} user={user} onAuth={openAuth} onAccount={() => setView("account")} onSignOut={signOut} limit={userLimit} isAdmin={isAdmin} onOpenAdmin={() => setView("admin")} />
+        : isNarrow
+        ? <EditorMobileNotice onBack={backToDashboard} darkMode={darkMode} toggleDark={toggleDark} />
         : <>
             <EditorHeader onBack={backToDashboard} autoSave={library.autoSave} onToggleAutoSave={toggleAutoSave} dirty={dirty} onSave={() => saveDoc(true)} darkMode={darkMode} toggleDark={toggleDark} user={user} onAuth={openAuth} onAccount={() => setView("account")} onSignOut={signOut} isAdmin={isAdmin} onOpenAdmin={() => setView("admin")} />
             <div className="ds-main"><Sidebar name={currentSystem?.name || "Untitled"} onRename={(n) => renameSystem(currentId, n)} /><ErrorBoundary resetKey={state.currentStep}><StepContent /></ErrorBoundary></div>
