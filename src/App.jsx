@@ -462,9 +462,9 @@ const css_styles = `
   [data-theme="dark"] {
     /* Negro neutro (#000) + acento #765DF5 */
     --ds-primary:hsl(0,0%,98%); --ds-primary-hover:hsl(0,0%,88%); --ds-primary-light:hsl(0,0%,18%);
-    --ds-bg:hsl(0,0%,7.35%); --ds-bg-card:hsl(0,0%,9%);
+    --ds-bg:hsl(0,0%,4%); --ds-bg-card:hsl(0,0%,7%);
     --ds-text:hsl(0,0%,98%); --ds-text-2:hsl(0,0%,70%); --ds-text-3:hsl(0,0%,50%);
-    --ds-border:hsl(0,0%,24%); --ds-border-light:hsl(0,0%,16%);
+    --ds-border:hsl(0,0%,22%); --ds-border-light:hsl(0,0%,13.5%);
     --ds-success:hsl(142,69%,52%); --ds-error:hsl(0,84%,66%);
     --ds-accent:hsl(250,88%,66%); --ds-accent-hover:hsl(250,88%,73%); --ds-accent-light:hsl(250,40%,18%); --ds-accent-ring:hsla(250,88%,66%,.25);
     --ds-shadow:0 1px 2px rgba(0,0,0,.6);
@@ -475,6 +475,7 @@ const css_styles = `
   .ds-app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
   .ds-header{background:var(--ds-bg-card);border-bottom:1px solid var(--ds-border-light);padding:0 24px;height:54px;display:flex;align-items:center;gap:12px;box-shadow:var(--ds-shadow)}
   .ds-header-icon{width:30px;height:30px;border-radius:var(--ds-radius);flex-shrink:0;display:block}
+  .ds-ver-pill{font-size:10px;font-weight:600;color:var(--ds-accent);background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring);border-radius:6px;padding:2px 7px;letter-spacing:.3px;flex-shrink:0;font-family:'SF Mono',Consolas,monospace}
   .ds-header h1{font-size:14px;font-weight:600;letter-spacing:-.01em} .ds-header p{font-size:11px;color:var(--ds-text-2);margin-top:1px}
   .ds-main{display:flex;flex:1;overflow:hidden}
   .ds-sidebar{width:200px;background:var(--ds-bg-card);border-right:1px solid var(--ds-border-light);padding:12px 8px;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column}
@@ -521,7 +522,7 @@ const css_styles = `
   .ds-input-error{border-color:var(--ds-error)!important;box-shadow:0 0 0 3px rgba(239,68,68,.1)!important}
   .ds-helper{font-size:12px;color:var(--ds-text-3);margin-top:5px}
   .ds-form-group{margin-bottom:18px} .ds-form-group label{display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--ds-text)}
-  .ds-card{background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:18px;margin-bottom:16px;box-shadow:var(--ds-shadow)} .ds-card h4{font-size:13px;font-weight:600;margin-bottom:12px}
+  .ds-card{background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:18px;margin-bottom:16px} .ds-card h4{font-size:13px;font-weight:600;margin-bottom:12px}
   .ds-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px} .ds-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
   .ds-mode-cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px}
   .ds-mode-card{position:relative;background:var(--ds-bg-card);border:1.5px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:20px;cursor:pointer;transition:all .2s;text-align:center;box-shadow:var(--ds-shadow)}
@@ -1024,6 +1025,7 @@ function GuestBanner({ onSignIn }) {
     </div>
   );
 }
+const APP_VERSION = "v1.0";
 function EditorHeader({ name, onRename, onBack, autoSave, onToggleAutoSave, dirty, onSave, darkMode, toggleDark, user, onAuth, onAccount, onSignOut, isAdmin }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(name);
@@ -1032,6 +1034,7 @@ function EditorHeader({ name, onRename, onBack, autoSave, onToggleAutoSave, dirt
   return (<header className="ds-header">
     <button className="ds-header-back" onClick={onBack} data-tip="Back to my systems">←</button>
     <BrandMark />
+    <span className="ds-ver-pill">{APP_VERSION}</span>
     {editing
       ? <input className="ds-input ds-input-sm" style={{ maxWidth: 240 }} autoFocus value={val} onChange={(e) => setVal(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setVal(name); setEditing(false); } }} />
       : <div><h1 onClick={() => setEditing(true)} style={{ cursor: "text" }} data-tip="Click to rename">{name}</h1><p>Design system editor</p></div>}
@@ -2584,6 +2587,7 @@ function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, 
   return (<>
     <header className="ds-header">
       <BrandMark />
+      <span className="ds-ver-pill">{APP_VERSION}</span>
       <div><h1>Design System Generator for Bricks Builder</h1><p>Your saved design systems</p></div>
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
         {isAdmin && <button className="ds-btn ds-btn-sm" onClick={onOpenAdmin} data-tip="Manage users">Users</button>}
