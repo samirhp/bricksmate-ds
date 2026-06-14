@@ -477,7 +477,7 @@ const css_styles = `
   .ds-header-icon{width:30px;height:30px;border-radius:var(--ds-radius);flex-shrink:0;display:block}
   .ds-ver-pill{font-size:10px;font-weight:600;color:var(--ds-accent);background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring);border-radius:4px;padding:2px 7px;letter-spacing:.3px;flex-shrink:0;font-family:'SF Mono',Consolas,monospace}
   .ds-wordmark{font-size:14px;font-weight:600;letter-spacing:-.01em;flex-shrink:0}
-  .ds-saved-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--ds-success);background:hsla(142,64%,46%,.1);border:1px solid hsla(142,64%,46%,.45);border-radius:5px;padding:5px 11px;white-space:nowrap}
+  .ds-saved-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--ds-success);background:hsla(142,64%,46%,.1);border:1px solid hsla(142,64%,46%,.45);border-radius:5px;padding:5px 11px 5px 8px;white-space:nowrap}
   .ds-dsname{margin:0 2px 12px;padding-bottom:12px;border-bottom:1px solid var(--ds-border-light)}
   .ds-dsname-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:var(--ds-text-3);padding:0 6px;margin-bottom:5px;display:block}
   .ds-dsname-field{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:var(--ds-radius);cursor:text;border:1px solid var(--ds-border-light);background:var(--ds-bg);transition:border-color .15s}
