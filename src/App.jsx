@@ -616,6 +616,7 @@ const css_styles = `
   /* Dashboard */
   .ds-dash{flex:1;overflow-y:auto;padding:28px 32px}
   .ds-dash-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:24px;max-width:1100px;margin-left:auto;margin-right:auto}
+  .ds-dash-content{max-width:1100px;margin:0 auto}
   .ds-dash-title{font-size:20px;font-weight:700;letter-spacing:-.02em}
   .ds-dash-sub{font-size:13px;color:var(--ds-text-2);margin-top:3px}
   .ds-dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr));gap:16px;max-width:1100px;margin:0 auto}
@@ -2723,14 +2724,16 @@ function AdminUsers({ onBack, darkMode, toggleDark, addToast, selfId, crossPromo
     </header>
     <div className="ds-dash">
       <div className="ds-dash-head"><div><h2 className="ds-dash-title">Users</h2><p className="ds-dash-sub">Admin · manage limits &amp; accounts</p></div></div>
-      <CrossPromoEditor value={crossPromo} onSave={onSaveCrossPromo} />
-      {err ? <div className="ds-warning">⚠ {err}</div>
-        : rows == null ? <div className="ds-auth-loading">Loading users…</div>
-        : rows.length === 0 ? <p className="ds-dash-sub">No users yet.</p>
-        : (<table className="ds-admin-table">
-            <thead><tr><th>Name</th><th>Email</th><th>Country</th><th>Systems</th><th>Cloud limit</th><th></th></tr></thead>
-            <tbody>{rows.map((r) => <AdminUserRow key={r.id} row={r} onSetLimit={setLimit} onDelete={removeUser} isSelf={r.id === selfId} />)}</tbody>
-          </table>)}
+      <div className="ds-dash-content">
+        <CrossPromoEditor value={crossPromo} onSave={onSaveCrossPromo} />
+        {err ? <div className="ds-warning">⚠ {err}</div>
+          : rows == null ? <div className="ds-auth-loading">Loading users…</div>
+          : rows.length === 0 ? <p className="ds-dash-sub">No users yet.</p>
+          : (<table className="ds-admin-table">
+              <thead><tr><th>Name</th><th>Email</th><th>Country</th><th>Systems</th><th>Cloud limit</th><th></th></tr></thead>
+              <tbody>{rows.map((r) => <AdminUserRow key={r.id} row={r} onSetLimit={setLimit} onDelete={removeUser} isSelf={r.id === selfId} />)}</tbody>
+            </table>)}
+      </div>
     </div>
   </>);
 }
@@ -2793,8 +2796,8 @@ function AccountView({ user, onBack, darkMode, toggleDark, addToast, onSignOut, 
       </div>
     </header>
     <div className="ds-dash">
-      <div className="ds-dash-head"><div><h2 className="ds-dash-title">Account</h2><p className="ds-dash-sub">Your profile</p></div></div>
       <div className="ds-account">
+        <div className="ds-dash-head" style={{ maxWidth: "none", margin: "0 0 24px" }}><div><h2 className="ds-dash-title">Account</h2><p className="ds-dash-sub">Your profile</p></div></div>
         <div className="ds-account-head"><Avatar user={user} size={64} admin={isAdmin} /><div><div className="ds-account-name">{userDisplayName(user)}</div><div className="ds-account-email">{user.email}</div></div></div>
         <div className="ds-grid-2">
           <div className="ds-form-group"><label>First name</label><input className="ds-input" value={firstName} onChange={(e) => setFirstName(e.target.value)} /></div>
