@@ -407,6 +407,7 @@ function reducer(state, action) {
     case "RESET_BTN_SIZES": return { ...state, buttons: { ...state.buttons, sizes: JSON.parse(JSON.stringify(BTN_SIZE_DEFAULTS)) } };
     case "RESET_SLICE": return { ...state, [action.key]: JSON.parse(JSON.stringify(initialState[action.key])) };
     case "RESTORE_SLICE": return { ...state, [action.key]: action.value };
+    case "RESET_PATCH": { let ns = state; Object.entries(action.patch).forEach(([slice, partial]) => { ns = { ...ns, [slice]: { ...ns[slice], ...partial } }; }); return ns; }
     case "TOGGLE_BTN_COLOR": {
       const cur = state.buttons.enabled?.[action.id] !== false;
       return { ...state, buttons: { ...state.buttons, enabled: { ...state.buttons.enabled, [action.id]: !cur } } };
@@ -1263,17 +1264,33 @@ function LayoutIcon({ mode }) {
   );
 }
 
-// Botón "Reset to defaults" por paso: resetea una slice del estado a sus defaults de fábrica,
-// con un toast que ofrece Undo (restaura el valor previo). sliceKey = clave de initialState.
-function ResetButton({ sliceKey }) {
+// Botón "Reset to defaults": resetea a defaults de fábrica con toast + Undo.
+// - sliceKey: resetea una slice entera de initialState (p.ej. "spacing").
+// - fields: { slice: [keys] } para reset PARCIAL (p.ej. solo heading o solo text).
+const clone = (v) => JSON.parse(JSON.stringify(v));
+function ResetButton({ sliceKey, fields, label = "Reset to defaults" }) {
   const { state, dispatch, addToast } = useDSContext();
   const onReset = () => {
-    const prev = JSON.parse(JSON.stringify(state[sliceKey]));
-    dispatch({ type: "RESET_SLICE", key: sliceKey });
-    addToast("Reset to defaults", "info", { label: "Undo", onClick: () => dispatch({ type: "RESTORE_SLICE", key: sliceKey, value: prev }) });
+    let undo;
+    if (fields) {
+      const defaults = {}, captured = {};
+      Object.entries(fields).forEach(([slice, keys]) => {
+        defaults[slice] = {}; captured[slice] = {};
+        keys.forEach((k) => { defaults[slice][k] = clone(initialState[slice][k]); captured[slice][k] = clone(state[slice][k]); });
+      });
+      dispatch({ type: "RESET_PATCH", patch: defaults });
+      undo = () => dispatch({ type: "RESET_PATCH", patch: captured });
+    } else {
+      const prev = clone(state[sliceKey]);
+      dispatch({ type: "RESET_SLICE", key: sliceKey });
+      undo = () => dispatch({ type: "RESTORE_SLICE", key: sliceKey, value: prev });
+    }
+    addToast("Reset to defaults", "info", { label: "Undo", onClick: undo });
   };
-  return <button className="ds-btn ds-btn-sm" onClick={onReset} data-tip="Restore this step to its default values">↺ Reset to defaults</button>;
+  return <button className="ds-btn ds-btn-sm" onClick={onReset} data-tip="Restore these values to defaults">↺ {label}</button>;
 }
+const TYPO_HEADING_RESET = { typography: ["headingScale", "headingBaseMob", "headingBaseDesk", "headings", "lineHeightHeading", "lsHeading", "lsHeadingUnit"], styles: ["headingWeight", "headingColor"] };
+const TYPO_TEXT_RESET = { typography: ["textScale", "textBaseMob", "textBaseDesk", "texts", "lineHeightBody", "lsBody", "lsBodyUnit"], styles: ["textWeight", "textColor"] };
 // Diagrama LITERAL del escalado: curva clamp lineal a trozos (plano-rampa-plano),
 // con ejes y los breakpoints reales del viewport. Ultrawide = continuación punteada.
 function ScalingDiagram({ minVp, maxVp, ultrawide }) {
@@ -1520,7 +1537,8 @@ function StepTypography() {
     </div>
     <ValidationAlert items={warns} />
     {/* HEADINGS */}
-    <div className="ds-card"><h4>Headings (base: h3)</h4>
+    <div className="ds-card">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}><h4 style={{ margin: 0 }}>Headings (base: h3)</h4><ResetButton fields={TYPO_HEADING_RESET} label="Reset headings" /></div>
       {t.useScale && (<div className="ds-grid-3" style={{ marginBottom: 16 }}>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>h3 Mobile</label><NumStepper value={t.headingBaseMob} set={(n) => dispatch({ type: "RECALC_HEADINGS", baseMob: n, baseDesk: t.headingBaseDesk, scale: t.headingScale })} min={0} /></div>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>h3 Desktop</label><NumStepper value={t.headingBaseDesk} set={(n) => dispatch({ type: "RECALC_HEADINGS", baseMob: t.headingBaseMob, baseDesk: n, scale: t.headingScale })} min={0} /></div>
@@ -1540,7 +1558,8 @@ function StepTypography() {
       </div>))}
     </div>
     {/* TEXT SIZES */}
-    <div className="ds-card"><h4>Text sizes (base: text-m)</h4>
+    <div className="ds-card">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}><h4 style={{ margin: 0 }}>Text sizes (base: text-m)</h4><ResetButton fields={TYPO_TEXT_RESET} label="Reset text" /></div>
       {t.useScale && (<div className="ds-grid-3" style={{ marginBottom: 16 }}>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>text-m Mobile</label><NumStepper value={t.textBaseMob} set={(n) => dispatch({ type: "RECALC_TEXTS", baseMob: n, baseDesk: t.textBaseDesk, scale: t.textScale })} min={0} /></div>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>text-m Desktop</label><NumStepper value={t.textBaseDesk} set={(n) => dispatch({ type: "RECALC_TEXTS", baseMob: t.textBaseMob, baseDesk: n, scale: t.textScale })} min={0} /></div>
@@ -1677,7 +1696,7 @@ function TransparencySection({ label, color, bgColor, field }) {
 function StepColors() {
   const { state, dispatch } = useDSContext();
   return (<div>
-    <div style={{ marginBottom: 16 }}><button className="ds-btn ds-btn-primary" onClick={() => dispatch({ type: "ADD_PALETTE" })}><Ico name="plus" />Add palette</button></div>
+    <div style={{ marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}><button className="ds-btn ds-btn-primary" onClick={() => dispatch({ type: "ADD_PALETTE" })}><Ico name="plus" />Add palette</button><ResetButton sliceKey="colors" /></div>
     {state.colors.palettes.map((p) => <PaletteCard key={p.id} palette={p} />)}
     <TransparencySection label="White" color="#ffffff" bgColor="#ffffff" field="whiteTransparency" />
     <TransparencySection label="Black" color="#000000" bgColor="#000000" field="blackTransparency" />
@@ -1701,8 +1720,8 @@ function StepGaps() {
   if (bad.length) warns.push({ type: "warn", msg: "Invalid format for " + bad.map(f => f.label).join(", ") + ". Use a number (e.g. 16) or var(--name)" });
   return (<div>
     <div className="ds-card">
-      <h4>Gaps</h4>
-      <div className="ds-helper" style={{ marginBottom: 16 }}>Enter a pixel value (e.g. 16) or a variable reference (e.g. var(--space-m))</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}><h4 style={{ margin: 0 }}>Gaps</h4><ResetButton sliceKey="gaps" /></div>
+      <div className="ds-helper" style={{ margin: "8px 0 16px" }}>Enter a pixel value (e.g. 16) or a variable reference (e.g. var(--space-m))</div>
       <ValidationAlert items={warns} />
       {fields.map((f) => (<div key={f.key} className="ds-form-group" style={{ marginBottom: 12 }}>
         <label>{f.label}</label>
@@ -1728,7 +1747,8 @@ function StepRadius() {
   const { state, dispatch } = useDSContext();
   const r = state.radius;
   return (<div>
-    <div className="ds-card"><h4>Base radius</h4>
+    <div className="ds-card">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}><h4 style={{ margin: 0 }}>Base radius</h4><ResetButton sliceKey="radius" /></div>
       <div className="ds-form-group"><label>Base value (px) — maps to --radius-m</label>
         <NumStepper value={r.base} set={(n) => dispatch({ type: "RECALC_RADIUS", base: n })} min={0} />
       </div>
