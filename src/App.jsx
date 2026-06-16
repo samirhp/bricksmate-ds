@@ -511,8 +511,8 @@ const css_styles = `
   .ds-cl-ver{font-size:14px;font-weight:700;color:var(--ds-text)}
   .ds-cl-date{font-size:11.5px;color:var(--ds-text-3)}
   .ds-cl-items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
-  .ds-cl-items li{display:flex;gap:9px;align-items:flex-start;font-size:13px;color:var(--ds-text-2);line-height:1.45}
-  .ds-cl-tag{flex-shrink:0;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:2px 7px;border-radius:5px;margin-top:1px}
+  .ds-cl-items li{display:grid;grid-template-columns:74px 1fr;gap:10px;align-items:start;font-size:13px;color:var(--ds-text-2);line-height:1.45}
+  .ds-cl-tag{justify-self:start;white-space:nowrap;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:2px 7px;border-radius:5px;margin-top:1px}
   .ds-cl-tag.new{color:var(--ds-accent);background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring)}
   .ds-cl-tag.imp{color:#4aa3ff;background:rgba(74,163,255,.1);border:1px solid rgba(74,163,255,.35)}
   .ds-cl-tag.fix{color:var(--ds-success);background:hsla(142,64%,46%,.1);border:1px solid hsla(142,64%,46%,.4)}
@@ -1146,12 +1146,19 @@ function GuestBanner({ onSignIn }) {
     </div>
   );
 }
-const APP_VERSION = "v1.0";
+const APP_VERSION = "v1.1";
 // Changelog (user-facing). Lo último arriba. tag: new | improved | fixed.
 // REGLA: SOLO cambios de cara al usuario. NUNCA incluir nada de backend/infra
 // (Vercel, Supabase, analytics, hosting, claves, etc.).
 const CL_TAGS = { new: { label: "New", cls: "new" }, improved: { label: "Improved", cls: "imp" }, fixed: { label: "Fixed", cls: "fix" } };
 const CHANGELOG = [
+  {
+    v: "1.1", date: "16 Jun 2026",
+    items: [
+      { tag: "improved", text: "Header offset is now fluid (mobile → desktop) and applied directly — set it to your sticky-header height for accurate #id anchor scrolling." },
+      { tag: "new", text: "Optional “Header height script” in Export — measures your real header so #id anchors stay pixel-perfect across breakpoints and sticky-shrink." },
+    ],
+  },
   {
     v: "1.0", date: "16 Jun 2026",
     items: [
