@@ -2228,7 +2228,7 @@ function generateFrameworkCSS(state, systemName) {
 
   css += "/* — Base & smooth scroll ————————————————— */\n";
   css += "html {\n  scroll-behavior: smooth;\n}\n";
-  css += "[id] {\n  scroll-margin-top: " + v('offset') + ";\n}\n";
+  css += "[id] {\n  scroll-margin-top: var(--header-h, " + v('offset') + ");\n}\n";
   css += "ul {\n  margin: 0;\n  padding: 0;\n}\n\n";
 
   css += "/* — Accessibility (keyboard focus) ——————— */\n";
