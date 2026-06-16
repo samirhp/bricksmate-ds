@@ -1,5 +1,14 @@
 import { useState, useEffect, useContext, useReducer, createContext, useMemo, useRef, Component } from "react";
 import { supabase, cloudEnabled } from "./supabase";
+import { PrismLight as SyntaxHighlighter } from "react-syntax-highlighter";
+import prismJs from "react-syntax-highlighter/dist/esm/languages/prism/javascript";
+import prismMarkup from "react-syntax-highlighter/dist/esm/languages/prism/markup";
+import prismCss from "react-syntax-highlighter/dist/esm/languages/prism/css";
+import prismTheme from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
+// Snippet bank-ready: registramos solo los lenguajes que usamos (bundle lean).
+SyntaxHighlighter.registerLanguage("javascript", prismJs);
+SyntaxHighlighter.registerLanguage("markup", prismMarkup);
+SyntaxHighlighter.registerLanguage("css", prismCss);
 
 const MAX_SYSTEMS = 5; // tope de sistemas por cuenta (también aplicado a invitados, y en la BD via trigger)
 
@@ -622,6 +631,11 @@ const css_styles = `
   .ds-export-file-card h4{font-size:14px;font-weight:600;margin-bottom:4px}
   .ds-export-file-card>p{font-size:12px;color:var(--ds-text-2);margin-bottom:14px;line-height:1.5}
   .ds-export-file-card .ds-download-btn{font-size:13px;padding:9px 14px;margin-top:auto}
+  .ds-editor{border:1px solid var(--ds-border);border-radius:var(--ds-radius);overflow:hidden;background:#0c0c0e}
+  .ds-editor-bar{display:flex;align-items:center;gap:7px;padding:8px 12px;background:#141416;border-bottom:1px solid #222226}
+  .ds-editor-bar .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  .ds-editor-name{margin-left:6px;font-size:11px;color:#7a7a82;font-family:'SF Mono',Consolas,monospace}
+  .ds-editor pre{margin:0!important;border-radius:0!important}
   .ds-resize-handle{position:absolute;top:0;bottom:0;right:-20px;width:20px;display:flex;align-items:center;justify-content:center;cursor:ew-resize;touch-action:none}
   .ds-grip{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:13px;height:56px;border-radius:7px;background:var(--ds-accent);box-shadow:0 2px 10px var(--ds-accent-ring);animation:ds-grip-pulse 2.2s ease-in-out infinite;transition:height .15s,box-shadow .15s}
   .ds-grip i{width:3px;height:3px;border-radius:50%;background:rgba(255,255,255,.92)}
@@ -2746,6 +2760,53 @@ function CrossPromoEditor({ value, onSave }) {
   );
 }
 
+const HEADER_SCRIPT = `<script>
+(function () {
+  // Adjust this to your sticky header's selector.
+  var HEADER = '#brx-header, header.brxe-header, header';
+  var header = document.querySelector(HEADER);
+  if (!header) return;
+  var root = document.documentElement;
+  function setH() { root.style.setProperty('--header-h', Math.round(header.offsetHeight) + 'px'); }
+  setH();
+  if ('ResizeObserver' in window) new ResizeObserver(setH).observe(header);
+  window.addEventListener('resize', setH);
+  window.addEventListener('load', setH);
+})();
+</script>`;
+// Editor de código reutilizable (Prism light). language: markup | javascript | css …
+function CodeEditor({ code, name, language = "markup" }) {
+  return (
+    <div className="ds-editor">
+      <div className="ds-editor-bar">
+        <span className="dot" style={{ background: "#f7544f" }} /><span className="dot" style={{ background: "#f9b94e" }} /><span className="dot" style={{ background: "#54c93f" }} />
+        <span className="ds-editor-name">{name}</span>
+      </div>
+      <SyntaxHighlighter language={language} style={prismTheme} showLineNumbers
+        customStyle={{ margin: 0, background: "transparent", padding: "12px 14px", fontSize: 11.5, lineHeight: 1.6 }}
+        codeTagProps={{ style: { fontFamily: "'SF Mono',Consolas,monospace", fontSize: 11.5 } }}
+        lineNumberStyle={{ minWidth: "2.2em", paddingRight: "1em", color: "#52525b", opacity: 0.8 }}>
+        {code}
+      </SyntaxHighlighter>
+    </div>
+  );
+}
+function HeaderScriptCard() {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(HEADER_SCRIPT); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch {}
+  };
+  return (
+    <div className="ds-export-file-card" style={{ marginTop: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <h4 style={{ marginBottom: 4 }}>Header height script <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— optional, for pixel-perfect anchor scroll</span></h4>
+        <button className="ds-btn ds-btn-sm" onClick={copy} style={{ flexShrink: 0 }}>{copied ? "✓ Copied" : "⧉ Copy"}</button>
+      </div>
+      <p style={{ marginBottom: 10 }}>Measures your sticky header and sets <code style={{ fontFamily: "'SF Mono',monospace" }}>--header-h</code> live, so <code style={{ fontFamily: "'SF Mono',monospace" }}>#id</code> anchors stay perfect across breakpoints &amp; sticky-shrink. Optional — without it the framework CSS falls back to <code style={{ fontFamily: "'SF Mono',monospace" }}>--offset</code>. Paste in <strong>Bricks → Settings → Custom Code → Body scripts</strong>, and set the header selector to your site.</p>
+      <CodeEditor code={HEADER_SCRIPT} name="header-offset.js" />
+    </div>
+  );
+}
 function StepExport() {
   const { state, dispatch, addToast, systemName, user, openAuth } = useDSContext();
   const [status, setStatus] = useState(null);
@@ -2820,6 +2881,7 @@ function StepExport() {
         );
       })}
     </div>
+    <HeaderScriptCard />
     {status?.type === "ok"    && <div className="ds-status ok">✓ {status.file} downloaded successfully</div>}
     {status?.type === "error" && <div className="ds-status" style={{ background: "rgba(220,53,69,.08)", color: "var(--ds-error)", border: "1px solid var(--ds-error)" }}>⚠ Error: {status.msg}</div>}
   </div>);
