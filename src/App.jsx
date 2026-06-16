@@ -50,6 +50,12 @@ function sizeAtVP(min, max, s, vp) {
   return Math.round(Math.max(lo, Math.min(hi, mn + (mx - mn) * tt)) * 100) / 100;
 }
 function slugify(str) { return str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "color"; }
+// Header offset (altura del header sticky). Compat: sistemas antiguos lo guardaban como número.
+function getOffset(s) {
+  const o = s && s.offset;
+  if (typeof o === "number") return { mobile: Math.round(o * 0.7), desktop: o };
+  return { mobile: o?.mobile ?? 56, desktop: o?.desktop ?? 80 };
+}
 function hslToHex(h, s, l) {
   s /= 100; l /= 100;
   const a = s * Math.min(l, 1 - l);
@@ -242,7 +248,7 @@ const initialState = {
   },
   gutter: { mobile: 16, desktop: 64 },
   sectionPadding: { y: "section-space-l", x: "gutter" },
-  offset: 80,
+  offset: { mobile: 56, desktop: 80 }, // altura del header sticky (móvil/desktop) → scroll de anclas
   styles: { textColor: "var(--black)", headingColor: "var(--black)", textWeight: 400, headingWeight: 700 },
   typography: {
     useScale: true,
@@ -1432,9 +1438,12 @@ function StepLayout() {
         <div className="ds-toggle-text"><strong>Ultrawide display scaling</strong><span>Let the big headings (h1, h2) keep growing past your max viewport on very wide screens.</span></div>
       </div>)}
     </div>)}
-    {layoutMode && (<div className="ds-viewport-config" style={{ marginTop: 14 }}><h4>Header &amp; structure</h4>
-      <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Header offset (px) <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— --offset, for anchor scroll</span></label><NumStepper value={state.offset ?? 80} set={(n) => dispatch({ type: "SET_FIELD", field: "offset", value: Math.max(0, n) })} min={0} step={4} /><div className="ds-helper">Sticky header height. Anchored sections offset by --offset so they don't hide under it.</div></div>
-    </div>)}
+    {layoutMode && (() => { const off = getOffset(state); return (<div className="ds-viewport-config" style={{ marginTop: 14 }}><h4>Header offset <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 13 }}>— --offset</span></h4>
+      <div className="ds-viewport-row" style={{ marginBottom: 0 }}>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Mobile (px)</label><NumStepper value={off.mobile} set={(n) => dispatch({ type: "SET_FIELD", field: "offset", value: { ...off, mobile: Math.max(0, n) } })} min={0} step={4} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Desktop (px)</label><NumStepper value={off.desktop} set={(n) => dispatch({ type: "SET_FIELD", field: "offset", value: { ...off, desktop: Math.max(0, n) } })} min={0} step={4} /></div>
+      </div>
+      <div className="ds-helper" style={{ marginTop: 8 }}>Your sticky header's height. Anchored sections (<code style={{ fontFamily: "'SF Mono',monospace" }}>#id</code> links) stop below the header instead of behind it. Fluid between mobile and desktop, used directly as the scroll offset. Set it to 0 if your header isn't sticky.</div></div>); })()}
   </div>);
 }
 
@@ -2047,7 +2056,7 @@ function generateVariablesJSON(state) {
     vars.push(mk('heading-color', st.headingColor || '#111827', 'Styles'));
     vars.push(mk('text-weight', String(st.textWeight || 400), 'Styles'));
     vars.push(mk('heading-weight', String(st.headingWeight || 700), 'Styles'));
-    vars.push(mk('offset', (state.offset ?? 80) + 'px', 'Styles'));
+    { const off = getOffset(state); vars.push(mk('offset', flRem(off.mobile, off.desktop, state), 'Styles')); }
   }
 
   // Categorías con metadata de escala para que Bricks muestre el escalado visual
@@ -2219,7 +2228,7 @@ function generateFrameworkCSS(state, systemName) {
 
   css += "/* — Base & smooth scroll ————————————————— */\n";
   css += "html {\n  scroll-behavior: smooth;\n}\n";
-  css += "[id] {\n  scroll-margin-top: calc(" + v('offset') + " / 1.6);\n}\n";
+  css += "[id] {\n  scroll-margin-top: " + v('offset') + ";\n}\n";
   css += "ul {\n  margin: 0;\n  padding: 0;\n}\n\n";
 
   css += "/* — Accessibility (keyboard focus) ——————— */\n";
