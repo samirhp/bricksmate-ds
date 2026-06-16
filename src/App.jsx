@@ -486,7 +486,21 @@ const css_styles = `
   .ds-app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
   .ds-header{background:var(--ds-bg-card);border-bottom:1px solid var(--ds-border-light);padding:0 24px;height:54px;display:flex;align-items:center;gap:12px;box-shadow:var(--ds-shadow)}
   .ds-header-icon{width:30px;height:30px;border-radius:var(--ds-radius);flex-shrink:0;display:block}
-  .ds-ver-pill{font-size:10px;font-weight:600;color:var(--ds-accent);background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring);border-radius:4px;padding:2px 7px;letter-spacing:.3px;flex-shrink:0;font-family:'SF Mono',Consolas,monospace}
+  .ds-ver-pill{position:relative;font-size:10px;font-weight:600;color:var(--ds-accent);background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring);border-radius:4px;padding:2px 7px;letter-spacing:.3px;flex-shrink:0;font-family:'SF Mono',Consolas,monospace;cursor:pointer;transition:border-color .15s,background .15s}
+  .ds-ver-pill:hover{border-color:var(--ds-accent)}
+  .ds-ver-dot{position:absolute;top:-3px;right:-3px;width:6px;height:6px;border-radius:50%;background:var(--ds-accent);border:1px solid var(--ds-bg-card)}
+  .ds-changelog{max-width:520px}
+  .ds-changelog>p{margin-bottom:0}
+  .ds-cl-list{margin-top:16px;max-height:58vh;overflow-y:auto;display:flex;flex-direction:column;gap:20px;padding-right:4px}
+  .ds-cl-relhead{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+  .ds-cl-ver{font-size:14px;font-weight:700;color:var(--ds-text)}
+  .ds-cl-date{font-size:11.5px;color:var(--ds-text-3)}
+  .ds-cl-items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+  .ds-cl-items li{display:flex;gap:9px;align-items:flex-start;font-size:13px;color:var(--ds-text-2);line-height:1.45}
+  .ds-cl-tag{flex-shrink:0;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:2px 7px;border-radius:5px;margin-top:1px}
+  .ds-cl-tag.new{color:var(--ds-accent);background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring)}
+  .ds-cl-tag.imp{color:#4aa3ff;background:rgba(74,163,255,.1);border:1px solid rgba(74,163,255,.35)}
+  .ds-cl-tag.fix{color:var(--ds-success);background:hsla(142,64%,46%,.1);border:1px solid hsla(142,64%,46%,.4)}
   .ds-wordmark{font-size:14px;font-weight:600;letter-spacing:-.01em;flex-shrink:0}
   .ds-saved-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--ds-success);background:hsla(142,64%,46%,.1);border:1px solid hsla(142,64%,46%,.45);border-radius:5px;padding:5px 11px 5px 8px;white-space:nowrap}
   .ds-dsname{margin:0 2px 12px;padding-bottom:12px;border-bottom:1px solid var(--ds-border-light)}
@@ -1113,12 +1127,65 @@ function GuestBanner({ onSignIn }) {
   );
 }
 const APP_VERSION = "v1.0";
+// Changelog (user-facing). Lo último arriba. tag: new | improved | fixed.
+// REGLA: SOLO cambios de cara al usuario. NUNCA incluir nada de backend/infra
+// (Vercel, Supabase, analytics, hosting, claves, etc.).
+const CL_TAGS = { new: { label: "New", cls: "new" }, improved: { label: "Improved", cls: "imp" }, fixed: { label: "Fixed", cls: "fix" } };
+const CHANGELOG = [
+  {
+    v: "1.0", date: "16 Jun 2026",
+    items: [
+      { tag: "new", text: "Fluid scaling rebuilt — full-width uses editable master viewport variables; fixed-width anchors to a --content-width token, with optional ultrawide scaling for big headings." },
+      { tag: "new", text: "Letter-spacing controls for text and headings (em / rem / px)." },
+      { tag: "new", text: "Per-step “Reset to defaults”, with one-click Undo." },
+      { tag: "new", text: "Section padding as a token, per-palette button colours (fill & outline), and a “No radius” button option." },
+      { tag: "improved", text: "Refreshed dark UI — deeper background, flat cards, subtler corners, accent primary buttons and a profile dropdown." },
+      { tag: "improved", text: "Mobile-friendly dashboard, sign-in and account screens." },
+      { tag: "improved", text: "Live-preview variable inspector and cleaner export naming." },
+    ],
+  },
+];
+function ChangelogModal({ onClose }) {
+  return (
+    <div className="ds-modal-overlay" onClick={onClose}>
+      <div className="ds-modal ds-changelog" onClick={(e) => e.stopPropagation()}>
+        <button className="ds-modal-x" onClick={onClose} aria-label="Close">✕</button>
+        <h3>What's new</h3>
+        <p>Updates, improvements &amp; fixes to BricksMate DS.</p>
+        <div className="ds-cl-list">
+          {CHANGELOG.map((rel) => (
+            <div key={rel.v} className="ds-cl-rel">
+              <div className="ds-cl-relhead"><span className="ds-cl-ver">v{rel.v}</span><span className="ds-cl-date">{rel.date}</span></div>
+              <ul className="ds-cl-items">
+                {rel.items.map((it, i) => { const t = CL_TAGS[it.tag] || CL_TAGS.new; return (
+                  <li key={i}><span className={"ds-cl-tag " + t.cls}>{t.label}</span><span>{it.text}</span></li>
+                ); })}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+// Pill de versión clicable → abre el changelog. Muestra un punto si hay versión sin ver.
+function VersionPill() {
+  const [open, setOpen] = useState(false);
+  const latest = CHANGELOG[0]?.v;
+  const [seen, setSeen] = useState(() => { try { return localStorage.getItem("dsg-cl-seen"); } catch { return null; } });
+  const isNew = !!latest && seen !== latest;
+  const onOpen = () => { setOpen(true); try { localStorage.setItem("dsg-cl-seen", latest); } catch {} setSeen(latest); };
+  return (<>
+    <button className="ds-ver-pill" onClick={onOpen} data-tip="What's new">{APP_VERSION}{isNew && <span className="ds-ver-dot" />}</button>
+    {open && <ChangelogModal onClose={() => setOpen(false)} />}
+  </>);
+}
 function EditorHeader({ onBack, autoSave, onToggleAutoSave, dirty, onSave, darkMode, toggleDark, user, onAuth, onAccount, onSignOut, isAdmin, onOpenAdmin }) {
   return (<header className="ds-header">
     <button className="ds-header-back" onClick={onBack} data-tip="Back to my systems">←</button>
     <BrandMark />
     <span className="ds-wordmark">BricksMate DS</span>
-    <span className="ds-ver-pill">{APP_VERSION}</span>
+    <VersionPill />
     <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
       <div className="ds-autosave" onClick={onToggleAutoSave} data-tip="Save changes automatically on every edit">
         <div className={"ds-toggle-track" + (autoSave ? " on" : "")}><div className="ds-toggle-thumb" /></div>
@@ -2820,7 +2887,7 @@ function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, 
     <header className="ds-header">
       <BrandMark />
       <span className="ds-wordmark">BricksMate DS</span>
-      <span className="ds-ver-pill">{APP_VERSION}</span>
+      <VersionPill />
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
         <AuthControl user={user} isAdmin={isAdmin} onAuth={onAuth} onAccount={onAccount} onSignOut={onSignOut} onOpenAdmin={onOpenAdmin} />
         <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode"><ThemeIcon dark={darkMode} /></button>
@@ -2881,7 +2948,7 @@ function AdminUsers({ onBack, darkMode, toggleDark, addToast, selfId, crossPromo
       <button className="ds-header-back" onClick={onBack} data-tip="Back to my systems">←</button>
       <BrandMark />
       <span className="ds-wordmark">BricksMate DS</span>
-      <span className="ds-ver-pill">{APP_VERSION}</span>
+      <VersionPill />
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
         <AuthControl user={user} isAdmin={isAdmin} onAccount={onAccount} onSignOut={onSignOut} />
         <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode"><ThemeIcon dark={darkMode} /></button>
@@ -2954,7 +3021,7 @@ function AccountView({ user, onBack, darkMode, toggleDark, addToast, onSignOut, 
       <button className="ds-header-back" onClick={onBack} data-tip="Back to my systems">←</button>
       <BrandMark />
       <span className="ds-wordmark">BricksMate DS</span>
-      <span className="ds-ver-pill">{APP_VERSION}</span>
+      <VersionPill />
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
         <AuthControl user={user} isAdmin={isAdmin} onAccount={onAccount} onSignOut={onSignOut} onOpenAdmin={onOpenAdmin} />
         <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode"><ThemeIcon dark={darkMode} /></button>
