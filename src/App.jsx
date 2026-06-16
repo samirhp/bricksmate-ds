@@ -8,13 +8,27 @@ const MAX_SYSTEMS = 5; // tope de sistemas por cuenta (también aplicado a invit
    ================================================================ */
 // px → número rem limpio (sin ceros sobrantes), base 16px
 const remNum = (px) => parseFloat((Number(px) / 16).toFixed(4));
-// Clamp fluido PARAMETRIZADO: la pendiente/intercepto se expresan con las variables
-// maestras de viewport (--vp-min / --vp-max / --vp-range) en vez de hornear los números.
-// Cambiar esas maestras reescala TODO el sistema (también tras exportar, editándolas en Bricks).
-// ceilPx (opcional, ultrawide) sube el tope superior del clamp para que los tokens display
-// sigan creciendo más allá del vpMax, manteniendo la misma pendiente.
+// Clamp clásico HORNEADO (en rem) — modo fixed: el ancla es --content-width, no un rango maestro.
+function flRemBaked(min, max, s) {
+  const mn = Number(min), mx = Number(max);
+  if (!isFinite(mn) || !isFinite(mx)) return (isFinite(mn) ? remNum(mn) : 0) + "rem";
+  if (mn === mx) return remNum(mn) + "rem";
+  const loPx = Math.min(mn, mx), hiPx = Math.max(mn, mx);
+  const mnVP = Number(s.minViewport), mxVP = Number(s.maxViewport);
+  if (!(mxVP > mnVP)) return remNum(hiPx) + "rem";
+  const slope = (hiPx - loPx) / (mxVP - mnVP);          // px/px, adimensional
+  const interceptPx = loPx - slope * mnVP;
+  const f = (n) => parseFloat(n.toFixed(4));
+  return "clamp(" + remNum(loPx) + "rem, calc(" + remNum(interceptPx) + "rem + " + f(slope * 100) + "vw), " + remNum(hiPx) + "rem)";
+}
+// Clamp fluido PARAMETRIZADO (modo full-width): la pendiente/intercepto se expresan con las
+// variables maestras (--vp-min / --vp-max / --vp-range) en vez de hornear los números, así
+// editar esas maestras reescala TODO el sistema (también tras exportar, en Bricks).
+// ceilPx (opcional, ultrawide) sube el tope del clamp para que los display sigan creciendo > vpMax.
 // Las var() salen SIN prefijo aquí; `pv()` les añade el varPrefix al exportar.
+// En modo fixed delega en el clamp clásico horneado (ancla = content-width).
 function flRem(min, max, s, ceilPx) {
+  if (s && s.layoutMode === "fixed") return flRemBaked(min, max, s);
   const a = remNum(min), b = remNum(max);
   if (!isFinite(a) || !isFinite(b)) return (isFinite(a) ? a : 0) + "rem";
   if (a === b) return a + "rem"; // estático, sin clamp
@@ -537,6 +551,8 @@ const css_styles = `
   .ds-mode-info{background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring);border-radius:var(--ds-radius);padding:11px 14px;font-size:12.5px;line-height:1.55;color:var(--ds-text-2);margin-bottom:18px}
   .ds-mode-info strong{color:var(--ds-text)}
   .ds-mode-info .sub{display:block;margin-top:6px;color:var(--ds-text-3);font-size:11.5px}
+  .ds-curve-toggle{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:0;border:none;background:none;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:500;color:var(--ds-accent)}
+  .ds-curve-toggle:hover{text-decoration:underline}
   .ds-mode-card h3{font-size:14px;font-weight:600;margin-bottom:4px} .ds-mode-card p{font-size:12px;color:var(--ds-text-2);line-height:1.5}
   .ds-viewport-config{background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:18px;margin-bottom:16px;box-shadow:var(--ds-shadow)} .ds-viewport-config h4{font-size:13px;font-weight:600;margin-bottom:14px}
   .ds-viewport-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
@@ -1243,23 +1259,47 @@ function LayoutIcon({ mode }) {
   );
 }
 
-// Diagrama ilustrativo del escalado: rampa fluida vpMin→vpMax y luego plano (o sigue en ultrawide)
+// Diagrama LITERAL del escalado: curva clamp lineal a trozos (plano-rampa-plano),
+// con ejes y los breakpoints reales del viewport. Ultrawide = continuación punteada.
 function ScalingDiagram({ minVp, maxVp, ultrawide }) {
+  const dataMax = Math.max(maxVp * 1.45, maxVp + 200);
+  const X0 = 46, X1 = 344, Y0 = 28, Y1 = 158;
+  const xp = (v) => X0 + (v / dataMax) * (X1 - X0);
+  const yMin = 136, yMax = 50; // posiciones del token min/max
+  const xMin = xp(minVp), xMax = xp(maxVp);
+  const slope = (yMax - yMin) / (xMax - xMin || 1);
+  const uwY = Math.max(16, yMax + slope * (X1 - xMax));
+  const g = (x) => Math.round(x * 10) / 10;
   return (
-    <svg viewBox="0 0 300 96" style={{ width: "100%", maxWidth: 340, display: "block", marginTop: 10 }} aria-hidden="true">
-      <line x1="16" y1="74" x2="292" y2="74" stroke="var(--ds-border)" strokeWidth="1" />
-      <line x1="212" y1="12" x2="212" y2="74" stroke="var(--ds-border)" strokeWidth="1" strokeDasharray="3 3" />
-      <path d="M16 64 L212 24 L292 24" fill="none" stroke="var(--ds-accent)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-      {ultrawide && <path d="M212 24 L292 9" fill="none" stroke="var(--ds-accent)" strokeWidth="2" strokeDasharray="4 3" strokeLinecap="round" opacity="0.8" />}
-      <text x="16" y="90" fontSize="9" fill="var(--ds-text-3)" fontFamily="'SF Mono',Consolas,monospace">{minVp}px</text>
-      <text x="212" y="90" fontSize="9.5" fill="var(--ds-text-2)" fontFamily="'SF Mono',Consolas,monospace" textAnchor="middle">{maxVp}px</text>
-      <text x="292" y="90" fontSize="9" fill="var(--ds-text-3)" textAnchor="end">wider →</text>
+    <svg viewBox="0 0 360 186" style={{ width: "100%", maxWidth: 360, display: "block", marginTop: 10 }} aria-hidden="true">
+      <line x1={X0} y1={Y0} x2={X0} y2={Y1} stroke="var(--ds-border)" strokeWidth="1" />
+      <line x1={X0} y1={Y1} x2={X1} y2={Y1} stroke="var(--ds-border)" strokeWidth="1" />
+      <line x1={X0} y1={yMin} x2={X1} y2={yMin} stroke="var(--ds-border-light)" strokeWidth="1" strokeDasharray="2 3" />
+      <line x1={X0} y1={yMax} x2={X1} y2={yMax} stroke="var(--ds-border-light)" strokeWidth="1" strokeDasharray="2 3" />
+      <line x1={g(xMin)} y1={Y0} x2={g(xMin)} y2={Y1} stroke="var(--ds-border-light)" strokeWidth="1" strokeDasharray="2 3" />
+      <line x1={g(xMax)} y1={Y0} x2={g(xMax)} y2={Y1} stroke="var(--ds-border-light)" strokeWidth="1" strokeDasharray="2 3" />
+      <path d={`M${X0} ${yMin} L${g(xMin)} ${yMin} L${g(xMax)} ${yMax} L${X1} ${yMax}`} fill="none" stroke="var(--ds-accent)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+      {ultrawide && <path d={`M${g(xMax)} ${yMax} L${X1} ${g(uwY)}`} fill="none" stroke="var(--ds-accent)" strokeWidth="2" strokeDasharray="4 3" strokeLinecap="round" opacity="0.85" />}
+      <circle cx={g(xMin)} cy={yMin} r="3" fill="var(--ds-accent)" />
+      <circle cx={g(xMax)} cy={yMax} r="3" fill="var(--ds-accent)" />
+      <text x={X0 - 5} y={yMin + 3} fontSize="9" fill="var(--ds-text-3)" textAnchor="end">min</text>
+      <text x={X0 - 5} y={yMax + 3} fontSize="9" fill="var(--ds-text-3)" textAnchor="end">max</text>
+      <text x="50" y={Y0 - 4} fontSize="9" fill="var(--ds-text-3)">token size</text>
+      <text x={g(xMin)} y={Y1 + 13} fontSize="9" fill="var(--ds-text-3)" textAnchor="middle" fontFamily="'SF Mono',Consolas,monospace">{minVp}px</text>
+      <text x={g(xMax)} y={Y1 + 13} fontSize="9.5" fill="var(--ds-text-2)" textAnchor="middle" fontFamily="'SF Mono',Consolas,monospace">{maxVp}px</text>
+      <text x={X1} y={Y1 + 13} fontSize="9" fill="var(--ds-text-3)" textAnchor="end">viewport →</text>
+      <text x={(X0 + xMin) / 2} y={yMin - 5} fontSize="8.5" fill="var(--ds-text-3)" textAnchor="middle">flat</text>
+      <text x={(xMin + xMax) / 2} y={(yMin + yMax) / 2 - 4} fontSize="8.5" fill="var(--ds-text-3)" textAnchor="middle">fluid</text>
+      {ultrawide
+        ? <text x={(xMax + X1) / 2} y={yMax - 8} fontSize="8.5" fill="var(--ds-accent)" textAnchor="middle">ultrawide</text>
+        : <text x={(xMax + X1) / 2} y={yMax - 6} fontSize="8.5" fill="var(--ds-text-3)" textAnchor="middle">capped</text>}
     </svg>
   );
 }
 function StepLayout() {
   const { state, dispatch } = useDSContext();
   const { layoutMode, minViewport, maxViewport } = state;
+  const [showCurve, setShowCurve] = useState(false);
   const warns = [];
   if (layoutMode) {
     if (minViewport >= maxViewport) warns.push({ type: "error", msg: "Min viewport ≥ max viewport — clamp() fallback to static values, fluid scaling won't work" });
@@ -1272,21 +1312,26 @@ function StepLayout() {
     </div>
     {layoutMode && (<div className="ds-mode-info">
       <strong>{layoutMode === "fixed" ? "Fixed-width" : "Full-width"}</strong> — {layoutMode === "fixed"
-        ? "content is capped to a max width and centered. The shared viewport range anchors --vp-max to that content width, so fluid tokens (type, spacing, gaps…) reach their max there — wider screens just add side margins."
+        ? "content is capped to a max width and centered. Fluid tokens (type, spacing, gaps…) use a classic clamp() and lock at your content width — wider screens just add side margins."
         : "content spans the full screen (100%). Every fluid token shares one viewport range (--vp-min → --vp-max) and reaches its max at your max viewport; beyond that it stays flat."}
-      <span className="sub">All tokens interpolate over the same master range, exported as <code style={{ fontFamily: "'SF Mono',monospace" }}>--vp-min</code> / <code style={{ fontFamily: "'SF Mono',monospace" }}>--vp-max</code>. Change the max below and the whole system rescales — even after export, by editing those two variables in Bricks.</span>
-      <ScalingDiagram minVp={minViewport} maxVp={maxViewport} ultrawide={state.ultrawide} />
+      <span className="sub">{layoutMode === "fixed"
+        ? <>Tokens export as baked <code style={{ fontFamily: "'SF Mono',monospace" }}>clamp()</code> values capped at <code style={{ fontFamily: "'SF Mono',monospace" }}>--content-width</code> ({maxViewport}px).</>
+        : <>All tokens interpolate over the same master range, exported as <code style={{ fontFamily: "'SF Mono',monospace" }}>--vp-min</code> / <code style={{ fontFamily: "'SF Mono',monospace" }}>--vp-max</code>. Change the max below and the whole system rescales — even after export, by editing those two variables in Bricks.</>}</span>
+      <button type="button" className="ds-curve-toggle" onClick={() => setShowCurve((v) => !v)}>
+        <span style={{ display: "inline-block", transition: "transform .15s", transform: showCurve ? "rotate(90deg)" : "none" }}>▸</span> How fluid scaling works
+      </button>
+      {showCurve && <ScalingDiagram minVp={minViewport} maxVp={maxViewport} ultrawide={state.ultrawide && layoutMode === "fullwidth"} />}
     </div>)}
     {layoutMode && (<div className="ds-viewport-config"><h4>Viewport range</h4>
       <ValidationAlert items={warns} />
       <div className="ds-viewport-row" style={{ marginBottom: 0 }}>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Min viewport (px) <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— --vp-min</span></label><NumStepper value={minViewport} set={(n) => dispatch({ type: "SET_FIELD", field: "minViewport", value: Math.max(0, n) })} min={0} step={5} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Max viewport (px) <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— --vp-max</span></label><NumStepper value={maxViewport} set={(n) => dispatch({ type: "SET_FIELD", field: "maxViewport", value: Math.max(0, n) })} min={0} step={10} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Min viewport (px) {layoutMode === "fixed" ? <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— scale start</span> : <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— --vp-min</span>}</label><NumStepper value={minViewport} set={(n) => dispatch({ type: "SET_FIELD", field: "minViewport", value: Math.max(0, n) })} min={0} step={5} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label>{layoutMode === "fixed" ? "Content width (px)" : "Max viewport (px)"} <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— {layoutMode === "fixed" ? "--content-width" : "--vp-max"}</span></label><NumStepper value={maxViewport} set={(n) => dispatch({ type: "SET_FIELD", field: "maxViewport", value: Math.max(0, n) })} min={0} step={10} /></div>
       </div>
-      <div className="ds-toggle-row" style={{ marginTop: 14 }} onClick={() => dispatch({ type: "SET_FIELD", field: "ultrawide", value: !state.ultrawide })}>
+      {layoutMode === "fullwidth" && (<div className="ds-toggle-row" style={{ marginTop: 14 }} onClick={() => dispatch({ type: "SET_FIELD", field: "ultrawide", value: !state.ultrawide })}>
         <div className={"ds-toggle-track" + (state.ultrawide ? " on" : "")}><div className="ds-toggle-thumb" /></div>
         <div className="ds-toggle-text"><strong>Ultrawide display scaling</strong><span>Let the big headings (h1, h2) keep growing past your max viewport on very wide screens.</span></div>
-      </div>
+      </div>)}
     </div>)}
     {layoutMode && (<div className="ds-viewport-config" style={{ marginTop: 14 }}><h4>Header &amp; structure</h4>
       <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Header offset (px) <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— --offset, for anchor scroll</span></label><NumStepper value={state.offset ?? 80} set={(n) => dispatch({ type: "SET_FIELD", field: "offset", value: Math.max(0, n) })} min={0} step={4} /><div className="ds-helper">Sticky header height. Anchored sections offset by --offset so they don't hide under it.</div></div>
@@ -1814,12 +1859,17 @@ function generateVariablesJSON(state) {
   const mk = (name, value, cat) => ({ name: pn(name), value: pv(value), id: randId(), category: catIds[cat] });
   const vars = [];
 
-  // Layout — rango maestro de viewport (rem, sin unidad) + contenedores topados.
-  // Editas vp-min/vp-max y reescala todo el sistema fluido (var(--vp-range) es vivo).
-  vars.push(mk('vp-min', String(remNum(state.minViewport)), 'Layout'));
-  vars.push(mk('vp-max', String(remNum(state.maxViewport)), 'Layout'));
-  vars.push(mk('vp-range', 'calc(var(--vp-max) - var(--vp-min))', 'Layout'));
-  vars.push(mk('max-width-main', 'calc(var(--vp-max) * 1rem)', 'Layout'));
+  // Layout — full-width: rango maestro de viewport (editas vp-min/vp-max y reescala todo).
+  //          fixed: el ancla es --content-width y los tokens usan el clamp clásico horneado.
+  if (state.layoutMode === 'fixed') {
+    vars.push(mk('content-width', remNum(state.maxViewport) + 'rem', 'Layout'));
+    vars.push(mk('max-width-main', 'var(--content-width)', 'Layout'));
+  } else {
+    vars.push(mk('vp-min', String(remNum(state.minViewport)), 'Layout'));
+    vars.push(mk('vp-max', String(remNum(state.maxViewport)), 'Layout'));
+    vars.push(mk('vp-range', 'calc(var(--vp-max) - var(--vp-min))', 'Layout'));
+    vars.push(mk('max-width-main', 'calc(var(--vp-max) * 1rem)', 'Layout'));
+  }
   vars.push(mk('max-width-small', '100vw', 'Layout'));
   vars.push(mk('max-width-full', '100%', 'Layout'));
 
@@ -1837,7 +1887,7 @@ function generateVariablesJSON(state) {
   TEXT_KEYS.forEach(k => { const tv = state.typography.texts[k]; if (!tv) return; vars.push(mk('text-' + k, flRem(tv.mobile, tv.desktop, state), 'Texts')); });
   // Headings (fluid clamp, rem)
   ['h1','h2','h3','h4','h5','h6'].forEach(h => { const hv = state.typography.headings[h]; if (!hv) return;
-    const uw = state.ultrawide && (h === 'h1' || h === 'h2'); // display sigue creciendo en ultrawide
+    const uw = state.ultrawide && state.layoutMode === 'fullwidth' && (h === 'h1' || h === 'h2'); // display crece en ultrawide (solo full-width)
     vars.push(mk(h, flRem(hv.mobile, hv.desktop, state, uw ? hv.desktop * 1.3 : null), 'Headings')); });
   // Gaps
   vars.push(mk('grid-gap', gapVal(state.gaps.gridGap), 'Gaps'));
