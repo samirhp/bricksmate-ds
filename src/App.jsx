@@ -6,30 +6,24 @@ const MAX_SYSTEMS = 5; // tope de sistemas por cuenta (también aplicado a invit
 /* ================================================================
    UTILITIES
    ================================================================ */
-function fluidValue(min, max, minVP, maxVP, cap) {
-  const mn = Number(min), mx = Number(max), mnVP = Number(minVP), mxVP = Number(maxVP);
-  // Guard: NaN / Infinity
-  if (!isFinite(mn) || !isFinite(mx) || !isFinite(mnVP) || !isFinite(mxVP)) return (isFinite(mn) ? mn : 0) + "px";
-  // Guard: viewport range inválido → fallback valor móvil
-  if (mnVP >= mxVP) return mn + "px";
-  // Guard: valores idénticos → estático, no hace falta clamp
-  if (mn === mx) return mn + "px";
-  // Guard: rango invertido (mobile > desktop) → swap para que lo < hi
-  const lo = Math.min(mn, mx), hi = Math.max(mn, mx);
-  const slope = (hi - lo) / (mxVP - mnVP);
-  const intercept = lo - slope * mnVP;
-  // Formato limpio: elimina trailing zeros y evita "-0.xx"
-  const fmt = (n, dec) => {
-    const r = Math.round(n * Math.pow(10, dec)) / Math.pow(10, dec);
-    return String(parseFloat((Math.abs(r) < 1e-9 ? 0 : r).toFixed(dec)));
-  };
-  const pref = fmt(intercept, 2) + "px + " + fmt(slope * 100, 4) + "vw";
-  return cap ? "clamp(" + lo + "px, calc(" + pref + "), " + hi + "px)" : "max(" + lo + "px, calc(" + pref + "))";
-}
-function fl(min, max, s) { return fluidValue(min, max, s.minViewport, s.maxViewport, true); }
-function flRem(min, max, s) {
-  const clampPx = fl(min, max, s);
-  return clampPx.replace(/(\d+(?:\.\d+)?)px/g, (_, p) => pxToRem(parseFloat(p)));
+// px → número rem limpio (sin ceros sobrantes), base 16px
+const remNum = (px) => parseFloat((Number(px) / 16).toFixed(4));
+// Clamp fluido PARAMETRIZADO: la pendiente/intercepto se expresan con las variables
+// maestras de viewport (--vp-min / --vp-max / --vp-range) en vez de hornear los números.
+// Cambiar esas maestras reescala TODO el sistema (también tras exportar, editándolas en Bricks).
+// ceilPx (opcional, ultrawide) sube el tope superior del clamp para que los tokens display
+// sigan creciendo más allá del vpMax, manteniendo la misma pendiente.
+// Las var() salen SIN prefijo aquí; `pv()` les añade el varPrefix al exportar.
+function flRem(min, max, s, ceilPx) {
+  const a = remNum(min), b = remNum(max);
+  if (!isFinite(a) || !isFinite(b)) return (isFinite(a) ? a : 0) + "rem";
+  if (a === b) return a + "rem"; // estático, sin clamp
+  const lo = Math.min(a, b), hi = Math.max(a, b);
+  const ceil = (ceilPx != null && isFinite(Number(ceilPx))) ? Math.max(hi, remNum(ceilPx)) : hi;
+  const delta = +(hi - lo).toFixed(4);
+  const slope = "(" + delta + " / var(--vp-range))";
+  const pref = "calc((" + lo + " - " + slope + " * var(--vp-min)) * 1rem + " + slope + " * 100vw)";
+  return "clamp(" + lo + "rem, " + pref + ", " + ceil + "rem)";
 }
 // Evalúa un valor fluido (mobile→desktop) a un viewport concreto, en px. Para el preview "device".
 function sizeAtVP(min, max, s, vp) {
@@ -62,7 +56,6 @@ function hslStrToHex(str) {
   return m ? hslToHex(+m[1], +m[2], +m[3]) : '#000000';
 }
 const toHexColor = (v) => (v && v.startsWith('#')) ? v : hslStrToHex(v);
-function pxToRem(px) { return (px / 16).toFixed(3).replace(/\.?0+$/, '') + 'rem'; }
 
 const SCALES = [
   { name: "Minor Second", value: 1.067 }, { name: "Major Second", value: 1.125 },
@@ -224,7 +217,7 @@ const initVariants = (h, s, l) => {
 
 const initialState = {
   currentStep: 1,
-  layoutMode: "", minViewport: 375, maxViewport: 1920,
+  layoutMode: "", minViewport: 375, maxViewport: 1920, ultrawide: false,
   spacing: {
     baseMobile: 20, baseDesktop: 24, scale: 1.5,
     values: initSpaceVals(20, 24, 1.5),
@@ -1250,6 +1243,20 @@ function LayoutIcon({ mode }) {
   );
 }
 
+// Diagrama ilustrativo del escalado: rampa fluida vpMin→vpMax y luego plano (o sigue en ultrawide)
+function ScalingDiagram({ minVp, maxVp, ultrawide }) {
+  return (
+    <svg viewBox="0 0 300 96" style={{ width: "100%", maxWidth: 340, display: "block", marginTop: 10 }} aria-hidden="true">
+      <line x1="16" y1="74" x2="292" y2="74" stroke="var(--ds-border)" strokeWidth="1" />
+      <line x1="212" y1="12" x2="212" y2="74" stroke="var(--ds-border)" strokeWidth="1" strokeDasharray="3 3" />
+      <path d="M16 64 L212 24 L292 24" fill="none" stroke="var(--ds-accent)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+      {ultrawide && <path d="M212 24 L292 9" fill="none" stroke="var(--ds-accent)" strokeWidth="2" strokeDasharray="4 3" strokeLinecap="round" opacity="0.8" />}
+      <text x="16" y="90" fontSize="9" fill="var(--ds-text-3)" fontFamily="'SF Mono',Consolas,monospace">{minVp}px</text>
+      <text x="212" y="90" fontSize="9.5" fill="var(--ds-text-2)" fontFamily="'SF Mono',Consolas,monospace" textAnchor="middle">{maxVp}px</text>
+      <text x="292" y="90" fontSize="9" fill="var(--ds-text-3)" textAnchor="end">wider →</text>
+    </svg>
+  );
+}
 function StepLayout() {
   const { state, dispatch } = useDSContext();
   const { layoutMode, minViewport, maxViewport } = state;
@@ -1265,15 +1272,20 @@ function StepLayout() {
     </div>
     {layoutMode && (<div className="ds-mode-info">
       <strong>{layoutMode === "fixed" ? "Fixed-width" : "Full-width"}</strong> — {layoutMode === "fixed"
-        ? "content is capped to a max width and centered. Fluid tokens (type, spacing, gaps…) reach their largest values at that max width and stop growing — wider screens just add side margins."
-        : "content spans the full screen (100%). Fluid tokens (type, spacing, gaps…) keep scaling across the whole viewport, up to your max viewport."}
-      <span className="sub">Both modes use the same fields below — the layout mode only changes how those fluid values are calculated (the max viewport caps fluid growth).</span>
+        ? "content is capped to a max width and centered. The shared viewport range anchors --vp-max to that content width, so fluid tokens (type, spacing, gaps…) reach their max there — wider screens just add side margins."
+        : "content spans the full screen (100%). Every fluid token shares one viewport range (--vp-min → --vp-max) and reaches its max at your max viewport; beyond that it stays flat."}
+      <span className="sub">All tokens interpolate over the same master range, exported as <code style={{ fontFamily: "'SF Mono',monospace" }}>--vp-min</code> / <code style={{ fontFamily: "'SF Mono',monospace" }}>--vp-max</code>. Change the max below and the whole system rescales — even after export, by editing those two variables in Bricks.</span>
+      <ScalingDiagram minVp={minViewport} maxVp={maxViewport} ultrawide={state.ultrawide} />
     </div>)}
     {layoutMode && (<div className="ds-viewport-config"><h4>Viewport range</h4>
       <ValidationAlert items={warns} />
       <div className="ds-viewport-row" style={{ marginBottom: 0 }}>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Min viewport (px)</label><NumStepper value={minViewport} set={(n) => dispatch({ type: "SET_FIELD", field: "minViewport", value: Math.max(0, n) })} min={0} step={5} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Max viewport (px)</label><NumStepper value={maxViewport} set={(n) => dispatch({ type: "SET_FIELD", field: "maxViewport", value: Math.max(0, n) })} min={0} step={10} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Min viewport (px) <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— --vp-min</span></label><NumStepper value={minViewport} set={(n) => dispatch({ type: "SET_FIELD", field: "minViewport", value: Math.max(0, n) })} min={0} step={5} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Max viewport (px) <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— --vp-max</span></label><NumStepper value={maxViewport} set={(n) => dispatch({ type: "SET_FIELD", field: "maxViewport", value: Math.max(0, n) })} min={0} step={10} /></div>
+      </div>
+      <div className="ds-toggle-row" style={{ marginTop: 14 }} onClick={() => dispatch({ type: "SET_FIELD", field: "ultrawide", value: !state.ultrawide })}>
+        <div className={"ds-toggle-track" + (state.ultrawide ? " on" : "")}><div className="ds-toggle-thumb" /></div>
+        <div className="ds-toggle-text"><strong>Ultrawide display scaling</strong><span>Let the big headings (h1, h2) keep growing past your max viewport on very wide screens.</span></div>
       </div>
     </div>)}
     {layoutMode && (<div className="ds-viewport-config" style={{ marginTop: 14 }}><h4>Header &amp; structure</h4>
@@ -1798,9 +1810,18 @@ function generateVariablesJSON(state) {
   const pn = (n) => prefix + n;
   const pv = (val) => prefix ? val.replace(/var\(--([\w-]+)/g, (_, n) => 'var(--' + prefix + n) : val;
   const catIds = {};
-  ['Spacing','SectionSpacing','Texts','Headings','Gaps','Grid','Buttons','Radius','Styles'].forEach(n => { catIds[n] = randId(); });
+  ['Layout','Spacing','SectionSpacing','Texts','Headings','Gaps','Grid','Buttons','Radius','Styles'].forEach(n => { catIds[n] = randId(); });
   const mk = (name, value, cat) => ({ name: pn(name), value: pv(value), id: randId(), category: catIds[cat] });
   const vars = [];
+
+  // Layout — rango maestro de viewport (rem, sin unidad) + contenedores topados.
+  // Editas vp-min/vp-max y reescala todo el sistema fluido (var(--vp-range) es vivo).
+  vars.push(mk('vp-min', String(remNum(state.minViewport)), 'Layout'));
+  vars.push(mk('vp-max', String(remNum(state.maxViewport)), 'Layout'));
+  vars.push(mk('vp-range', 'calc(var(--vp-max) - var(--vp-min))', 'Layout'));
+  vars.push(mk('max-width-main', 'calc(var(--vp-max) * 1rem)', 'Layout'));
+  vars.push(mk('max-width-small', '100vw', 'Layout'));
+  vars.push(mk('max-width-full', '100%', 'Layout'));
 
   // Spacing (fluid clamp, rem)
   SPACE_KEYS.forEach(k => {
@@ -1815,7 +1836,9 @@ function generateVariablesJSON(state) {
   // Texts (fluid clamp, rem)
   TEXT_KEYS.forEach(k => { const tv = state.typography.texts[k]; if (!tv) return; vars.push(mk('text-' + k, flRem(tv.mobile, tv.desktop, state), 'Texts')); });
   // Headings (fluid clamp, rem)
-  ['h1','h2','h3','h4','h5','h6'].forEach(h => { const hv = state.typography.headings[h]; if (!hv) return; vars.push(mk(h, flRem(hv.mobile, hv.desktop, state), 'Headings')); });
+  ['h1','h2','h3','h4','h5','h6'].forEach(h => { const hv = state.typography.headings[h]; if (!hv) return;
+    const uw = state.ultrawide && (h === 'h1' || h === 'h2'); // display sigue creciendo en ultrawide
+    vars.push(mk(h, flRem(hv.mobile, hv.desktop, state, uw ? hv.desktop * 1.3 : null), 'Headings')); });
   // Gaps
   vars.push(mk('grid-gap', gapVal(state.gaps.gridGap), 'Gaps'));
   vars.push(mk('content-gap', gapVal(state.gaps.contentGap), 'Gaps'));
@@ -1951,6 +1974,7 @@ function generateVariablesJSON(state) {
     { id: catIds['Buttons'], name: 'Buttons' },
     { id: catIds['Radius'], name: 'Radius' },
     { id: catIds['Styles'], name: 'Styles' },
+    { id: catIds['Layout'], name: 'Layout' },
   ];
   return JSON.stringify({ variables: vars, categories }, null, 2);
 }
@@ -2068,6 +2092,9 @@ function generateFrameworkCSS(state, systemName) {
   css += ".bricks-is-frontend header {\n  max-width: 100vw;\n}\n";
   css += "body.bricks-is-frontend {\n  overflow-x: clip;\n}\n";
   css += "body.bricks-is-frontend.no-scroll {\n  overflow: hidden !important;\n}\n";
+
+  css += "\n/* — Reading measure (full-bleed safe) ———— */\n";
+  [50, 60, 70].forEach((n) => { css += ".u-max-width-" + n + "ch {\n  max-width: " + n + "ch;\n}\n"; });
 
   css += generateButtonsCSS(state, v);
   return css;
