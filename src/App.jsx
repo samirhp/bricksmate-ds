@@ -405,6 +405,8 @@ function reducer(state, action) {
       return { ...state, buttons: { ...state.buttons, sizes } };
     }
     case "RESET_BTN_SIZES": return { ...state, buttons: { ...state.buttons, sizes: JSON.parse(JSON.stringify(BTN_SIZE_DEFAULTS)) } };
+    case "RESET_SLICE": return { ...state, [action.key]: JSON.parse(JSON.stringify(initialState[action.key])) };
+    case "RESTORE_SLICE": return { ...state, [action.key]: action.value };
     case "TOGGLE_BTN_COLOR": {
       const cur = state.buttons.enabled?.[action.id] !== false;
       return { ...state, buttons: { ...state.buttons, enabled: { ...state.buttons.enabled, [action.id]: !cur } } };
@@ -676,6 +678,8 @@ const css_styles = `
   .ds-toast{display:flex;align-items:center;gap:9px;background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius);padding:10px 14px;font-size:13px;font-weight:500;color:var(--ds-text);box-shadow:var(--ds-shadow-md);animation:ds-toast-in .28s cubic-bezier(.16,1,.3,1);pointer-events:auto;min-width:200px}
   .ds-toast-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
   .ds-toast.ok .ds-toast-dot{background:var(--ds-success)} .ds-toast.info .ds-toast-dot{background:var(--ds-accent)} .ds-toast.err .ds-toast-dot{background:var(--ds-error)}
+  .ds-toast-action{margin-left:10px;border:none;background:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;color:var(--ds-accent);padding:0}
+  .ds-toast-action:hover{text-decoration:underline}
 
   /* ===== Tier 2: profundidad & pulido ===== */
   .ds-sys-swatches{position:relative}
@@ -1259,6 +1263,17 @@ function LayoutIcon({ mode }) {
   );
 }
 
+// Botón "Reset to defaults" por paso: resetea una slice del estado a sus defaults de fábrica,
+// con un toast que ofrece Undo (restaura el valor previo). sliceKey = clave de initialState.
+function ResetButton({ sliceKey }) {
+  const { state, dispatch, addToast } = useDSContext();
+  const onReset = () => {
+    const prev = JSON.parse(JSON.stringify(state[sliceKey]));
+    dispatch({ type: "RESET_SLICE", key: sliceKey });
+    addToast("Reset to defaults", "info", { label: "Undo", onClick: () => dispatch({ type: "RESTORE_SLICE", key: sliceKey, value: prev }) });
+  };
+  return <button className="ds-btn ds-btn-sm" onClick={onReset} data-tip="Restore this step to its default values">↺ Reset to defaults</button>;
+}
 // Diagrama LITERAL del escalado: curva clamp lineal a trozos (plano-rampa-plano),
 // con ejes y los breakpoints reales del viewport. Ultrawide = continuación punteada.
 function ScalingDiagram({ minVp, maxVp, ultrawide }) {
@@ -1351,7 +1366,8 @@ function StepSpacing() {
   const invKeys = SPACE_KEYS.filter(k => k !== "section" && (sp.values[k]?.mobile || 0) > (sp.values[k]?.desktop || 0));
   if (invKeys.length) warns.push({ type: "warn", msg: (invKeys.length === 1 ? "1 value is" : invKeys.length + " values are") + " larger on mobile than desktop: " + invKeys.map(k => "--space-" + k).join(", ") });
   return (<div>
-    <div className="ds-card"><h4>Base space</h4>
+    <div className="ds-card">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}><h4 style={{ margin: 0 }}>Base space</h4><ResetButton sliceKey="spacing" /></div>
       <div className="ds-grid-3">
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Mobile</label><NumStepper value={sp.baseMobile} set={(n) => recalc(n, sp.baseDesktop)} min={0} /></div>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Desktop</label><NumStepper value={sp.baseDesktop} set={(n) => recalc(sp.baseMobile, n)} min={0} /></div>
@@ -1384,7 +1400,8 @@ function StepSectionSpacing() {
   const invKeys = SPACE_KEYS.filter(k => (ss.values[k]?.mobile || 0) > (ss.values[k]?.desktop || 0));
   if (invKeys.length) warns.push({ type: "warn", msg: (invKeys.length === 1 ? "1 value is" : invKeys.length + " values are") + " larger on mobile than desktop: " + invKeys.map(k => "--section-space-" + k).join(", ") });
   return (<div>
-    <div className="ds-card"><h4>Base section space</h4>
+    <div className="ds-card">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}><h4 style={{ margin: 0 }}>Base section space</h4><ResetButton sliceKey="sectionSpacing" /></div>
       <div className="ds-grid-3">
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Mobile</label><NumStepper value={ss.baseMobile} set={(n) => recalc(n, ss.baseDesktop)} min={0} /></div>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Desktop</label><NumStepper value={ss.baseDesktop} set={(n) => recalc(ss.baseMobile, n)} min={0} /></div>
@@ -2742,10 +2759,12 @@ function StepContent() {
   </div>);
 }
 
-function ToastHost({ toasts }) {
+function ToastHost({ toasts, onDismiss }) {
   if (!toasts.length) return null;
   return (<div className="ds-toasts">
-    {toasts.map((t) => <div key={t.id} className={"ds-toast " + (t.type || "info")}><span className="ds-toast-dot" />{t.msg}</div>)}
+    {toasts.map((t) => <div key={t.id} className={"ds-toast " + (t.type || "info")}><span className="ds-toast-dot" />{t.msg}
+      {t.action && <button className="ds-toast-action" onClick={() => { t.action.onClick(); onDismiss?.(t.id); }}>{t.action.label}</button>}
+    </div>)}
   </div>);
 }
 
@@ -2960,10 +2979,11 @@ export default function App() {
   const savedToastTimer = useRef(null);
   const [toasts, setToasts] = useState([]);
   const toastId = useRef(0);
-  const addToast = (msg, type = "info") => {
+  const removeToast = (id) => setToasts((ts) => ts.filter((t) => t.id !== id));
+  const addToast = (msg, type = "info", action) => {
     const id = ++toastId.current;
-    setToasts((ts) => [...ts, { id, msg, type }]);
-    setTimeout(() => setToasts((ts) => ts.filter((t) => t.id !== id)), 2800);
+    setToasts((ts) => [...ts, { id, msg, type, action }]);
+    setTimeout(() => removeToast(id), action ? 6000 : 2800); // más tiempo si hay Undo
   };
   // ── Auth / nube ──
   const [user, setUser] = useState(null);
@@ -3259,7 +3279,7 @@ export default function App() {
           </>}
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} addToast={addToast} initialMode={authMode} />}
       {migratePrompt && <SelectMigrateModal prompt={migratePrompt} onClose={() => setMigratePrompt(null)} onConfirm={async (sel) => { setMigratePrompt(null); await migrateThese(sel); }} />}
-      <ToastHost toasts={toasts} />
+      <ToastHost toasts={toasts} onDismiss={removeToast} />
     </div>
   </DSContext.Provider>);
 }
