@@ -294,6 +294,8 @@ const initialState = {
   },
   radius: { base: 8, values: {}, circle: 999 },
   varPrefix: "",
+  palettePrefix: "",
+  paletteExportMode: "single", // "single" = una paleta con todo | "categorized" = una paleta (archivo) por color
 };
 
 // Init radius
@@ -513,7 +515,8 @@ const css_styles = `
   .ds-header-icon{width:30px;height:30px;border-radius:var(--ds-radius);flex-shrink:0;display:block}
   .ds-ver-pill{position:relative;font-size:10px;font-weight:600;color:var(--ds-accent);background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring);border-radius:4px;padding:2px 7px;letter-spacing:.3px;flex-shrink:0;font-family:'SF Mono',Consolas,monospace;cursor:pointer;transition:border-color .15s,background .15s}
   .ds-ver-pill:hover{border-color:var(--ds-accent)}
-  .ds-ver-dot{position:absolute;top:-3px;right:-3px;width:6px;height:6px;border-radius:50%;background:var(--ds-accent);border:1px solid var(--ds-bg-card)}
+  .ds-ver-dot{position:absolute;top:-3px;right:-3px;width:6px;height:6px;border-radius:50%;background:var(--ds-accent);border:1px solid var(--ds-bg-card);animation:ds-ver-pulse 1.8s ease-out infinite}
+  @keyframes ds-ver-pulse{0%{box-shadow:0 0 0 0 hsla(250,88%,66%,.55)}70%{box-shadow:0 0 0 6px hsla(250,88%,66%,0)}100%{box-shadow:0 0 0 0 hsla(250,88%,66%,0)}}
   .ds-changelog{max-width:520px}
   .ds-changelog>p{margin-bottom:0}
   .ds-cl-list{margin-top:16px;max-height:58vh;overflow-y:auto;display:flex;flex-direction:column;gap:20px;padding-right:4px}
@@ -523,9 +526,9 @@ const css_styles = `
   .ds-cl-items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
   .ds-cl-items li{display:grid;grid-template-columns:74px 1fr;gap:10px;align-items:start;font-size:13px;color:var(--ds-text-2);line-height:1.45}
   .ds-cl-tag{justify-self:start;white-space:nowrap;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:2px 7px;border-radius:5px;margin-top:1px}
-  .ds-cl-tag.new{color:var(--ds-accent);background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring)}
+  .ds-cl-tag.new{color:var(--ds-success);background:color-mix(in srgb,var(--ds-success) 12%,transparent);border:1px solid color-mix(in srgb,var(--ds-success) 40%,transparent)}
   .ds-cl-tag.imp{color:var(--ds-info);background:color-mix(in srgb,var(--ds-info) 12%,transparent);border:1px solid color-mix(in srgb,var(--ds-info) 35%,transparent)}
-  .ds-cl-tag.fix{color:var(--ds-success);background:color-mix(in srgb,var(--ds-success) 12%,transparent);border:1px solid color-mix(in srgb,var(--ds-success) 40%,transparent)}
+  .ds-cl-tag.fix{color:var(--ds-accent);background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring)}
   .ds-wordmark{font-size:14px;font-weight:600;letter-spacing:-.01em;flex-shrink:0}
   .ds-saved-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--ds-success);background:color-mix(in srgb,var(--ds-success) 12%,transparent);border:1px solid color-mix(in srgb,var(--ds-success) 45%,transparent);border-radius:5px;padding:5px 11px 5px 8px;white-space:nowrap}
   .ds-dsname{margin:0 2px 12px;padding-bottom:12px;border-bottom:1px solid var(--ds-border-light)}
@@ -863,7 +866,7 @@ const css_styles = `
   .ds-account-name{font-size:16px;font-weight:600;color:var(--ds-text)}
   .ds-account-email{font-size:13px;color:var(--ds-text-3)}
 
-  @media (prefers-reduced-motion:reduce){.ds-step-anim,.ds-step-check,.ds-toast,.ds-step-node.done{animation:none}*{transition-duration:.01ms!important}}
+  @media (prefers-reduced-motion:reduce){.ds-step-anim,.ds-step-check,.ds-toast,.ds-step-node.done,.ds-ver-dot{animation:none}*{transition-duration:.01ms!important}}
 
   /* ===== Responsive (≤767px): stack entry surfaces; the editor shows a notice ===== */
   .ds-mobile-notice{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;padding:32px 24px;overflow:auto}
@@ -1160,12 +1163,20 @@ function GuestBanner({ onSignIn }) {
     </div>
   );
 }
-const APP_VERSION = "v1.2";
+const APP_VERSION = "v1.3";
 // Changelog (user-facing). Lo último arriba. tag: new | improved | fixed.
 // REGLA: SOLO cambios de cara al usuario. NUNCA incluir nada de backend/infra
 // (Vercel, Supabase, analytics, hosting, claves, etc.).
 const CL_TAGS = { new: { label: "New", cls: "new" }, improved: { label: "Improved", cls: "imp" }, fixed: { label: "Fixed", cls: "fix" } };
 const CHANGELOG = [
+  {
+    v: "1.3", date: "17 Jun 2026",
+    items: [
+      { tag: "new", text: "Colour palette export now has two modes — everything in one Bricks palette, or one palette per colour so they appear as separate categories in the Bricks picker, with an optional name prefix." },
+      { tag: "improved", text: "“Download all” and the per-colour palette export now download as a single .zip instead of many separate files." },
+      { tag: "improved", text: "Black and white are now shown as separate colours in the Preview." },
+    ],
+  },
   {
     v: "1.2", date: "17 Jun 2026",
     items: [
@@ -1180,8 +1191,8 @@ const CHANGELOG = [
   {
     v: "1.1", date: "16 Jun 2026",
     items: [
-      { tag: "improved", text: "Header offset is now fluid (mobile → desktop) and applied directly — set it to your sticky-header height for accurate #id anchor scrolling." },
       { tag: "new", text: "Optional “Header height script” in Export — measures your real header so #id anchors stay pixel-perfect across breakpoints and sticky-shrink." },
+      { tag: "improved", text: "Header offset is now fluid (mobile → desktop) and applied directly — set it to your sticky-header height for accurate #id anchor scrolling." },
     ],
   },
   {
@@ -2208,24 +2219,87 @@ function generateClassesJSON(state, systemName) {
   return JSON.stringify(classes, null, 2);
 }
 
-function generateColorPaletteJSON(state, systemName) {
+// ZIP mínimo "store" (sin compresión), sin dependencias — para empaquetar exports de texto pequeños.
+const _CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c >>> 0; }
+  return t;
+})();
+function _crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = _CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+// files: [{ name, content }] → Blob(.zip). Flag bit 11 marca nombres UTF-8.
+function makeZip(files) {
+  const enc = new TextEncoder();
+  const u16 = (n) => [n & 0xFF, (n >>> 8) & 0xFF];
+  const u32 = (n) => [n & 0xFF, (n >>> 8) & 0xFF, (n >>> 16) & 0xFF, (n >>> 24) & 0xFF];
+  const local = [], central = [];
+  let offset = 0;
+  files.forEach((f) => {
+    const nameB = enc.encode(f.name), dataB = enc.encode(f.content), crc = _crc32(dataB);
+    const lh = [...u32(0x04034b50), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0), ...u32(crc), ...u32(dataB.length), ...u32(dataB.length), ...u16(nameB.length), ...u16(0)];
+    local.push(new Uint8Array(lh), nameB, dataB);
+    const ch = [...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0), ...u32(crc), ...u32(dataB.length), ...u32(dataB.length), ...u16(nameB.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(offset)];
+    central.push(new Uint8Array(ch), nameB);
+    offset += lh.length + nameB.length + dataB.length;
+  });
+  const cdSize = central.reduce((n, c) => n + c.length, 0);
+  const end = new Uint8Array([...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(files.length), ...u16(files.length), ...u32(cdSize), ...u32(offset), ...u16(0)]);
+  return new Blob([...local, ...central, end], { type: "application/zip" });
+}
+
+// Construye los grupos de color [{ name, colors }] — una entrada por paleta + White + Black.
+// `colors` ya está en el shape que Bricks usa dentro de una paleta (raw/id/name/light + variantes/transparencias anidadas por parent).
+function buildPaletteGroups(state) {
   const prefix = state.varPrefix ? state.varPrefix + '-' : '';
   const vr = (n) => 'var(--' + prefix + n + ')';
-  const colors = [];
+  const groups = [];
   state.colors.palettes.forEach(p => {
     const slug = slugify(p.name);
     const hex = hslToHex(p.hue, p.saturation, p.lightness);
     const rootId = randId();
-    colors.push({ raw: vr(slug), id: rootId, name: p.name, light: hex });
+    const colors = [{ raw: vr(slug), id: rootId, name: p.name, light: hex }];
     if (p.showVariants) {
       ['ultra-dark','dark','semi-dark'].forEach((key, idx) => { if (p.variants[key]) colors.push({ id: randId(), type: 'dark', raw: vr(slug + '-' + key), index: idx, parent: rootId, light: hslStrToHex(p.variants[key]) }); });
       ['semi-light','light','ultra-light'].forEach((key, idx) => { if (p.variants[key]) colors.push({ id: randId(), type: 'light', raw: vr(slug + '-' + key), index: idx, parent: rootId, light: hslStrToHex(p.variants[key]) }); });
     }
     if (p.showTransparency) { [90,80,70,60,50,40,30,20,10].forEach((o, idx) => { colors.push({ id: randId(), type: 'transparent', raw: vr(slug + '-trans-' + o), index: idx, parent: rootId, light: 'hsla(' + p.hue + ', ' + p.saturation + '%, ' + p.lightness + '%, ' + (o/100) + ')' }); }); }
+    groups.push({ name: p.name, colors });
   });
-  if (state.colors.whiteTransparency) { const wId = randId(); colors.push({ raw: vr('white'), id: wId, name: 'White', light: '#ffffff' }); [90,80,70,60,50,40,30,20,10].forEach((o, idx) => colors.push({ id: randId(), type: 'transparent', raw: vr('white-trans-' + o), index: idx, parent: wId, light: 'rgba(255, 255, 255, ' + (o/100) + ')' })); }
-  if (state.colors.blackTransparency) { const bId = randId(); colors.push({ raw: vr('black'), id: bId, name: 'Black', light: '#000000' }); [90,80,70,60,50,40,30,20,10].forEach((o, idx) => colors.push({ id: randId(), type: 'transparent', raw: vr('black-trans-' + o), index: idx, parent: bId, light: 'rgba(0, 0, 0, ' + (o/100) + ')' })); }
-  return JSON.stringify({ id: randId(), name: (systemName && systemName.trim()) || 'Design system', colors, default: true }, null, 2);
+  if (state.colors.whiteTransparency) {
+    const wId = randId();
+    const colors = [{ raw: vr('white'), id: wId, name: 'White', light: '#ffffff' }];
+    [90,80,70,60,50,40,30,20,10].forEach((o, idx) => colors.push({ id: randId(), type: 'transparent', raw: vr('white-trans-' + o), index: idx, parent: wId, light: 'rgba(255, 255, 255, ' + (o/100) + ')' }));
+    groups.push({ name: 'White', colors });
+  }
+  if (state.colors.blackTransparency) {
+    const bId = randId();
+    const colors = [{ raw: vr('black'), id: bId, name: 'Black', light: '#000000' }];
+    [90,80,70,60,50,40,30,20,10].forEach((o, idx) => colors.push({ id: randId(), type: 'transparent', raw: vr('black-trans-' + o), index: idx, parent: bId, light: 'rgba(0, 0, 0, ' + (o/100) + ')' }));
+    groups.push({ name: 'Black', colors });
+  }
+  return groups;
+}
+
+const palettePrefixOf = (state) => (state.palettePrefix || '').trim() ? (state.palettePrefix || '').trim() + ' ' : '';
+
+// Modo "single": UNA paleta Bricks con todos los colores (el formato que Bricks acepta al importar: un objeto, no un array).
+function generateColorPaletteJSON(state, systemName) {
+  const pp = palettePrefixOf(state);
+  const colors = buildPaletteGroups(state).flatMap(g => g.colors);
+  const base = (systemName && systemName.trim()) || 'Design system';
+  return JSON.stringify({ id: randId(), name: pp + base, colors, default: true }, null, 2);
+}
+
+// Modo "categorized": un archivo por grupo (cada objeto = una paleta = una categoría del picker). Devuelve [{ name, json }].
+function generateColorPaletteFiles(state) {
+  const pp = palettePrefixOf(state);
+  return buildPaletteGroups(state).map((g, i) => ({
+    name: pp + g.name,
+    json: JSON.stringify(Object.assign({ id: randId(), name: pp + g.name, colors: g.colors }, i === 0 ? { default: true } : {}), null, 2),
+  }));
 }
 
 // Botones en BEM. Compose: <a class="btn btn--primary btn--lg">
@@ -2635,27 +2709,30 @@ function StepPreview() {
             )}
           </div>
         ))}
-        {(state.colors.whiteTransparency || state.colors.blackTransparency) && (
+        {state.colors.whiteTransparency && (
           <div style={{ background: "var(--ds-bg-card)", border: "0.5px solid var(--ds-border-light)", borderRadius: "var(--ds-radius-lg)", padding: 14 }}>
-            <div style={{ fontSize: 11, color: "var(--ds-text-3)", marginBottom: 6 }}>B&W transparencies</div>
-            {state.colors.whiteTransparency && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(9,1fr)", gap: 2, marginBottom: state.colors.blackTransparency ? 6 : 0 }}>
-                {[90,80,70,60,50,40,30,20,10].map(o => (
-                  <div key={o} title={"white " + o + "%"} style={{ height: 18, borderRadius: 3, background: "#9ca3af", position: "relative" }}>
-                    <div style={{ position: "absolute", inset: 0, borderRadius: 3, backgroundColor: "rgba(255,255,255," + (o / 100) + ")" }} />
-                  </div>
-                ))}
-              </div>
-            )}
-            {state.colors.blackTransparency && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(9,1fr)", gap: 2 }}>
-                {[90,80,70,60,50,40,30,20,10].map(o => (
-                  <div key={o} title={"black " + o + "%"} style={{ height: 18, borderRadius: 3, background: "#9ca3af", position: "relative" }}>
-                    <div style={{ position: "absolute", inset: 0, borderRadius: 3, backgroundColor: "rgba(0,0,0," + (o / 100) + ")" }} />
-                  </div>
-                ))}
-              </div>
-            )}
+            <div style={{ fontFamily: "monospace", fontSize: 11, color: "var(--ds-text-3)", marginBottom: 6 }}>--white</div>
+            <div style={{ height: 44, borderRadius: 6, backgroundColor: "#ffffff", border: "0.5px solid var(--ds-border)", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "center", color: "#000", fontSize: 12, fontWeight: 500 }}>White</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(9,1fr)", gap: 2 }}>
+              {[90,80,70,60,50,40,30,20,10].map(o => (
+                <div key={o} title={"white " + o + "%"} style={{ height: 18, borderRadius: 3, backgroundImage: "linear-gradient(45deg,#ccc 25%,transparent 25%),linear-gradient(-45deg,#ccc 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#ccc 75%),linear-gradient(-45deg,transparent 75%,#ccc 75%)", backgroundSize: "8px 8px", backgroundPosition: "0 0,0 4px,4px -4px,-4px 0", position: "relative" }}>
+                  <div style={{ position: "absolute", inset: 0, borderRadius: 3, backgroundColor: "rgba(255,255,255," + (o / 100) + ")" }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {state.colors.blackTransparency && (
+          <div style={{ background: "var(--ds-bg-card)", border: "0.5px solid var(--ds-border-light)", borderRadius: "var(--ds-radius-lg)", padding: 14 }}>
+            <div style={{ fontFamily: "monospace", fontSize: 11, color: "var(--ds-text-3)", marginBottom: 6 }}>--black</div>
+            <div style={{ height: 44, borderRadius: 6, backgroundColor: "#000000", border: "0.5px solid var(--ds-border)", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 500 }}>Black</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(9,1fr)", gap: 2 }}>
+              {[90,80,70,60,50,40,30,20,10].map(o => (
+                <div key={o} title={"black " + o + "%"} style={{ height: 18, borderRadius: 3, backgroundImage: "linear-gradient(45deg,#ccc 25%,transparent 25%),linear-gradient(-45deg,#ccc 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#ccc 75%),linear-gradient(-45deg,transparent 75%,#ccc 75%)", backgroundSize: "8px 8px", backgroundPosition: "0 0,0 4px,4px -4px,-4px 0", position: "relative" }}>
+                  <div style={{ position: "absolute", inset: 0, borderRadius: 3, backgroundColor: "rgba(0,0,0," + (o / 100) + ")" }} />
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -2849,25 +2926,51 @@ function StepExport() {
 
   const baseName = slugify(systemName || "design-system");
 
+  // Descarga cruda (blob → anchor), sin toasts — reutilizada por dl y por la descarga multi-archivo.
+  const downloadBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+  const rawDl = (content, filename, mime) => downloadBlob(new Blob([content], { type: mime }), filename);
+
   const dl = (generator, filename, mime, key) => {
     try {
-      const content = generator(state);
-      const blob = new Blob([content], { type: mime });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a"); a.href = url; a.download = filename;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      rawDl(generator(state), filename, mime);
       setStatus({ type: "ok", file: filename }); setTimeout(() => setStatus(null), 4000);
       setDone(key); setTimeout(() => setDone((d) => d === key ? null : d), 1600);
       addToast?.(filename + " downloaded", "ok");
     } catch (e) { setStatus({ type: "error", msg: e.message }); addToast?.("Export failed — try again; reload if it persists", "err"); }
   };
 
-  // Descarga todos los archivos exportables, con stagger para que el navegador no descarte descargas seguidas.
+  // Modo categorizado: empaqueta todas las paletas (un JSON por color) en un único .zip.
+  const dlPalettes = () => {
+    try {
+      const files = generateColorPaletteFiles(state).map((f) => ({ name: slugify(f.name) + ".json", content: f.json }));
+      if (!files.length) return;
+      downloadBlob(makeZip(files), baseName + "-palettes.zip");
+      setDone("palette"); setTimeout(() => setDone((d) => d === "palette" ? null : d), 1600);
+      addToast?.(files.length + " palettes zipped", "ok");
+    } catch (e) { setStatus({ type: "error", msg: e.message }); addToast?.("Export failed — try again; reload if it persists", "err"); }
+  };
+
+  // Descarga TODO en un único .zip (expandiendo la paleta a N archivos si está categorizada).
   const dlAll = () => {
-    CARDS.filter(c => !c.disabled).forEach((c, i) => {
-      setTimeout(() => dl(c.gen, baseName + "-" + c.suffix, c.mime, c.id), i * 250);
-    });
+    try {
+      const categorized = state.paletteExportMode === "categorized";
+      const files = [];
+      CARDS.filter((c) => !c.disabled).forEach((c) => {
+        if (c.id === "palette" && categorized) {
+          generateColorPaletteFiles(state).forEach((f) => files.push({ name: slugify(f.name) + ".json", content: f.json }));
+        } else {
+          files.push({ name: c.suffix, content: c.gen(state) });
+        }
+      });
+      if (!files.length) return;
+      downloadBlob(makeZip(files), baseName + ".zip");
+      addToast?.(files.length + " files zipped", "ok");
+    } catch (e) { setStatus({ type: "error", msg: e.message }); addToast?.("Export failed — try again; reload if it persists", "err"); }
   };
 
   const CARDS = [
@@ -2879,9 +2982,12 @@ function StepExport() {
     },
     {
       id: "palette", suffix: "palette.json", title: "Color Palette JSON",
-      desc: "Color swatches for the editor's color picker.",
+      desc: state.paletteExportMode === "categorized"
+        ? "A .zip with one JSON per colour → import each as a separate palette (category) in Bricks’ picker."
+        : "Every colour in a single Bricks palette — one import.",
       sub: "Bricks → Style Manager → Color Palettes → Import",
-      gen: (s) => generateColorPaletteJSON(s, systemName), mime: "application/json", label: "↓ Palette JSON",
+      gen: (s) => generateColorPaletteJSON(s, systemName), mime: "application/json",
+      label: state.paletteExportMode === "categorized" ? "↓ Palettes .zip (" + buildPaletteGroups(state).length + ")" : "↓ Palette JSON",
       disabled: !state.colors.palettes.length,
     },
     {
@@ -2906,7 +3012,22 @@ function StepExport() {
       <input className={"ds-input" + (state.varPrefix && !/^[a-z][a-z0-9-]*$/.test(state.varPrefix) ? " ds-input-error" : "")} value={state.varPrefix} placeholder="e.g. ds, brand, acme" onChange={(e) => dispatch({ type: "SET_FIELD", field: "varPrefix", value: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} />
       <div className="ds-helper">{state.varPrefix ? "--" + state.varPrefix + "-space-m, --" + state.varPrefix + "-primary, ..." : "Leave empty for default naming: --space-m, --primary, ..."}</div>
     </div>
-    <button className="ds-download-btn" onClick={dlAll} disabled={warnings.length > 0} style={{ width: "auto", margin: "0 0 16px", paddingInline: 20 }}>↓ Download all ({CARDS.filter(c => !c.disabled).length} files)</button>
+    <div className="ds-form-group" style={{ marginBottom: 20 }}>
+      <label>Palette export <span style={{ fontWeight: 400, color: "var(--ds-text-3)" }}>— how colours land in Bricks</span></label>
+      <select className="ds-input" value={state.paletteExportMode || "single"} onChange={(e) => dispatch({ type: "SET_FIELD", field: "paletteExportMode", value: e.target.value })}>
+        <option value="single">All in one palette — single import</option>
+        <option value="categorized">One palette per colour — categories in the picker</option>
+      </select>
+      <div className="ds-helper">{state.paletteExportMode === "categorized" ? "Downloads one JSON per palette + White + Black. Import each in Bricks (Color Palettes → Import) to get them as separate categories in the picker." : "One JSON with every colour in a single Bricks palette. One import, but no categories."}</div>
+    </div>
+    {state.paletteExportMode === "categorized" && (
+      <div className="ds-form-group" style={{ marginBottom: 20 }}>
+        <label>Palette name prefix <span style={{ fontWeight: 400, color: "var(--ds-text-3)" }}>(optional)</span></label>
+        <input className="ds-input" value={state.palettePrefix || ""} placeholder="e.g. BM, Acme" maxLength={24} onChange={(e) => dispatch({ type: "SET_FIELD", field: "palettePrefix", value: e.target.value.replace(/[^A-Za-z0-9 ]/g, "") })} />
+        <div className="ds-helper">{(state.palettePrefix || "").trim() ? "Categories in Bricks: “" + state.palettePrefix.trim() + " Primary”, “" + state.palettePrefix.trim() + " White”, “" + state.palettePrefix.trim() + " Black”…" : "Optional prefix to namespace the categories (e.g. “BM” → “BM Primary”, “BM White”…)."}</div>
+      </div>
+    )}
+    <button className="ds-download-btn" onClick={dlAll} disabled={warnings.length > 0} style={{ width: "auto", margin: "0 0 16px", paddingInline: 20 }}>↓ Download all (.zip · {CARDS.filter(c => !c.disabled).reduce((n, c) => n + (c.id === "palette" && state.paletteExportMode === "categorized" ? buildPaletteGroups(state).length : 1), 0)} files)</button>
     <div className="ds-export-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}>
       {CARDS.map(c => {
         const filename = baseName + "-" + c.suffix;
@@ -2919,7 +3040,7 @@ function StepExport() {
             <span style={{ color: "var(--ds-text-2)", fontFamily: "monospace" }}>{c.sub}</span>
           </div>
           <div style={{ fontSize: 12, color: "var(--ds-text-2)", marginBottom: 14, fontFamily: "monospace", padding: "7px 10px", background: "var(--ds-bg)", border: "1px solid var(--ds-border-light)", borderRadius: "var(--ds-radius)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{filename}</div>
-          <button className={"ds-download-btn" + (done === c.id ? " ds-dl-done" : "")} onClick={() => dl(c.gen, filename, c.mime, c.id)} disabled={warnings.length > 0 || c.disabled} style={{ marginTop: "auto" }}>{done === c.id ? "✓ Downloaded!" : c.label}</button>
+          <button className={"ds-download-btn" + (done === c.id ? " ds-dl-done" : "")} onClick={() => (c.id === "palette" && state.paletteExportMode === "categorized") ? dlPalettes() : dl(c.gen, filename, c.mime, c.id)} disabled={warnings.length > 0 || c.disabled} style={{ marginTop: "auto" }}>{done === c.id ? "✓ Downloaded!" : c.label}</button>
         </div>
         );
       })}
