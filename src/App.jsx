@@ -12,6 +12,14 @@ SyntaxHighlighter.registerLanguage("css", prismCss);
 
 const MAX_SYSTEMS = 5; // tope de sistemas por cuenta (también aplicado a invitados, y en la BD via trigger)
 
+// a11y: divs que actúan como toggle/botón necesitan teclado (Enter/Espacio → click)
+const TGL_KEY = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } };
+
+// Ayuda contextual: badge "?" con tooltip que envuelve (hover + foco por teclado, leído por SR vía aria-label).
+function InfoTip({ children }) {
+  return <span className="ds-infotip" tabIndex={0} role="img" aria-label={String(children)} data-tip={children}>?</span>;
+}
+
 /* ================================================================
    UTILITIES
    ================================================================ */
@@ -473,14 +481,16 @@ const DESCS = {
    STYLES
    ================================================================ */
 const css_styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap');
   :root {
     --ds-primary:hsl(240,5.9%,10%); --ds-primary-hover:hsl(240,5.9%,18%); --ds-primary-light:hsl(240,4.8%,95.9%);
     --ds-bg:hsl(0,0%,98%); --ds-bg-card:hsl(0,0%,100%);
-    --ds-text:hsl(240,10%,3.9%); --ds-text-2:hsl(240,3.7%,46.1%); --ds-text-3:hsl(240,5%,64.9%);
+    --ds-text:hsl(240,10%,3.9%); --ds-text-2:hsl(240,3.7%,46.1%); --ds-text-3:hsl(240,4%,45%);
     --ds-border:hsl(240,5.9%,90%); --ds-border-light:hsl(240,4.8%,95.5%);
-    --ds-success:hsl(142,71%,38%); --ds-error:hsl(0,84%,55%);
+    --ds-success:hsl(142,71%,38%); --ds-error:hsl(0,84%,55%); --ds-info:hsl(211,80%,42%); --ds-warning:hsl(38,92%,38%);
     --ds-accent:hsl(250,88%,66%); --ds-accent-hover:hsl(250,88%,58%); --ds-accent-light:hsl(250,100%,97%); --ds-accent-ring:hsla(250,88%,66%,.20);
+    /* Chip-veil para indicadores de magnitud (barras/cajas): mismo lenguaje que el pill (veil + ring) pero con fill robusto en ambos temas — el accent-light puro es casi blanco en light. */
+    --ds-accent-fill:color-mix(in srgb,var(--ds-accent) 20%,var(--ds-bg-card));
     --ds-radius:4px; --ds-radius-lg:5px;
     --ds-shadow:0 1px 2px rgba(0,0,0,.05);
     --ds-shadow-md:0 1px 3px rgba(0,0,0,.08),0 1px 2px -1px rgba(0,0,0,.05);
@@ -489,15 +499,15 @@ const css_styles = `
     /* Negro neutro (#000) + acento #765DF5 */
     --ds-primary:hsl(0,0%,98%); --ds-primary-hover:hsl(0,0%,88%); --ds-primary-light:hsl(0,0%,18%);
     --ds-bg:hsl(0,0%,4%); --ds-bg-card:hsl(0,0%,7%);
-    --ds-text:hsl(0,0%,98%); --ds-text-2:hsl(0,0%,70%); --ds-text-3:hsl(0,0%,50%);
+    --ds-text:hsl(0,0%,98%); --ds-text-2:hsl(0,0%,70%); --ds-text-3:hsl(0,0%,54%);
     --ds-border:hsl(0,0%,22%); --ds-border-light:hsl(0,0%,13.5%);
-    --ds-success:hsl(142,69%,52%); --ds-error:hsl(0,84%,66%);
+    --ds-success:hsl(142,69%,52%); --ds-error:hsl(0,84%,66%); --ds-info:hsl(211,89%,64%); --ds-warning:hsl(38,92%,62%);
     --ds-accent:hsl(250,88%,66%); --ds-accent-hover:hsl(250,88%,73%); --ds-accent-light:hsl(250,40%,18%); --ds-accent-ring:hsla(250,88%,66%,.25);
     --ds-shadow:0 1px 2px rgba(0,0,0,.6);
     --ds-shadow-md:0 2px 4px rgba(0,0,0,.7),0 1px 2px rgba(0,0,0,.5);
   }
   *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--ds-bg);color:var(--ds-text);line-height:1.6;-webkit-font-smoothing:antialiased}
+  body{font-family:'Hanken Grotesk',system-ui,-apple-system,sans-serif;background:var(--ds-bg);color:var(--ds-text);line-height:1.6;-webkit-font-smoothing:antialiased}
   .ds-app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
   .ds-header{background:var(--ds-bg-card);border-bottom:1px solid var(--ds-border-light);padding:0 24px;height:54px;display:flex;align-items:center;gap:12px;box-shadow:var(--ds-shadow)}
   .ds-header-icon{width:30px;height:30px;border-radius:var(--ds-radius);flex-shrink:0;display:block}
@@ -514,10 +524,10 @@ const css_styles = `
   .ds-cl-items li{display:grid;grid-template-columns:74px 1fr;gap:10px;align-items:start;font-size:13px;color:var(--ds-text-2);line-height:1.45}
   .ds-cl-tag{justify-self:start;white-space:nowrap;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:2px 7px;border-radius:5px;margin-top:1px}
   .ds-cl-tag.new{color:var(--ds-accent);background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring)}
-  .ds-cl-tag.imp{color:#4aa3ff;background:rgba(74,163,255,.1);border:1px solid rgba(74,163,255,.35)}
-  .ds-cl-tag.fix{color:var(--ds-success);background:hsla(142,64%,46%,.1);border:1px solid hsla(142,64%,46%,.4)}
+  .ds-cl-tag.imp{color:var(--ds-info);background:color-mix(in srgb,var(--ds-info) 12%,transparent);border:1px solid color-mix(in srgb,var(--ds-info) 35%,transparent)}
+  .ds-cl-tag.fix{color:var(--ds-success);background:color-mix(in srgb,var(--ds-success) 12%,transparent);border:1px solid color-mix(in srgb,var(--ds-success) 40%,transparent)}
   .ds-wordmark{font-size:14px;font-weight:600;letter-spacing:-.01em;flex-shrink:0}
-  .ds-saved-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--ds-success);background:hsla(142,64%,46%,.1);border:1px solid hsla(142,64%,46%,.45);border-radius:5px;padding:5px 11px 5px 8px;white-space:nowrap}
+  .ds-saved-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--ds-success);background:color-mix(in srgb,var(--ds-success) 12%,transparent);border:1px solid color-mix(in srgb,var(--ds-success) 45%,transparent);border-radius:5px;padding:5px 11px 5px 8px;white-space:nowrap}
   .ds-dsname{margin:0 2px 12px;padding-bottom:12px;border-bottom:1px solid var(--ds-border-light)}
   .ds-dsname-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:var(--ds-text-3);padding:0 6px;margin-bottom:5px;display:block}
   .ds-dsname-field{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:var(--ds-radius);cursor:text;border:1px solid var(--ds-border-light);background:var(--ds-bg);transition:border-color .15s}
@@ -532,7 +542,7 @@ const css_styles = `
   .ds-steps-head{display:flex;align-items:center;gap:8px;padding:0 8px 12px}
   .ds-steps-head .ds-steps-lbl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:var(--ds-text-3);flex-shrink:0}
   .ds-progress-track{flex:1;height:5px;border-radius:3px;background:var(--ds-border);overflow:hidden}
-  .ds-progress-fill{height:100%;background:var(--ds-accent);border-radius:3px;transition:width .4s cubic-bezier(.16,1,.3,1)}
+  .ds-progress-fill{height:100%;width:100%;background:var(--ds-accent);border-radius:3px;transform-origin:left;transition:transform .4s cubic-bezier(.16,1,.3,1)}
   .ds-progress-pct{font-size:11px;font-weight:600;color:var(--ds-text-2);flex-shrink:0;min-width:26px;text-align:right}
   .ds-steprail{position:relative}
   .ds-steprail::before{content:'';position:absolute;left:16px;top:16px;bottom:16px;width:2px;background:var(--ds-border);border-radius:2px}
@@ -589,6 +599,7 @@ const css_styles = `
   .ds-viewport-config{background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:18px;margin-bottom:16px;box-shadow:var(--ds-shadow)} .ds-viewport-config h4{font-size:13px;font-weight:600;margin-bottom:14px}
   .ds-viewport-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
   .ds-toggle-row{display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--ds-bg);border-radius:var(--ds-radius);border:1px solid var(--ds-border-light);cursor:pointer;user-select:none;margin-bottom:10px;transition:border-color .15s}
+  .ds-toggle-row:focus-visible,.ds-step-item:focus-visible,.ds-autosave:focus-visible{outline:none;box-shadow:0 0 0 2px var(--ds-accent-ring)}
   .ds-toggle-row:hover{border-color:var(--ds-border)}
   .ds-toggle-track{width:32px;height:18px;border-radius:9px;background:var(--ds-border);position:relative;transition:background .2s;flex-shrink:0}
   .ds-toggle-track.on{background:var(--ds-primary)} .ds-toggle-thumb{width:14px;height:14px;border-radius:50%;background:var(--ds-bg-card);position:absolute;top:2px;left:2px;transition:transform .2s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
@@ -599,7 +610,7 @@ const css_styles = `
   .ds-space-inputs{display:flex;gap:8px;flex:1}
   .ds-space-input{width:68px;padding:5px 8px;border:1px solid var(--ds-border);border-radius:var(--ds-radius);font-size:13px;text-align:center;background:var(--ds-bg-card);font-family:inherit;color:var(--ds-text);transition:all .15s;box-shadow:var(--ds-shadow)}
   .ds-space-input:hover{border-color:var(--ds-border)} .ds-space-input:focus{outline:none;border-color:var(--ds-primary);box-shadow:0 0 0 3px rgba(0,0,0,.08)}
-  .ds-space-bar{height:16px;border-radius:4px;background:var(--ds-text-3);border:1px solid var(--ds-border);transition:width .3s;min-width:4px}
+  .ds-space-bar{height:16px;border-radius:4px;background:var(--ds-accent-fill);border:1px solid var(--ds-accent-ring);min-width:4px}
   .ds-space-label{font-size:10px;color:var(--ds-text-3);text-align:center;margin-top:2px}
   .ds-palette-card{background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:18px;margin-bottom:14px;box-shadow:var(--ds-shadow)}
   .ds-palette-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
@@ -625,7 +636,7 @@ const css_styles = `
   .ds-download-btn{width:100%;padding:11px 24px;background:var(--ds-primary);color:hsl(0,0%,98%);border:none;border-radius:var(--ds-radius);font-size:14px;font-weight:500;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px;font-family:inherit;box-shadow:0 1px 2px rgba(0,0,0,.1)}
   .ds-download-btn:hover:not(:disabled){background:var(--ds-primary-hover)} .ds-download-btn:disabled{opacity:.45;cursor:not-allowed}
   .ds-warning{padding:10px 14px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.25);border-radius:var(--ds-radius);font-size:13px;color:var(--ds-error);margin-bottom:14px;cursor:pointer}
-  .ds-status{padding:10px 14px;border-radius:var(--ds-radius);font-size:13px;margin-top:14px} .ds-status.ok{background:rgba(34,197,94,.07);color:var(--ds-success);border:1px solid rgba(34,197,94,.2)}
+  .ds-status{padding:10px 14px;border-radius:var(--ds-radius);font-size:13px;margin-top:14px} .ds-status.ok{background:color-mix(in srgb,var(--ds-success) 8%,transparent);color:var(--ds-success);border:1px solid color-mix(in srgb,var(--ds-success) 22%,transparent)}
   .ds-export-grid{display:grid;grid-template-columns:repeat(2,minmax(180px,1fr));gap:14px;margin-bottom:18px}
   .ds-export-file-card{background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:18px;display:flex;flex-direction:column;box-shadow:var(--ds-shadow)}
   .ds-export-file-card h4{font-size:14px;font-weight:600;margin-bottom:4px}
@@ -637,7 +648,7 @@ const css_styles = `
   .ds-editor-name{margin-left:6px;font-size:11px;color:#7a7a82;font-family:'SF Mono',Consolas,monospace}
   .ds-editor pre{margin:0!important;border-radius:0!important}
   .ds-resize-handle{position:absolute;top:0;bottom:0;right:-20px;width:20px;display:flex;align-items:center;justify-content:center;cursor:ew-resize;touch-action:none}
-  .ds-grip{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:13px;height:56px;border-radius:7px;background:var(--ds-accent);box-shadow:0 2px 10px var(--ds-accent-ring);animation:ds-grip-pulse 2.2s ease-in-out infinite;transition:height .15s,box-shadow .15s}
+  .ds-grip{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:13px;height:56px;border-radius:7px;background:var(--ds-accent);box-shadow:0 2px 10px var(--ds-accent-ring);animation:ds-grip-pulse 2.2s ease-in-out infinite;transition:box-shadow .15s}
   .ds-grip i{width:3px;height:3px;border-radius:50%;background:rgba(255,255,255,.92)}
   .ds-resize-handle:hover .ds-grip{height:72px;box-shadow:0 2px 14px var(--ds-accent-ring);animation:none}
   @keyframes ds-grip-pulse{0%,100%{transform:translateX(0)}50%{transform:translateX(-3px)}}
@@ -680,8 +691,7 @@ const css_styles = `
   .ds-validation-block{margin-bottom:14px;display:flex;flex-direction:column;gap:5px}
   .ds-val-item{padding:8px 11px;border-radius:var(--ds-radius);font-size:12px;display:flex;align-items:flex-start;gap:8px;line-height:1.4}
   .ds-val-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;margin-top:4px}
-  .ds-val-warn{background:rgba(234,179,8,.07);color:hsl(38,92%,28%);border:1px solid rgba(234,179,8,.25)} .ds-val-warn .ds-val-dot{background:hsl(38,92%,48%)}
-  [data-theme="dark"] .ds-val-warn{background:rgba(234,179,8,.1);color:hsl(38,92%,68%)}
+  .ds-val-warn{background:color-mix(in srgb,var(--ds-warning) 10%,transparent);color:var(--ds-warning);border:1px solid color-mix(in srgb,var(--ds-warning) 28%,transparent)} .ds-val-warn .ds-val-dot{background:var(--ds-warning)}
   .ds-val-error{background:rgba(239,68,68,.06);color:var(--ds-error);border:1px solid rgba(239,68,68,.2)} .ds-val-error .ds-val-dot{background:var(--ds-error)}
   .ds-val-info{background:var(--ds-border-light);color:var(--ds-text);border:1px solid var(--ds-border)} .ds-val-info .ds-val-dot{background:var(--ds-text-2)}
   ::-webkit-scrollbar{width:5px} ::-webkit-scrollbar-track{background:transparent} ::-webkit-scrollbar-thumb{background:var(--ds-border-light);border-radius:3px}
@@ -697,7 +707,7 @@ const css_styles = `
   @keyframes ds-step-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
   .ds-step-anim{animation:ds-step-in .3s cubic-bezier(.16,1,.3,1)}
   @keyframes ds-check-pop{0%{transform:scale(0);opacity:0}60%{transform:scale(1.25)}100%{transform:scale(1);opacity:1}}
-  .ds-step-node.done{animation:ds-check-pop .32s cubic-bezier(.34,1.56,.64,1)}
+  .ds-step-node.done{animation:ds-check-pop .32s cubic-bezier(.22,1,.36,1)}
   .ds-mode-card,.ds-export-file-card,.ds-sys-card{transition:transform .18s cubic-bezier(.16,1,.3,1),box-shadow .18s,border-color .18s}
   .ds-mode-card:hover,.ds-export-file-card:hover,.ds-sys-card:hover{transform:translateY(-3px)}
   .ds-grid-chip{transition:transform .15s,border-color .15s,color .15s}
@@ -731,6 +741,10 @@ const css_styles = `
   [data-tip]{position:relative}
   [data-tip]:hover::after{content:attr(data-tip);position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--ds-text);color:var(--ds-bg);font-size:11px;font-weight:500;line-height:1.3;padding:5px 9px;border-radius:6px;white-space:nowrap;z-index:1000;pointer-events:none;box-shadow:var(--ds-shadow-md);animation:ds-tip .14s ease-out}
   [data-tip]:hover::before{content:'';position:absolute;top:calc(100% + 3px);left:50%;transform:translateX(-50%);border:5px solid transparent;border-bottom-color:var(--ds-text);z-index:1000;pointer-events:none}
+  .ds-infotip{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;border:1px solid var(--ds-border);color:var(--ds-text-3);font-size:9px;font-weight:700;cursor:help;margin-left:5px;vertical-align:middle;flex-shrink:0;user-select:none;transition:border-color .15s,color .15s}
+  .ds-infotip:hover,.ds-infotip:focus-visible{border-color:var(--ds-accent);color:var(--ds-accent);outline:none}
+  .ds-infotip:hover::after,.ds-infotip:focus-visible::after{content:attr(data-tip);position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--ds-text);color:var(--ds-bg);font-size:11px;font-weight:500;line-height:1.4;padding:6px 9px;border-radius:6px;white-space:normal;width:max-content;max-width:230px;text-align:left;z-index:1000;pointer-events:none;box-shadow:var(--ds-shadow-md);animation:ds-tip .14s ease-out}
+  .ds-infotip:hover::before,.ds-infotip:focus-visible::before{content:'';position:absolute;top:calc(100% + 3px);left:50%;transform:translateX(-50%);border:5px solid transparent;border-bottom-color:var(--ds-text);z-index:1000;pointer-events:none}
   @keyframes ds-tip{from{opacity:0;transform:translateX(-50%) translateY(-3px)}to{opacity:1}}
   /* Number steppers (+/−) */
   .ds-stepper{display:flex;align-items:stretch;border:1px solid var(--ds-border);border-radius:var(--ds-radius);background:var(--ds-bg-card);box-shadow:var(--ds-shadow);overflow:hidden;transition:border-color .15s,box-shadow .15s}
@@ -849,7 +863,7 @@ const css_styles = `
   .ds-account-name{font-size:16px;font-weight:600;color:var(--ds-text)}
   .ds-account-email{font-size:13px;color:var(--ds-text-3)}
 
-  @media (prefers-reduced-motion:reduce){.ds-step-anim,.ds-step-check,.ds-toast{animation:none}*{transition-duration:.01ms!important}}
+  @media (prefers-reduced-motion:reduce){.ds-step-anim,.ds-step-check,.ds-toast,.ds-step-node.done{animation:none}*{transition-duration:.01ms!important}}
 
   /* ===== Responsive (≤767px): stack entry surfaces; the editor shows a notice ===== */
   .ds-mobile-notice{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;padding:32px 24px;overflow:auto}
@@ -1146,12 +1160,23 @@ function GuestBanner({ onSignIn }) {
     </div>
   );
 }
-const APP_VERSION = "v1.1";
+const APP_VERSION = "v1.2";
 // Changelog (user-facing). Lo último arriba. tag: new | improved | fixed.
 // REGLA: SOLO cambios de cara al usuario. NUNCA incluir nada de backend/infra
 // (Vercel, Supabase, analytics, hosting, claves, etc.).
 const CL_TAGS = { new: { label: "New", cls: "new" }, improved: { label: "Improved", cls: "imp" }, fixed: { label: "Fixed", cls: "fix" } };
 const CHANGELOG = [
+  {
+    v: "1.2", date: "17 Jun 2026",
+    items: [
+      { tag: "new", text: "“Download all” in Export — grab every file (Variables, Palette, Classes, Framework CSS) in one click." },
+      { tag: "new", text: "Inline help — a “?” on Scale and Viewport range explains them, and each export now shows where it goes in Bricks." },
+      { tag: "improved", text: "Full keyboard navigation and screen-reader support across the wizard, with a visible focus ring on every control." },
+      { tag: "improved", text: "New UI typeface for a sharper, more distinctive interface." },
+      { tag: "improved", text: "Clearer error messages and smarter input limits, so it’s harder to end up with a broken system." },
+      { tag: "fixed", text: "Higher-contrast secondary text for better readability in both light and dark themes." },
+    ],
+  },
   {
     v: "1.1", date: "16 Jun 2026",
     items: [
@@ -1214,7 +1239,7 @@ function EditorHeader({ onBack, autoSave, onToggleAutoSave, dirty, onSave, darkM
     <span className="ds-wordmark">BricksMate DS</span>
     <VersionPill />
     <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
-      <div className="ds-autosave" onClick={onToggleAutoSave} data-tip="Save changes automatically on every edit">
+      <div className="ds-autosave" role="switch" tabIndex={0} aria-checked={autoSave} aria-label="Auto-save" onKeyDown={TGL_KEY} onClick={onToggleAutoSave} data-tip="Save changes automatically on every edit">
         <div className={"ds-toggle-track" + (autoSave ? " on" : "")}><div className="ds-toggle-thumb" /></div>
         <span>Auto-save</span>
       </div>
@@ -1264,14 +1289,14 @@ function Sidebar({ name, onRename }) {
     {name != null && <SystemNameField name={name} onRename={onRename} />}
     <div className="ds-steps-head">
       <span className="ds-steps-lbl">Steps</span>
-      <div className="ds-progress-track"><div className="ds-progress-fill" style={{ width: pct + "%" }} /></div>
+      <div className="ds-progress-track"><div className="ds-progress-fill" style={{ transform: "scaleX(" + (pct / 100) + ")" }} /></div>
       <span className="ds-progress-pct">{pct}%</span>
     </div>
     <div className="ds-steprail">{STEPS.map((s) => {
       const active = state.currentStep === s.id;
       const done = !active && s.check(state);
       const row = (
-        <div key={s.id} className="ds-step-item" onClick={() => dispatch({ type: "SET_STEP", payload: s.id })}>
+        <div key={s.id} className="ds-step-item" role="button" tabIndex={0} aria-current={active ? "step" : undefined} onKeyDown={TGL_KEY} onClick={() => dispatch({ type: "SET_STEP", payload: s.id })}>
           <div className={"ds-step-node" + (done ? " done" : active ? " active" : "")}>{done ? "✓" : s.id}</div>
           <span className="ds-step-label">{s.label}</span>
         </div>
@@ -1448,13 +1473,13 @@ function StepLayout() {
       </button>
       {showCurve && <ScalingDiagram minVp={minViewport} maxVp={maxViewport} ultrawide={state.ultrawide && layoutMode === "fullwidth"} />}
     </div>)}
-    {layoutMode && (<div className="ds-viewport-config"><h4>Viewport range</h4>
+    {layoutMode && (<div className="ds-viewport-config"><h4>Viewport range<InfoTip>The screen widths your values fluidly scale between. Below the min they hold the min value; above the max, the max value.</InfoTip></h4>
       <ValidationAlert items={warns} />
       <div className="ds-viewport-row" style={{ marginBottom: 0 }}>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label>Min viewport (px) {layoutMode === "fixed" ? <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— scale start</span> : <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— --vp-min</span>}</label><NumStepper value={minViewport} set={(n) => dispatch({ type: "SET_FIELD", field: "minViewport", value: Math.max(0, n) })} min={0} step={5} /></div>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label>{layoutMode === "fixed" ? "Content width (px)" : "Max viewport (px)"} <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— {layoutMode === "fixed" ? "--content-width" : "--vp-max"}</span></label><NumStepper value={maxViewport} set={(n) => dispatch({ type: "SET_FIELD", field: "maxViewport", value: Math.max(0, n) })} min={0} step={10} /></div>
       </div>
-      {layoutMode === "fullwidth" && (<div className="ds-toggle-row" style={{ marginTop: 14 }} onClick={() => dispatch({ type: "SET_FIELD", field: "ultrawide", value: !state.ultrawide })}>
+      {layoutMode === "fullwidth" && (<div className="ds-toggle-row" role="switch" tabIndex={0} aria-checked={state.ultrawide} onKeyDown={TGL_KEY} style={{ marginTop: 14 }} onClick={() => dispatch({ type: "SET_FIELD", field: "ultrawide", value: !state.ultrawide })}>
         <div className={"ds-toggle-track" + (state.ultrawide ? " on" : "")}><div className="ds-toggle-thumb" /></div>
         <div className="ds-toggle-text"><strong>Ultrawide display scaling</strong><span>Let the big headings (h1, h2) keep growing past your max viewport on very wide screens.</span></div>
       </div>)}
@@ -1483,9 +1508,9 @@ function StepSpacing() {
     <div className="ds-card">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}><h4 style={{ margin: 0 }}>Base space</h4><ResetButton sliceKey="spacing" /></div>
       <div className="ds-grid-3">
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Mobile</label><NumStepper value={sp.baseMobile} set={(n) => recalc(n, sp.baseDesktop)} min={0} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Desktop</label><NumStepper value={sp.baseDesktop} set={(n) => recalc(sp.baseMobile, n)} min={0} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale</label><NumStepper value={sp.scale} set={(n) => recalc(sp.baseMobile, sp.baseDesktop, n)} min={1} step={0.05} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Mobile</label><NumStepper value={sp.baseMobile} set={(n) => recalc(n, sp.baseDesktop)} min={0} max={400} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Desktop</label><NumStepper value={sp.baseDesktop} set={(n) => recalc(sp.baseMobile, n)} min={0} max={400} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale<InfoTip>Ratio between steps — 1.5 means each size is 1.5× the previous. Higher ratio, more dramatic jumps between sizes.</InfoTip></label><NumStepper value={sp.scale} set={(n) => recalc(sp.baseMobile, sp.baseDesktop, n)} min={1} max={3} step={0.05} /></div>
       </div>
     </div>
     <ValidationAlert items={warns} />
@@ -1517,9 +1542,9 @@ function StepSectionSpacing() {
     <div className="ds-card">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}><h4 style={{ margin: 0 }}>Base section space</h4><ResetButton sliceKey="sectionSpacing" /></div>
       <div className="ds-grid-3">
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Mobile</label><NumStepper value={ss.baseMobile} set={(n) => recalc(n, ss.baseDesktop)} min={0} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Desktop</label><NumStepper value={ss.baseDesktop} set={(n) => recalc(ss.baseMobile, n)} min={0} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale</label><NumStepper value={ss.scale} set={(n) => recalc(ss.baseMobile, ss.baseDesktop, n)} min={1} step={0.05} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Mobile</label><NumStepper value={ss.baseMobile} set={(n) => recalc(n, ss.baseDesktop)} min={0} max={800} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Desktop</label><NumStepper value={ss.baseDesktop} set={(n) => recalc(ss.baseMobile, n)} min={0} max={800} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale<InfoTip>Ratio between steps — 1.5 means each size is 1.5× the previous. Higher ratio, more dramatic jumps between sizes.</InfoTip></label><NumStepper value={ss.scale} set={(n) => recalc(ss.baseMobile, ss.baseDesktop, n)} min={1} max={3} step={0.05} /></div>
       </div>
     </div>
     <ValidationAlert items={warns} />
@@ -1628,7 +1653,7 @@ function StepTypography() {
   if (hDesk.every(v => v > 0) && !hDesk.every((v, i) => i === 0 || v <= hDesk[i - 1])) warns.push({ type: "warn", msg: "Headings not in descending order — h1 should be the largest" });
   if ((t.texts?.m?.desktop || 0) > 0 && t.texts.m.desktop < 14) warns.push({ type: "warn", msg: "text-m below 14px on desktop — consider 14–18px for readable body text" });
   return (<div>
-    <div className="ds-toggle-row" onClick={() => dispatch({ type: "SET_TYPO", payload: { useScale: !t.useScale } })}>
+    <div className="ds-toggle-row" role="switch" tabIndex={0} aria-checked={t.useScale} onKeyDown={TGL_KEY} onClick={() => dispatch({ type: "SET_TYPO", payload: { useScale: !t.useScale } })}>
       <div className={"ds-toggle-track" + (t.useScale ? " on" : "")}><div className="ds-toggle-thumb" /></div>
       <div className="ds-toggle-text"><strong>Use typographic scale</strong><span>{t.useScale ? "Values auto-calculated from base + scale" : "Enter all values manually"}</span></div>
     </div>
@@ -1639,7 +1664,7 @@ function StepTypography() {
       {t.useScale && (<div className="ds-grid-3" style={{ marginBottom: 16 }}>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>h3 Mobile</label><NumStepper value={t.headingBaseMob} set={(n) => dispatch({ type: "RECALC_HEADINGS", baseMob: n, baseDesk: t.headingBaseDesk, scale: t.headingScale })} min={0} /></div>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>h3 Desktop</label><NumStepper value={t.headingBaseDesk} set={(n) => dispatch({ type: "RECALC_HEADINGS", baseMob: t.headingBaseMob, baseDesk: n, scale: t.headingScale })} min={0} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale</label>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale<InfoTip>Ratio between steps — 1.5 means each size is 1.5× the previous. Higher ratio, more dramatic jumps between sizes.</InfoTip></label>
           <select className="ds-input" value={t.headingScale} onChange={(e) => dispatch({ type: "RECALC_HEADINGS", baseMob: t.headingBaseMob, baseDesk: t.headingBaseDesk, scale: parseFloat(e.target.value) })}>
             {SCALES.map((s) => <option key={s.value} value={s.value}>{s.name} ({s.value})</option>)}
           </select>
@@ -1660,7 +1685,7 @@ function StepTypography() {
       {t.useScale && (<div className="ds-grid-3" style={{ marginBottom: 16 }}>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>text-m Mobile</label><NumStepper value={t.textBaseMob} set={(n) => dispatch({ type: "RECALC_TEXTS", baseMob: n, baseDesk: t.textBaseDesk, scale: t.textScale })} min={0} /></div>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>text-m Desktop</label><NumStepper value={t.textBaseDesk} set={(n) => dispatch({ type: "RECALC_TEXTS", baseMob: t.textBaseMob, baseDesk: n, scale: t.textScale })} min={0} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale</label>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale<InfoTip>Ratio between steps — 1.5 means each size is 1.5× the previous. Higher ratio, more dramatic jumps between sizes.</InfoTip></label>
           <select className="ds-input" value={t.textScale} onChange={(e) => dispatch({ type: "RECALC_TEXTS", baseMob: t.textBaseMob, baseDesk: t.textBaseDesk, scale: parseFloat(e.target.value) })}>
             {SCALES.map((s) => <option key={s.value} value={s.value}>{s.name} ({s.value})</option>)}
           </select>
@@ -1745,11 +1770,11 @@ function PaletteCard({ palette }) {
       </div>
     </div>
     <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-      <div className="ds-toggle-row" style={{ flex: 1, marginBottom: 0 }} onClick={() => upd("showTransparency", !showTransparency)}>
+      <div className="ds-toggle-row" role="switch" tabIndex={0} aria-checked={showTransparency} onKeyDown={TGL_KEY} style={{ flex: 1, marginBottom: 0 }} onClick={() => upd("showTransparency", !showTransparency)}>
         <div className={"ds-toggle-track" + (showTransparency ? " on" : "")}><div className="ds-toggle-thumb" /></div>
         <div className="ds-toggle-text"><strong>Transparencies</strong></div>
       </div>
-      <div className="ds-toggle-row" style={{ flex: 1, marginBottom: 0 }} onClick={() => { if (!showVariants) recalcVariants(); upd("showVariants", !showVariants); }}>
+      <div className="ds-toggle-row" role="switch" tabIndex={0} aria-checked={showVariants} onKeyDown={TGL_KEY} style={{ flex: 1, marginBottom: 0 }} onClick={() => { if (!showVariants) recalcVariants(); upd("showVariants", !showVariants); }}>
         <div className={"ds-toggle-track" + (showVariants ? " on" : "")}><div className="ds-toggle-thumb" /></div>
         <div className="ds-toggle-text"><strong>Expand Palette</strong></div>
       </div>
@@ -1773,7 +1798,7 @@ function TransparencySection({ label, color, bgColor, field }) {
   const { state, dispatch } = useDSContext();
   const show = state.colors[field];
   return (<div className="ds-card">
-    <div className="ds-toggle-row" style={{ marginBottom: show ? 12 : 0 }} onClick={() => dispatch({ type: "SET_COLORS", payload: { [field]: !show } })}>
+    <div className="ds-toggle-row" role="switch" tabIndex={0} aria-checked={show} onKeyDown={TGL_KEY} style={{ marginBottom: show ? 12 : 0 }} onClick={() => dispatch({ type: "SET_COLORS", payload: { [field]: !show } })}>
       <div className={"ds-toggle-track" + (show ? " on" : "")}><div className="ds-toggle-thumb" /></div>
       <div className="ds-toggle-text"><strong>{label} Transparencies</strong></div>
     </div>
@@ -1853,12 +1878,12 @@ function StepRadius() {
     {RADIUS_KEYS.map((k, i) => (<div key={k} className={"ds-space-row" + (i % 2 ? " alt" : "")}>
       <div className="ds-space-name">--radius-{k}</div>
       <div><input className="ds-space-input" type="number" value={r.values[k] || 0} onChange={(e) => dispatch({ type: "SET_RADIUS_VAL", key: k, value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">px</div></div>
-      <div style={{ width: 60, height: 40, background: "var(--ds-border-light)", border: "0.5px solid var(--ds-text-3)", borderRadius: r.values[k] || 0 }} />
+      <div style={{ width: 60, height: 40, background: "var(--ds-accent-fill)", border: "1px solid var(--ds-accent-ring)", borderRadius: r.values[k] || 0 }} />
     </div>))}
     <div className="ds-space-row alt" style={{ marginTop: 6 }}>
       <div className="ds-space-name">--radius-circle</div>
       <div><input className="ds-space-input" type="number" value={r.circle} onChange={(e) => dispatch({ type: "SET_RADIUS", payload: { circle: parseInt(e.target.value) || 0 } })} /><div className="ds-space-label">px</div></div>
-      <div style={{ width: 40, height: 40, background: "var(--ds-border-light)", border: "0.5px solid var(--ds-text-3)", borderRadius: r.circle }} />
+      <div style={{ width: 40, height: 40, background: "var(--ds-accent-fill)", border: "1px solid var(--ds-accent-ring)", borderRadius: r.circle }} />
     </div>
   </div>);
 }
@@ -1898,7 +1923,7 @@ function StepButtons() {
     {/* OPTIONS */}
     <div className="ds-card">
       <h4>Options</h4>
-      <div className="ds-toggle-row" onClick={() => dispatch({ type: "SET_BTN", payload: { outline: !b.outline } })}>
+      <div className="ds-toggle-row" role="switch" tabIndex={0} aria-checked={b.outline} onKeyDown={TGL_KEY} onClick={() => dispatch({ type: "SET_BTN", payload: { outline: !b.outline } })}>
         <div className={"ds-toggle-track" + (b.outline ? " on" : "")}><div className="ds-toggle-thumb" /></div>
         <div className="ds-toggle-text"><strong>Include outline variants</strong><span>Adds a .btn--outline modifier for each enabled color</span></div>
       </div>
@@ -1928,7 +1953,7 @@ function StepButtons() {
       <h4>Colors <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— enable palette colors &amp; customize each button's states</span></h4>
       {palettes.map((p) => { const on = btnEnabled(state, p.id); const slug = slugify(p.name); const cfg = btnColorCfg(b, p.id); return (
         <div key={p.id} style={{ marginBottom: on ? 10 : 1 }}>
-          <div className="ds-toggle-row" style={{ marginBottom: on ? 8 : 0 }} onClick={() => dispatch({ type: "TOGGLE_BTN_COLOR", id: p.id })}>
+          <div className="ds-toggle-row" role="switch" tabIndex={0} aria-checked={on} onKeyDown={TGL_KEY} style={{ marginBottom: on ? 8 : 0 }} onClick={() => dispatch({ type: "TOGGLE_BTN_COLOR", id: p.id })}>
             <div className={"ds-toggle-track" + (on ? " on" : "")}><div className="ds-toggle-thumb" /></div>
             <div style={{ width: 18, height: 18, borderRadius: 4, flexShrink: 0, background: "hsl(" + p.hue + "," + p.saturation + "%," + p.lightness + "%)", border: "1px solid var(--ds-border)" }} />
             <div className="ds-toggle-text"><strong>{p.name}</strong><span style={{ fontFamily: "monospace" }}>.btn--{slug}{b.outline ? " · .btn--" + slug + ".btn--outline" : ""}</span></div>
@@ -2465,7 +2490,7 @@ function LandingPreview({ state }) {
           const flipY = hl.py + 16 + estH > vh;
           return (<>
             <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 6 }}>
-              <div style={{ position: "absolute", top: hl.top, left: hl.left, width: hl.width, height: hl.height, outline: "2px solid var(--ds-accent)", outlineOffset: "-1px", background: "hsla(250,88%,66%,.07)", borderRadius: 3, boxSizing: "border-box" }} />
+              <div style={{ position: "absolute", top: hl.top, left: hl.left, width: hl.width, height: hl.height, outline: "2px solid var(--ds-accent)", outlineOffset: "-1px", background: "color-mix(in srgb, var(--ds-accent) 7%, transparent)", borderRadius: 3, boxSizing: "border-box" }} />
             </div>
             <div style={{ position: "fixed", left: flipX ? Math.max(4, hl.px - W - 12) : hl.px + 16, top: flipY ? Math.max(4, hl.py - estH - 8) : hl.py + 16, width: W, background: "#0e0e0e", color: "#e5e5e5", border: "1px solid #2c2c2c", borderRadius: 8, padding: "9px 11px", boxShadow: "0 10px 30px rgba(0,0,0,.5)", fontFamily: "'SF Mono',Consolas,monospace", fontSize: 11, lineHeight: 1.55, pointerEvents: "none", zIndex: 10000 }}>
               <div style={{ color: "var(--ds-accent)", fontWeight: 700, marginBottom: 6 }}>
@@ -2693,13 +2718,13 @@ function StepPreview() {
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", background: "var(--ds-bg-card)", padding: 20, borderRadius: "var(--ds-radius-lg)", border: "0.5px solid var(--ds-border-light)" }}>
         {RADIUS_KEYS.map((k) => (
           <div key={k} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-            <div style={{ width: 60, height: 40, background: "var(--ds-border-light)", border: "0.5px solid var(--ds-text-3)", borderRadius: r.values[k] || 0 }} />
+            <div style={{ width: 60, height: 40, background: "var(--ds-accent-fill)", border: "1px solid var(--ds-accent-ring)", borderRadius: r.values[k] || 0 }} />
             <div style={{ fontSize: 10, color: "var(--ds-text-3)" }}>{k}</div>
             <div style={{ fontSize: 10, fontWeight: 600, color: "var(--ds-primary)" }}>{r.values[k]}px</div>
           </div>
         ))}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 40, height: 40, background: "var(--ds-border-light)", border: "0.5px solid var(--ds-text-3)", borderRadius: r.circle }} />
+          <div style={{ width: 40, height: 40, background: "var(--ds-accent-fill)", border: "1px solid var(--ds-accent-ring)", borderRadius: r.circle }} />
           <div style={{ fontSize: 10, color: "var(--ds-text-3)" }}>circle</div>
           <div style={{ fontSize: 10, fontWeight: 600, color: "var(--ds-primary)" }}>{r.circle}px</div>
         </div>
@@ -2750,7 +2775,7 @@ function CrossPromoEditor({ value, onSave }) {
   return (
     <div className="ds-card" style={{ marginBottom: 18 }}>
       <h4 style={{ marginTop: 0 }}>Cross-promo <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— shown in the editor sidebar to every user</span></h4>
-      <div className="ds-toggle-row" onClick={() => set("visible", !draft.visible)}>
+      <div className="ds-toggle-row" role="switch" tabIndex={0} aria-checked={draft.visible} onKeyDown={TGL_KEY} onClick={() => set("visible", !draft.visible)}>
         <div className={"ds-toggle-track" + (draft.visible ? " on" : "")}><div className="ds-toggle-thumb" /></div>
         <div className="ds-toggle-text"><strong>Visible</strong><span>Show the cross-promo card in the step sidebar</span></div>
       </div>
@@ -2835,7 +2860,14 @@ function StepExport() {
       setStatus({ type: "ok", file: filename }); setTimeout(() => setStatus(null), 4000);
       setDone(key); setTimeout(() => setDone((d) => d === key ? null : d), 1600);
       addToast?.(filename + " downloaded", "ok");
-    } catch (e) { setStatus({ type: "error", msg: e.message }); addToast?.("Export failed", "err"); }
+    } catch (e) { setStatus({ type: "error", msg: e.message }); addToast?.("Export failed — try again; reload if it persists", "err"); }
+  };
+
+  // Descarga todos los archivos exportables, con stagger para que el navegador no descarte descargas seguidas.
+  const dlAll = () => {
+    CARDS.filter(c => !c.disabled).forEach((c, i) => {
+      setTimeout(() => dl(c.gen, baseName + "-" + c.suffix, c.mime, c.id), i * 250);
+    });
   };
 
   const CARDS = [
@@ -2874,6 +2906,7 @@ function StepExport() {
       <input className={"ds-input" + (state.varPrefix && !/^[a-z][a-z0-9-]*$/.test(state.varPrefix) ? " ds-input-error" : "")} value={state.varPrefix} placeholder="e.g. ds, brand, acme" onChange={(e) => dispatch({ type: "SET_FIELD", field: "varPrefix", value: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} />
       <div className="ds-helper">{state.varPrefix ? "--" + state.varPrefix + "-space-m, --" + state.varPrefix + "-primary, ..." : "Leave empty for default naming: --space-m, --primary, ..."}</div>
     </div>
+    <button className="ds-download-btn" onClick={dlAll} disabled={warnings.length > 0} style={{ width: "auto", margin: "0 0 16px", paddingInline: 20 }}>↓ Download all ({CARDS.filter(c => !c.disabled).length} files)</button>
     <div className="ds-export-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}>
       {CARDS.map(c => {
         const filename = baseName + "-" + c.suffix;
@@ -2881,7 +2914,10 @@ function StepExport() {
         <div key={c.id} className="ds-export-file-card">
           <h4>{c.title}</h4>
           <p>{c.desc}</p>
-          <div style={{ fontSize: 11, color: "var(--ds-text-3)", marginBottom: 8, fontFamily: "monospace" }}>{c.sub}</div>
+          <div style={{ fontSize: 11, marginBottom: 8, display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+            <span style={{ color: "var(--ds-accent)", fontWeight: 600, whiteSpace: "nowrap" }}>In Bricks</span>
+            <span style={{ color: "var(--ds-text-2)", fontFamily: "monospace" }}>{c.sub}</span>
+          </div>
           <div style={{ fontSize: 12, color: "var(--ds-text-2)", marginBottom: 14, fontFamily: "monospace", padding: "7px 10px", background: "var(--ds-bg)", border: "1px solid var(--ds-border-light)", borderRadius: "var(--ds-radius)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{filename}</div>
           <button className={"ds-download-btn" + (done === c.id ? " ds-dl-done" : "")} onClick={() => dl(c.gen, filename, c.mime, c.id)} disabled={warnings.length > 0 || c.disabled} style={{ marginTop: "auto" }}>{done === c.id ? "✓ Downloaded!" : c.label}</button>
         </div>
@@ -2890,7 +2926,7 @@ function StepExport() {
     </div>
     <HeaderScriptCard />
     {status?.type === "ok"    && <div className="ds-status ok">✓ {status.file} downloaded successfully</div>}
-    {status?.type === "error" && <div className="ds-status" style={{ background: "rgba(220,53,69,.08)", color: "var(--ds-error)", border: "1px solid var(--ds-error)" }}>⚠ Error: {status.msg}</div>}
+    {status?.type === "error" && <div className="ds-status" style={{ background: "rgba(220,53,69,.08)", color: "var(--ds-error)", border: "1px solid var(--ds-error)" }}>⚠ Couldn't build the file: {status.msg}. Try the download again — if it keeps failing, reload the page (your work is saved).</div>}
   </div>);
 }
 
@@ -2905,9 +2941,12 @@ class ErrorBoundary extends Component {
   render() {
     if (this.state.err) return (
       <div className="ds-auth-loading" style={{ flexDirection: "column", gap: 12, textAlign: "center", padding: 24 }}>
-        <div style={{ fontWeight: 600 }}>Something went wrong rendering this view.</div>
-        <div style={{ fontSize: 12, color: "var(--ds-text-3)" }}>Your data is safe. Go to another step or reload.</div>
-        <button className="ds-btn" onClick={() => this.setState({ err: null })}>Try again</button>
+        <div style={{ fontWeight: 600 }}>This step hit a display error.</div>
+        <div style={{ fontSize: 12, color: "var(--ds-text-3)", maxWidth: 320, lineHeight: 1.5 }}>Your work is saved. Click <strong>Try again</strong> to re-render this step — if it keeps happening, reload the page or move to another step.</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="ds-btn ds-btn-primary" onClick={() => this.setState({ err: null })}>Try again</button>
+          <button className="ds-btn" onClick={() => window.location.reload()}>Reload page</button>
+        </div>
       </div>
     );
     return this.props.children;
