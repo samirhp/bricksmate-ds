@@ -1,14 +1,7 @@
-import { useState, useEffect, useContext, useReducer, createContext, useMemo, useRef, Component } from "react";
+import { useState, useEffect, useContext, useReducer, createContext, useMemo, useRef, Component, lazy, Suspense } from "react";
 import { supabase, cloudEnabled } from "./supabase";
-import { PrismLight as SyntaxHighlighter } from "react-syntax-highlighter";
-import prismJs from "react-syntax-highlighter/dist/esm/languages/prism/javascript";
-import prismMarkup from "react-syntax-highlighter/dist/esm/languages/prism/markup";
-import prismCss from "react-syntax-highlighter/dist/esm/languages/prism/css";
-import prismTheme from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
-// Snippet bank-ready: registramos solo los lenguajes que usamos (bundle lean).
-SyntaxHighlighter.registerLanguage("javascript", prismJs);
-SyntaxHighlighter.registerLanguage("markup", prismMarkup);
-SyntaxHighlighter.registerLanguage("css", prismCss);
+// Code-split: el editor de código (react-syntax-highlighter, ~pesado) se carga solo al usarse (paso Export).
+const CodeEditor = lazy(() => import("./CodeEditor"));
 
 const MAX_SYSTEMS = 5; // tope de sistemas por cuenta (también aplicado a invitados, y en la BD via trigger)
 
@@ -487,7 +480,7 @@ const DESCS = {
    STYLES
    ================================================================ */
 const css_styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap');
   :root {
     --ds-primary:hsl(240,5.9%,10%); --ds-primary-hover:hsl(240,5.9%,18%); --ds-primary-light:hsl(240,4.8%,95.9%);
     --ds-bg:hsl(0,0%,98%); --ds-bg-card:hsl(0,0%,100%);
@@ -513,11 +506,11 @@ const css_styles = `
     --ds-shadow-md:0 2px 4px rgba(0,0,0,.7),0 1px 2px rgba(0,0,0,.5);
   }
   *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Hanken Grotesk',system-ui,-apple-system,sans-serif;background:var(--ds-bg);color:var(--ds-text);line-height:1.6;-webkit-font-smoothing:antialiased}
+  body{font-family:'Geist',system-ui,-apple-system,sans-serif;background:var(--ds-bg);color:var(--ds-text);line-height:1.6;-webkit-font-smoothing:antialiased}
   .ds-app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
   .ds-header{background:var(--ds-bg-card);border-bottom:1px solid var(--ds-border-light);padding:0 24px;height:54px;display:flex;align-items:center;gap:12px;box-shadow:var(--ds-shadow)}
   .ds-header-icon{width:30px;height:30px;border-radius:var(--ds-radius);flex-shrink:0;display:block}
-  .ds-ver-pill{position:relative;font-size:10px;font-weight:600;color:var(--ds-accent);background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring);border-radius:4px;padding:2px 7px;letter-spacing:.3px;flex-shrink:0;font-family:'SF Mono',Consolas,monospace;cursor:pointer;transition:border-color .15s,background .15s}
+  .ds-ver-pill{position:relative;display:inline-flex;align-items:center;min-height:24px;box-sizing:border-box;font-size:10px;font-weight:600;color:var(--ds-accent);background:var(--ds-accent-light);border:1px solid var(--ds-accent-ring);border-radius:4px;padding:2px 8px;letter-spacing:.3px;flex-shrink:0;font-family:'SF Mono',Consolas,monospace;cursor:pointer;transition:border-color .15s,background .15s}
   .ds-ver-pill:hover{border-color:var(--ds-accent)}
   .ds-ver-dot{position:absolute;top:-3px;right:-3px;width:6px;height:6px;border-radius:50%;background:var(--ds-accent);border:1px solid var(--ds-bg-card);animation:ds-ver-pulse 1.8s ease-out infinite}
   @keyframes ds-ver-pulse{0%{box-shadow:0 0 0 0 hsla(250,88%,66%,.55)}70%{box-shadow:0 0 0 6px hsla(250,88%,66%,0)}100%{box-shadow:0 0 0 0 hsla(250,88%,66%,0)}}
@@ -566,7 +559,7 @@ const css_styles = `
   .ds-step-desc{font-size:11px;color:var(--ds-accent);padding:0 10px 6px 36px;line-height:1.4}
   .ds-content{flex:1;display:flex;flex-direction:column;overflow:hidden}
   .ds-content-header{background:var(--ds-bg-card);padding:14px 24px;border-bottom:1px solid var(--ds-border-light)}
-  .ds-content-header h2{font-size:17px;font-weight:600;letter-spacing:-.02em} .ds-content-header p{font-size:13px;color:var(--ds-text-2);margin-top:3px}
+  .ds-content-header h1{font-size:17px;font-weight:600;letter-spacing:-.02em} .ds-content-header p{font-size:13px;color:var(--ds-text-2);margin-top:3px}
   .ds-content-body{flex:1;padding:24px;overflow-y:auto}
   .ds-footer{background:var(--ds-bg-card);border-top:1px solid var(--ds-border-light);padding:10px 24px;display:flex;justify-content:space-between;align-items:center}
   .ds-footer-info{font-size:12px;color:var(--ds-text-3)} .ds-footer-actions{display:flex;gap:8px}
@@ -862,7 +855,7 @@ const css_styles = `
   .ds-cs-search{margin-bottom:6px}
   .ds-cs-list{overflow-y:auto}
   .ds-cs-opt{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--ds-text)}
-  .ds-cs-opt:hover{background:var(--ds-bg)} .ds-cs-opt.sel{background:var(--ds-accent-light)}
+  .ds-cs-opt:hover,.ds-cs-opt.hi{background:var(--ds-bg)} .ds-cs-opt.sel{background:var(--ds-accent-light)}
   .ds-cs-empty{padding:12px;text-align:center;color:var(--ds-text-3);font-size:12px}
   /* Panel de cuenta */
   .ds-account{max-width:480px;margin:0 auto}
@@ -871,6 +864,12 @@ const css_styles = `
   .ds-account-email{font-size:13px;color:var(--ds-text-3)}
 
   @media (prefers-reduced-motion:reduce){.ds-step-anim,.ds-step-check,.ds-toast,.ds-step-node.done,.ds-ver-dot{animation:none}*{transition-duration:.01ms!important}}
+  /* Touch: targets cómodos (≥44px) en punteros gruesos (móvil/tablet). En desktop se quedan compactos. */
+  @media (pointer:coarse){
+    .ds-btn,.ds-btn-primary,.ds-download-btn,.ds-input,.ds-cs-btn,.ds-stepper-input,.ds-header-back{min-height:44px}
+    .ds-header-theme,.ds-modal-x,.ds-stepper-btn{min-width:44px;min-height:44px}
+    .ds-ver-pill{min-height:34px}
+  }
 
   /* ===== Responsive (≤767px): stack entry surfaces; the editor shows a notice ===== */
   .ds-mobile-notice{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;padding:32px 24px;overflow:auto}
@@ -929,7 +928,9 @@ const flagUrl = (code) => "https://flagcdn.com/20x15/" + code + ".png";
 function CountrySelect({ value, onChange }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const [hi, setHi] = useState(0); // índice resaltado para navegación por teclado
   const ref = useRef(null);
+  const listRef = useRef(null);
   useEffect(() => {
     const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
     document.addEventListener("mousedown", h);
@@ -937,18 +938,26 @@ function CountrySelect({ value, onChange }) {
   }, []);
   const sel = COUNTRIES.find((c) => c.n === value);
   const filtered = COUNTRIES.filter((c) => c.n.toLowerCase().includes(q.trim().toLowerCase()));
+  const pick = (c) => { if (!c) return; onChange(c.n); setOpen(false); setQ(""); setHi(0); };
+  useEffect(() => { if (open && listRef.current) listRef.current.querySelector(".ds-cs-opt.hi")?.scrollIntoView({ block: "nearest" }); }, [hi, open]);
+  const onSearchKey = (e) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); setHi((i) => Math.min(i + 1, filtered.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setHi((i) => Math.max(i - 1, 0)); }
+    else if (e.key === "Enter") { e.preventDefault(); pick(filtered[hi]); }
+    else if (e.key === "Escape") { e.preventDefault(); setOpen(false); }
+  };
   return (
     <div className="ds-cs" ref={ref}>
-      <button type="button" className="ds-input ds-cs-btn" onClick={() => setOpen((o) => !o)}>
+      <button type="button" className="ds-input ds-cs-btn" aria-label={sel ? "Country: " + sel.n : "Country"} aria-haspopup="listbox" aria-expanded={open} onClick={() => { setOpen((o) => !o); setHi(0); }}>
         {sel ? <span className="ds-cs-val">{sel.c && <img className="ds-cs-flag" src={flagUrl(sel.c)} alt="" />}{sel.n}</span> : <span className="ds-cs-ph">Country…</span>}
         <span className="ds-cs-caret">▾</span>
       </button>
       {open && (
         <div className="ds-cs-panel">
-          <input className="ds-input ds-cs-search" placeholder="Search country…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
-          <div className="ds-cs-list">
-            {filtered.map((c) => (
-              <div key={c.n} className={"ds-cs-opt" + (c.n === value ? " sel" : "")} onClick={() => { onChange(c.n); setOpen(false); setQ(""); }}>
+          <input className="ds-input ds-cs-search" aria-label="Search country" placeholder="Search country…" value={q} onChange={(e) => { setQ(e.target.value); setHi(0); }} onKeyDown={onSearchKey} autoFocus />
+          <div className="ds-cs-list" role="listbox" aria-label="Country" ref={listRef}>
+            {filtered.map((c, i) => (
+              <div key={c.n} role="option" aria-selected={c.n === value} className={"ds-cs-opt" + (c.n === value ? " sel" : "") + (i === hi ? " hi" : "")} onMouseEnter={() => setHi(i)} onClick={() => pick(c)}>
                 {c.c ? <img className="ds-cs-flag" src={flagUrl(c.c)} alt="" loading="lazy" /> : <span className="ds-cs-flag" />}{c.n}
               </div>
             ))}
@@ -992,7 +1001,7 @@ function AuthModal({ onClose, addToast, initialMode }) {
   const submit = async (e) => {
     e.preventDefault();
     if (!email.trim() || busy || !supabase) return;
-    if (isSignup && (!firstName.trim() || !country)) { addToast?.("Please complete name and country", "err"); return; }
+    if (isSignup && (!firstName.trim() || !lastName.trim() || !country)) { addToast?.("Please complete your name and country", "err"); return; }
     setBusy(true);
     try {
       try { localStorage.setItem("dsg-optin", optIn ? "1" : "0"); } catch {}
@@ -1002,7 +1011,7 @@ function AuthModal({ onClose, addToast, initialMode }) {
       const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options });
       if (error) {
         if (!isSignup && /signups?\s+not\s+allowed|not\s*found|no\s*user/i.test(error.message || "")) {
-          addToast?.("No account with that email — create one first.", "err");
+          addToast?.("No account with that email. Create one first.", "err");
           setMode("signup"); setBusy(false); return;
         }
         throw error;
@@ -1024,16 +1033,30 @@ function AuthModal({ onClose, addToast, initialMode }) {
           <form onSubmit={submit}>
             <h3>{isSignup ? "Create your account" : "Sign in"}</h3>
             <p>{isSignup
-              ? "Save your design systems in the cloud and keep them safe across devices. No password — we'll email you a magic link."
+              ? "Save your design systems in the cloud and keep them safe across devices. No password needed, we'll email you a magic link."
               : "Welcome back. Enter your email and we'll send you a magic link."}</p>
             {isSignup && (
               <div className="ds-grid-2" style={{ marginBottom: 10 }}>
-                <input className="ds-input" placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} required autoFocus />
-                <input className="ds-input" placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                <div className="ds-form-group" style={{ marginBottom: 0 }}>
+                  <label htmlFor="auth-first">First name</label>
+                  <input id="auth-first" className="ds-input" value={firstName} onChange={(e) => setFirstName(e.target.value)} required autoFocus />
+                </div>
+                <div className="ds-form-group" style={{ marginBottom: 0 }}>
+                  <label htmlFor="auth-last">Last name</label>
+                  <input id="auth-last" className="ds-input" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+                </div>
               </div>
             )}
-            <input className="ds-input" type="email" required placeholder="you@email.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ marginBottom: isSignup ? 10 : 0 }} autoFocus={!isSignup} />
-            {isSignup && <CountrySelect value={country} onChange={setCountry} />}
+            <div className="ds-form-group" style={{ marginBottom: isSignup ? 10 : 0 }}>
+              <label htmlFor="auth-email">Email</label>
+              <input id="auth-email" className="ds-input" type="email" required placeholder="you@email.com" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus={!isSignup} />
+            </div>
+            {isSignup && (
+              <div className="ds-form-group" style={{ marginBottom: 10 }}>
+                <label>Country</label>
+                <CountrySelect value={country} onChange={setCountry} />
+              </div>
+            )}
             {isSignup && <label className="ds-optin"><input type="checkbox" checked={optIn} onChange={(e) => setOptIn(e.target.checked)} /><span>I want to receive occasional tips &amp; updates from Samir Haddad. No spam, unsubscribe anytime.</span></label>}
             <button className="ds-btn ds-btn-primary" type="submit" disabled={busy} style={{ width: "100%", marginTop: isSignup ? 4 : 10 }}><Ico name="mail" />{busy ? "Sending…" : (isSignup ? "Create account" : "Send magic link")}</button>
             <div className="ds-auth-switch">
@@ -1057,7 +1080,7 @@ function SelectMigrateModal({ prompt, onConfirm, onClose }) {
       <div className="ds-modal ds-modal-wide" onClick={(e) => e.stopPropagation()}>
         <button className="ds-modal-x" onClick={onClose} aria-label="Close">✕</button>
         <h3>Choose what to sync to the cloud</h3>
-        <p>You have {candidates.length} systems on this device but only {slots} cloud slot{slots === 1 ? "" : "s"} free. Pick up to {slots} — the rest stay safe on this device.</p>
+        <p>You have {candidates.length} systems on this device but only {slots} cloud slot{slots === 1 ? "" : "s"} free. Pick up to {slots}; the rest stay safe on this device.</p>
         <div className="ds-migrate-list">
           {candidates.map((c) => {
             const checked = sel.includes(c.id);
@@ -1162,17 +1185,25 @@ function GuestBanner({ onSignIn }) {
   if (!cloudEnabled) return null;
   return (
     <div className="ds-guest-banner">
-      <span><strong>Guest mode</strong> — your systems are saved only in this browser and can be lost. Create an account to keep them safe in the cloud.</span>
+      <span><strong>Guest mode</strong>: your systems are saved only in this browser and can be lost. Create an account to keep them safe in the cloud.</span>
       <button className="ds-btn ds-btn-sm" onClick={onSignIn}>Sign up</button>
     </div>
   );
 }
-const APP_VERSION = "v1.3.1";
+const APP_VERSION = "v1.3.2";
 // Changelog (user-facing). Lo último arriba. tag: new | improved | fixed.
 // REGLA: SOLO cambios de cara al usuario. NUNCA incluir nada de backend/infra
 // (Vercel, Supabase, analytics, hosting, claves, etc.).
 const CL_TAGS = { new: { label: "New", cls: "new" }, improved: { label: "Improved", cls: "imp" }, fixed: { label: "Fixed", cls: "fix" } };
 const CHANGELOG = [
+  {
+    v: "1.3.2", date: "19 Jun 2026",
+    items: [
+      { tag: "improved", text: "The sign-up form now shows a label on every field and works fully by keyboard (including the country picker, navigable with arrow keys)." },
+      { tag: "improved", text: "Faster first load, more accessible controls across the app (keyboard names and headings), and bigger tap targets on touch devices." },
+      { tag: "fixed", text: "Cleaner empty state on the dashboard and tidied-up wording." },
+    ],
+  },
   {
     v: "1.3.1", date: "18 Jun 2026",
     items: [
@@ -1183,7 +1214,7 @@ const CHANGELOG = [
   {
     v: "1.3", date: "17 Jun 2026",
     items: [
-      { tag: "new", text: "Colour palette export now has two modes — everything in one Bricks palette, or one palette per colour so they appear as separate categories in the Bricks picker, with an optional name prefix." },
+      { tag: "new", text: "Colour palette export now has two modes: everything in one Bricks palette, or one palette per colour so they appear as separate categories in the Bricks picker, with an optional name prefix." },
       { tag: "improved", text: "“Download all” and the per-colour palette export now download as a single .zip instead of many separate files." },
       { tag: "improved", text: "Black and white are now shown as separate colours in the Preview." },
     ],
@@ -1191,8 +1222,8 @@ const CHANGELOG = [
   {
     v: "1.2", date: "17 Jun 2026",
     items: [
-      { tag: "new", text: "“Download all” in Export — grab every file (Variables, Palette, Classes, Framework CSS) in one click." },
-      { tag: "new", text: "Inline help — a “?” on Scale and Viewport range explains them, and each export now shows where it goes in Bricks." },
+      { tag: "new", text: "“Download all” in Export: grab every file (Variables, Palette, Classes, Framework CSS) in one click." },
+      { tag: "new", text: "Inline help: a “?” on Scale and Viewport range explains them, and each export now shows where it goes in Bricks." },
       { tag: "improved", text: "Full keyboard navigation and screen-reader support across the wizard, with a visible focus ring on every control." },
       { tag: "improved", text: "New UI typeface for a sharper, more distinctive interface." },
       { tag: "improved", text: "Clearer error messages and smarter input limits, so it’s harder to end up with a broken system." },
@@ -1202,18 +1233,18 @@ const CHANGELOG = [
   {
     v: "1.1", date: "16 Jun 2026",
     items: [
-      { tag: "new", text: "Optional “Header height script” in Export — measures your real header so #id anchors stay pixel-perfect across breakpoints and sticky-shrink." },
-      { tag: "improved", text: "Header offset is now fluid (mobile → desktop) and applied directly — set it to your sticky-header height for accurate #id anchor scrolling." },
+      { tag: "new", text: "Optional “Header height script” in Export: measures your real header so #id anchors stay pixel-perfect across breakpoints and sticky-shrink." },
+      { tag: "improved", text: "Header offset is now fluid (mobile → desktop) and applied directly, so set it to your sticky-header height for accurate #id anchor scrolling." },
     ],
   },
   {
     v: "1.0", date: "16 Jun 2026",
     items: [
-      { tag: "new", text: "Fluid scaling rebuilt — full-width uses editable master viewport variables; fixed-width anchors to a --content-width token, with optional ultrawide scaling for big headings." },
+      { tag: "new", text: "Fluid scaling rebuilt: full-width uses editable master viewport variables; fixed-width anchors to a --content-width token, with optional ultrawide scaling for big headings." },
       { tag: "new", text: "Letter-spacing controls for text and headings (em / rem / px)." },
       { tag: "new", text: "Per-step “Reset to defaults”, with one-click Undo." },
       { tag: "new", text: "Section padding as a token, per-palette button colours (fill & outline), and a “No radius” button option." },
-      { tag: "improved", text: "Refreshed dark UI — deeper background, flat cards, subtler corners, accent primary buttons and a profile dropdown." },
+      { tag: "improved", text: "Refreshed dark UI: deeper background, flat cards, subtler corners, accent primary buttons and a profile dropdown." },
       { tag: "improved", text: "Mobile-friendly dashboard, sign-in and account screens." },
       { tag: "improved", text: "Live-preview variable inspector and cleaner export naming." },
     ],
@@ -1351,14 +1382,26 @@ function ValidationAlert({ items }) {
 }
 
 // Input numérico con botones +/− (steppers)
-function NumStepper({ value, set, min, max, step = 1 }) {
+function NumStepper({ value, set, min, max, step = 1, ariaLabel }) {
+  const inputRef = useRef(null);
+  // a11y: si no se pasa ariaLabel, lo derivamos del <label> del .ds-form-group (solo nodos de texto,
+  // así excluimos el InfoTip "?" y los hints en <span>). Da nombre accesible al input sin tocar las 23 llamadas.
+  useEffect(() => {
+    const inp = inputRef.current; if (!inp) return;
+    let txt = ariaLabel;
+    if (!txt) {
+      const lbl = inp.closest(".ds-form-group")?.querySelector("label");
+      if (lbl) txt = [...lbl.childNodes].filter((n) => n.nodeType === 3).map((n) => n.nodeValue).join("").replace(/\s+/g, " ").trim();
+    }
+    if (txt && inp.getAttribute("aria-label") !== txt) inp.setAttribute("aria-label", txt);
+  });
   const norm = (n) => (step < 1 ? Math.round(n * 100) / 100 : Math.round(n));
   const clamp = (n) => { if (min != null) n = Math.max(min, n); if (max != null) n = Math.min(max, n); return n; };
   const change = (d) => set(clamp(norm((parseFloat(value) || 0) + d)));
   const onType = (e) => { const v = e.target.value; if (v === "") { set(min != null ? min : 0); return; } set(clamp(step < 1 ? (parseFloat(v) || 0) : (parseInt(v) || 0))); };
   return (<div className="ds-stepper">
     <button type="button" className="ds-stepper-btn" tabIndex={-1} onClick={() => change(-step)} aria-label="Decrease">−</button>
-    <input type="number" className="ds-stepper-input" value={value} min={min} max={max} step={step} onChange={onType} />
+    <input ref={inputRef} type="number" className="ds-stepper-input" value={value} min={min} max={max} step={step} onChange={onType} />
     <button type="button" className="ds-stepper-btn" tabIndex={-1} onClick={() => change(step)} aria-label="Increase">+</button>
   </div>);
 }
@@ -1475,8 +1518,8 @@ function StepLayout() {
   const [showCurve, setShowCurve] = useState(false);
   const warns = [];
   if (layoutMode) {
-    if (minViewport >= maxViewport) warns.push({ type: "error", msg: "Min viewport ≥ max viewport — clamp() fallback to static values, fluid scaling won't work" });
-    else if ((maxViewport - minViewport) < 300) warns.push({ type: "warn", msg: "Viewport range below 300px — fluid values will barely scale" });
+    if (minViewport >= maxViewport) warns.push({ type: "error", msg: "Min viewport ≥ max viewport; clamp() falls back to static values, fluid scaling won't work" });
+    else if ((maxViewport - minViewport) < 300) warns.push({ type: "warn", msg: "Viewport range below 300px; fluid values will barely scale" });
   }
   return (<div>
     <div className={"ds-mode-cards" + (layoutMode ? " has-sel" : "")}>
@@ -1484,8 +1527,8 @@ function StepLayout() {
       <div className={"ds-mode-card" + (layoutMode === "fixed" ? " selected" : "")} onClick={() => dispatch({ type: "SET_LAYOUT_MODE", payload: "fixed" })}><span className="ds-mode-check">✓</span><span className="ds-mode-icon"><LayoutIcon mode="fixed" /></span><h3>Fixed-width</h3><p>Content constrained to max-width</p></div>
     </div>
     {layoutMode && (<div className="ds-mode-info">
-      <strong>{layoutMode === "fixed" ? "Fixed-width" : "Full-width"}</strong> — {layoutMode === "fixed"
-        ? "content is capped to a max width and centered. Fluid tokens (type, spacing, gaps…) use a classic clamp() and lock at your content width — wider screens just add side margins."
+      <strong>{layoutMode === "fixed" ? "Fixed-width" : "Full-width"}</strong>: {layoutMode === "fixed"
+        ? "content is capped to a max width and centered. Fluid tokens (type, spacing, gaps…) use a classic clamp() and lock at your content width; wider screens just add side margins."
         : "content spans the full screen (100%). Every fluid token shares one viewport range (--vp-min → --vp-max) and reaches its max at your max viewport; beyond that it stays flat."}
       <span className="sub">{layoutMode === "fixed"
         ? <>Tokens export as baked <code style={{ fontFamily: "'SF Mono',monospace" }}>clamp()</code> values capped at <code style={{ fontFamily: "'SF Mono',monospace" }}>--content-width</code> ({maxViewport}px).</>
@@ -1523,7 +1566,7 @@ function StepSpacing() {
   const sp = state.spacing;
   const recalc = (bm, bd, sc) => dispatch({ type: "RECALC_SPACING", baseMobile: bm, baseDesktop: bd, scale: sc ?? sp.scale });
   const warns = [];
-  if (sp.baseMobile > sp.baseDesktop) warns.push({ type: "warn", msg: "Mobile base larger than desktop — spacing scale decreases on larger screens" });
+  if (sp.baseMobile > sp.baseDesktop) warns.push({ type: "warn", msg: "Mobile base larger than desktop; spacing scale decreases on larger screens" });
   const invKeys = SPACE_KEYS.filter(k => k !== "section" && (sp.values[k]?.mobile || 0) > (sp.values[k]?.desktop || 0));
   if (invKeys.length) warns.push({ type: "warn", msg: (invKeys.length === 1 ? "1 value is" : invKeys.length + " values are") + " larger on mobile than desktop: " + invKeys.map(k => "--space-" + k).join(", ") });
   return (<div>
@@ -1532,7 +1575,7 @@ function StepSpacing() {
       <div className="ds-grid-3">
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Mobile</label><NumStepper value={sp.baseMobile} set={(n) => recalc(n, sp.baseDesktop)} min={0} max={400} /></div>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Desktop</label><NumStepper value={sp.baseDesktop} set={(n) => recalc(sp.baseMobile, n)} min={0} max={400} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale<InfoTip>Ratio between steps — 1.5 means each size is 1.5× the previous. Higher ratio, more dramatic jumps between sizes.</InfoTip></label><NumStepper value={sp.scale} set={(n) => recalc(sp.baseMobile, sp.baseDesktop, n)} min={1} max={3} step={0.05} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale<InfoTip>Ratio between steps. 1.5 means each size is 1.5× the previous. Higher ratio, more dramatic jumps between sizes.</InfoTip></label><NumStepper value={sp.scale} set={(n) => recalc(sp.baseMobile, sp.baseDesktop, n)} min={1} max={3} step={0.05} /></div>
       </div>
     </div>
     <ValidationAlert items={warns} />
@@ -1540,8 +1583,8 @@ function StepSpacing() {
       return keys.map((k, i) => (<div key={k} className={"ds-space-row" + (i % 2 ? " alt" : "")}>
       <div className="ds-space-name">--space-{k}</div>
       <div className="ds-space-inputs">
-        <div><input className="ds-space-input" type="number" value={sp.values[k]?.mobile || 0} onChange={(e) => dispatch({ type: "SET_SPACE_VALUE", key: k, side: "mobile", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Mobile</div></div>
-        <div><input className="ds-space-input" type="number" value={sp.values[k]?.desktop || 0} onChange={(e) => dispatch({ type: "SET_SPACE_VALUE", key: k, side: "desktop", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Desktop</div></div>
+        <div><input className="ds-space-input" type="number" aria-label={"space " + k + " mobile"} value={sp.values[k]?.mobile || 0} onChange={(e) => dispatch({ type: "SET_SPACE_VALUE", key: k, side: "mobile", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Mobile</div></div>
+        <div><input className="ds-space-input" type="number" aria-label={"space " + k + " desktop"} value={sp.values[k]?.desktop || 0} onChange={(e) => dispatch({ type: "SET_SPACE_VALUE", key: k, side: "desktop", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Desktop</div></div>
       </div>
       <div className="ds-space-bar" style={{ width: Math.round(6 + (sp.values[k]?.desktop || 0) / maxV * 134) }} />
     </div>)); })()}
@@ -1557,7 +1600,7 @@ function StepSectionSpacing() {
   const gut = state.gutter || { mobile: 16, desktop: 64 };
   const recalc = (bm, bd, sc) => dispatch({ type: "RECALC_SECTION_SPACING", baseMobile: bm, baseDesktop: bd, scale: sc ?? ss.scale });
   const warns = [];
-  if (ss.baseMobile > ss.baseDesktop) warns.push({ type: "warn", msg: "Mobile base larger than desktop — section spacing scale decreases on larger screens" });
+  if (ss.baseMobile > ss.baseDesktop) warns.push({ type: "warn", msg: "Mobile base larger than desktop; section spacing scale decreases on larger screens" });
   const invKeys = SPACE_KEYS.filter(k => (ss.values[k]?.mobile || 0) > (ss.values[k]?.desktop || 0));
   if (invKeys.length) warns.push({ type: "warn", msg: (invKeys.length === 1 ? "1 value is" : invKeys.length + " values are") + " larger on mobile than desktop: " + invKeys.map(k => "--section-space-" + k).join(", ") });
   return (<div>
@@ -1566,7 +1609,7 @@ function StepSectionSpacing() {
       <div className="ds-grid-3">
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Mobile</label><NumStepper value={ss.baseMobile} set={(n) => recalc(n, ss.baseDesktop)} min={0} max={800} /></div>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Desktop</label><NumStepper value={ss.baseDesktop} set={(n) => recalc(ss.baseMobile, n)} min={0} max={800} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale<InfoTip>Ratio between steps — 1.5 means each size is 1.5× the previous. Higher ratio, more dramatic jumps between sizes.</InfoTip></label><NumStepper value={ss.scale} set={(n) => recalc(ss.baseMobile, ss.baseDesktop, n)} min={1} max={3} step={0.05} /></div>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale<InfoTip>Ratio between steps. 1.5 means each size is 1.5× the previous. Higher ratio, more dramatic jumps between sizes.</InfoTip></label><NumStepper value={ss.scale} set={(n) => recalc(ss.baseMobile, ss.baseDesktop, n)} min={1} max={3} step={0.05} /></div>
       </div>
     </div>
     <ValidationAlert items={warns} />
@@ -1574,8 +1617,8 @@ function StepSectionSpacing() {
       return SPACE_KEYS.map((k, i) => (<div key={k} className={"ds-space-row" + (i % 2 ? " alt" : "")}>
       <div className="ds-space-name">--section-space-{k}</div>
       <div className="ds-space-inputs">
-        <div><input className="ds-space-input" type="number" value={ss.values[k]?.mobile || 0} onChange={(e) => dispatch({ type: "SET_SECTION_SPACE_VALUE", key: k, side: "mobile", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Mobile</div></div>
-        <div><input className="ds-space-input" type="number" value={ss.values[k]?.desktop || 0} onChange={(e) => dispatch({ type: "SET_SECTION_SPACE_VALUE", key: k, side: "desktop", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Desktop</div></div>
+        <div><input className="ds-space-input" type="number" aria-label={"section space " + k + " mobile"} value={ss.values[k]?.mobile || 0} onChange={(e) => dispatch({ type: "SET_SECTION_SPACE_VALUE", key: k, side: "mobile", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Mobile</div></div>
+        <div><input className="ds-space-input" type="number" aria-label={"section space " + k + " desktop"} value={ss.values[k]?.desktop || 0} onChange={(e) => dispatch({ type: "SET_SECTION_SPACE_VALUE", key: k, side: "desktop", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Desktop</div></div>
       </div>
       <div className="ds-space-bar" style={{ width: Math.round(6 + (ss.values[k]?.desktop || 0) / maxV * 134) }} />
     </div>)); })()}
@@ -1671,9 +1714,9 @@ function StepTypography() {
   const WEIGHTS = [300, 400, 500, 600, 700, 800];
   const hDesk = ["h1","h2","h3","h4","h5","h6"].map(h => t.headings[h]?.desktop || 0);
   const warns = [];
-  if (hDesk.some(v => v > 0 && v < 12)) warns.push({ type: "error", msg: "Heading below 12px on desktop — WCAG accessibility minimum" });
-  if (hDesk.every(v => v > 0) && !hDesk.every((v, i) => i === 0 || v <= hDesk[i - 1])) warns.push({ type: "warn", msg: "Headings not in descending order — h1 should be the largest" });
-  if ((t.texts?.m?.desktop || 0) > 0 && t.texts.m.desktop < 14) warns.push({ type: "warn", msg: "text-m below 14px on desktop — consider 14–18px for readable body text" });
+  if (hDesk.some(v => v > 0 && v < 12)) warns.push({ type: "error", msg: "Heading below 12px on desktop; under the WCAG minimum" });
+  if (hDesk.every(v => v > 0) && !hDesk.every((v, i) => i === 0 || v <= hDesk[i - 1])) warns.push({ type: "warn", msg: "Headings not in descending order; h1 should be the largest" });
+  if ((t.texts?.m?.desktop || 0) > 0 && t.texts.m.desktop < 14) warns.push({ type: "warn", msg: "text-m below 14px on desktop; consider 14–18px for readable body text" });
   return (<div>
     <div className="ds-toggle-row" role="switch" tabIndex={0} aria-checked={t.useScale} onKeyDown={TGL_KEY} onClick={() => dispatch({ type: "SET_TYPO", payload: { useScale: !t.useScale } })}>
       <div className={"ds-toggle-track" + (t.useScale ? " on" : "")}><div className="ds-toggle-thumb" /></div>
@@ -1686,7 +1729,7 @@ function StepTypography() {
       {t.useScale && (<div className="ds-grid-3" style={{ marginBottom: 16 }}>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>h3 Mobile</label><NumStepper value={t.headingBaseMob} set={(n) => dispatch({ type: "RECALC_HEADINGS", baseMob: n, baseDesk: t.headingBaseDesk, scale: t.headingScale })} min={0} /></div>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>h3 Desktop</label><NumStepper value={t.headingBaseDesk} set={(n) => dispatch({ type: "RECALC_HEADINGS", baseMob: t.headingBaseMob, baseDesk: n, scale: t.headingScale })} min={0} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale<InfoTip>Ratio between steps — 1.5 means each size is 1.5× the previous. Higher ratio, more dramatic jumps between sizes.</InfoTip></label>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale<InfoTip>Ratio between steps. 1.5 means each size is 1.5× the previous. Higher ratio, more dramatic jumps between sizes.</InfoTip></label>
           <select className="ds-input" value={t.headingScale} onChange={(e) => dispatch({ type: "RECALC_HEADINGS", baseMob: t.headingBaseMob, baseDesk: t.headingBaseDesk, scale: parseFloat(e.target.value) })}>
             {SCALES.map((s) => <option key={s.value} value={s.value}>{s.name} ({s.value})</option>)}
           </select>
@@ -1695,8 +1738,8 @@ function StepTypography() {
       {["h1","h2","h3","h4","h5","h6"].map((h) => (<div key={h} className="ds-space-row" style={{ marginBottom: 6 }}>
         <div className="ds-space-name">--{h}</div>
         <div className="ds-space-inputs" style={{ flexGrow: 0 }}>
-          <div><input className="ds-space-input" type="number" value={t.headings[h]?.mobile || 0} onChange={(e) => dispatch({ type: "SET_HEADING_VAL", key: h, side: "mobile", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Mobile</div></div>
-          <div><input className="ds-space-input" type="number" value={t.headings[h]?.desktop || 0} onChange={(e) => dispatch({ type: "SET_HEADING_VAL", key: h, side: "desktop", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Desktop</div></div>
+          <div><input className="ds-space-input" type="number" aria-label={h + " mobile"} value={t.headings[h]?.mobile || 0} onChange={(e) => dispatch({ type: "SET_HEADING_VAL", key: h, side: "mobile", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Mobile</div></div>
+          <div><input className="ds-space-input" type="number" aria-label={h + " desktop"} value={t.headings[h]?.desktop || 0} onChange={(e) => dispatch({ type: "SET_HEADING_VAL", key: h, side: "desktop", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Desktop</div></div>
         </div>
         <div style={{ flex: 1, minWidth: 0, textAlign: "left", paddingLeft: 12, fontSize: t.headings[h]?.desktop || 16, fontWeight: 700, lineHeight: t.lineHeightHeading, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Heading</div>
       </div>))}
@@ -1707,7 +1750,7 @@ function StepTypography() {
       {t.useScale && (<div className="ds-grid-3" style={{ marginBottom: 16 }}>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>text-m Mobile</label><NumStepper value={t.textBaseMob} set={(n) => dispatch({ type: "RECALC_TEXTS", baseMob: n, baseDesk: t.textBaseDesk, scale: t.textScale })} min={0} /></div>
         <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>text-m Desktop</label><NumStepper value={t.textBaseDesk} set={(n) => dispatch({ type: "RECALC_TEXTS", baseMob: t.textBaseMob, baseDesk: n, scale: t.textScale })} min={0} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale<InfoTip>Ratio between steps — 1.5 means each size is 1.5× the previous. Higher ratio, more dramatic jumps between sizes.</InfoTip></label>
+        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Scale<InfoTip>Ratio between steps. 1.5 means each size is 1.5× the previous. Higher ratio, more dramatic jumps between sizes.</InfoTip></label>
           <select className="ds-input" value={t.textScale} onChange={(e) => dispatch({ type: "RECALC_TEXTS", baseMob: t.textBaseMob, baseDesk: t.textBaseDesk, scale: parseFloat(e.target.value) })}>
             {SCALES.map((s) => <option key={s.value} value={s.value}>{s.name} ({s.value})</option>)}
           </select>
@@ -1716,8 +1759,8 @@ function StepTypography() {
       {TEXT_KEYS.map((k) => (<div key={k} className="ds-space-row" style={{ marginBottom: 6 }}>
         <div className="ds-space-name">--text-{k}</div>
         <div className="ds-space-inputs" style={{ flexGrow: 0 }}>
-          <div><input className="ds-space-input" type="number" value={t.texts[k]?.mobile || 0} onChange={(e) => dispatch({ type: "SET_TEXT_VAL", key: k, side: "mobile", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Mobile</div></div>
-          <div><input className="ds-space-input" type="number" value={t.texts[k]?.desktop || 0} onChange={(e) => dispatch({ type: "SET_TEXT_VAL", key: k, side: "desktop", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Desktop</div></div>
+          <div><input className="ds-space-input" type="number" aria-label={"text " + k + " mobile"} value={t.texts[k]?.mobile || 0} onChange={(e) => dispatch({ type: "SET_TEXT_VAL", key: k, side: "mobile", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Mobile</div></div>
+          <div><input className="ds-space-input" type="number" aria-label={"text " + k + " desktop"} value={t.texts[k]?.desktop || 0} onChange={(e) => dispatch({ type: "SET_TEXT_VAL", key: k, side: "desktop", value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">Desktop</div></div>
         </div>
         <div style={{ flex: 1, minWidth: 0, textAlign: "left", paddingLeft: 12, fontSize: t.texts[k]?.desktop || 14, lineHeight: t.lineHeightBody, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Sample</div>
       </div>))}
@@ -1893,18 +1936,18 @@ function StepRadius() {
   return (<div>
     <div className="ds-card">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}><h4 style={{ margin: 0 }}>Base radius</h4><ResetButton sliceKey="radius" /></div>
-      <div className="ds-form-group"><label>Base value (px) — maps to --radius-m</label>
+      <div className="ds-form-group"><label>Base value (px), maps to --radius-m</label>
         <NumStepper value={r.base} set={(n) => dispatch({ type: "RECALC_RADIUS", base: n })} min={0} />
       </div>
     </div>
     {RADIUS_KEYS.map((k, i) => (<div key={k} className={"ds-space-row" + (i % 2 ? " alt" : "")}>
       <div className="ds-space-name">--radius-{k}</div>
-      <div><input className="ds-space-input" type="number" value={r.values[k] || 0} onChange={(e) => dispatch({ type: "SET_RADIUS_VAL", key: k, value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">px</div></div>
+      <div><input className="ds-space-input" type="number" aria-label={"radius " + k} value={r.values[k] || 0} onChange={(e) => dispatch({ type: "SET_RADIUS_VAL", key: k, value: parseInt(e.target.value) || 0 })} /><div className="ds-space-label">px</div></div>
       <div style={{ width: 60, height: 40, background: "var(--ds-accent-fill)", border: "1px solid var(--ds-accent-ring)", borderRadius: r.values[k] || 0 }} />
     </div>))}
     <div className="ds-space-row alt" style={{ marginTop: 6 }}>
       <div className="ds-space-name">--radius-circle</div>
-      <div><input className="ds-space-input" type="number" value={r.circle} onChange={(e) => dispatch({ type: "SET_RADIUS", payload: { circle: parseInt(e.target.value) || 0 } })} /><div className="ds-space-label">px</div></div>
+      <div><input className="ds-space-input" type="number" aria-label="radius circle" value={r.circle} onChange={(e) => dispatch({ type: "SET_RADIUS", payload: { circle: parseInt(e.target.value) || 0 } })} /><div className="ds-space-label">px</div></div>
       <div style={{ width: 40, height: 40, background: "var(--ds-accent-fill)", border: "1px solid var(--ds-accent-ring)", borderRadius: r.circle }} />
     </div>
   </div>);
@@ -2561,7 +2604,7 @@ function LandingPreview({ state }) {
       <span style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: "var(--ds-radius)", background: "var(--ds-primary)", color: "var(--ds-bg)" }}>
         {isFixed ? "Fixed-width · max " + maxVp + "px" : "Full-width · 100%"}
       </span>
-      <span style={{ fontSize: 11.5, color: "var(--ds-text-3)" }}>↔ Drag to resize — simulating ≈{simVP}px viewport{ratio >= 0.999 ? " (desktop)" : ratio <= 0.001 ? " (mobile)" : ""}</span>
+      <span style={{ fontSize: 11.5, color: "var(--ds-text-3)" }}>↔ Drag to resize: simulating ≈{simVP}px viewport{ratio >= 0.999 ? " (desktop)" : ratio <= 0.001 ? " (mobile)" : ""}</span>
       <button className={"ds-btn ds-btn-sm" + (inspect ? " ds-btn-primary" : "")} onClick={() => { setInspect((v) => !v); setHl(null); }} style={{ marginLeft: "auto" }} data-tip="Hover elements to see their CSS variables">🔍 Inspect</button>
       {width && <button className="ds-btn ds-btn-sm" onClick={() => setWidth(null)}>Reset width</button>}
     </div>
@@ -2897,22 +2940,6 @@ const HEADER_SCRIPT = `<script>
 })();
 </script>`;
 // Editor de código reutilizable (Prism light). language: markup | javascript | css …
-function CodeEditor({ code, name, language = "markup" }) {
-  return (
-    <div className="ds-editor">
-      <div className="ds-editor-bar">
-        <span className="dot" style={{ background: "#f7544f" }} /><span className="dot" style={{ background: "#f9b94e" }} /><span className="dot" style={{ background: "#54c93f" }} />
-        <span className="ds-editor-name">{name}</span>
-      </div>
-      <SyntaxHighlighter language={language} style={prismTheme} showLineNumbers
-        customStyle={{ margin: 0, background: "transparent", padding: "12px 14px", fontSize: 11.5, lineHeight: 1.6 }}
-        codeTagProps={{ style: { fontFamily: "'SF Mono',Consolas,monospace", fontSize: 11.5 } }}
-        lineNumberStyle={{ minWidth: "2.2em", paddingRight: "1em", color: "#52525b", opacity: 0.8 }}>
-        {code}
-      </SyntaxHighlighter>
-    </div>
-  );
-}
 function HeaderScriptCard() {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
@@ -2925,7 +2952,7 @@ function HeaderScriptCard() {
         <button className="ds-btn ds-btn-sm" onClick={copy} style={{ flexShrink: 0 }}>{copied ? "✓ Copied" : "⧉ Copy"}</button>
       </div>
       <p style={{ marginBottom: 10 }}>Measures your sticky header and sets <code style={{ fontFamily: "'SF Mono',monospace" }}>--header-h</code> live, so <code style={{ fontFamily: "'SF Mono',monospace" }}>#id</code> anchors stay perfect across breakpoints &amp; sticky-shrink. Optional — without it the framework CSS falls back to <code style={{ fontFamily: "'SF Mono',monospace" }}>--offset</code>. Paste in <strong>Bricks → Settings → Custom Code → Body scripts</strong>, and set the header selector to your site.</p>
-      <CodeEditor code={HEADER_SCRIPT} name="header-offset.js" />
+      <Suspense fallback={<div className="ds-editor" style={{ padding: 14, color: "var(--ds-text-3)", fontSize: 12 }}>Loading editor…</div>}><CodeEditor code={HEADER_SCRIPT} name="header-offset.js" /></Suspense>
     </div>
   );
 }
@@ -2954,7 +2981,7 @@ function StepExport() {
       setStatus({ type: "ok", file: filename }); setTimeout(() => setStatus(null), 4000);
       setDone(key); setTimeout(() => setDone((d) => d === key ? null : d), 1600);
       addToast?.(filename + " downloaded", "ok");
-    } catch (e) { setStatus({ type: "error", msg: e.message }); addToast?.("Export failed — try again; reload if it persists", "err"); }
+    } catch (e) { setStatus({ type: "error", msg: e.message }); addToast?.("Export failed. Try again, or reload if it persists", "err"); }
   };
 
   // Modo categorizado: empaqueta todas las paletas (un JSON por color) en un único .zip.
@@ -2965,7 +2992,7 @@ function StepExport() {
       downloadBlob(makeZip(files), baseName + "-palettes.zip");
       setDone("palette"); setTimeout(() => setDone((d) => d === "palette" ? null : d), 1600);
       addToast?.(files.length + " palettes zipped", "ok");
-    } catch (e) { setStatus({ type: "error", msg: e.message }); addToast?.("Export failed — try again; reload if it persists", "err"); }
+    } catch (e) { setStatus({ type: "error", msg: e.message }); addToast?.("Export failed. Try again, or reload if it persists", "err"); }
   };
 
   // Descarga TODO en un único .zip (expandiendo la paleta a N archivos si está categorizada).
@@ -2983,7 +3010,7 @@ function StepExport() {
       if (!files.length) return;
       downloadBlob(makeZip(files), baseName + ".zip");
       addToast?.(files.length + " files zipped", "ok");
-    } catch (e) { setStatus({ type: "error", msg: e.message }); addToast?.("Export failed — try again; reload if it persists", "err"); }
+    } catch (e) { setStatus({ type: "error", msg: e.message }); addToast?.("Export failed. Try again, or reload if it persists", "err"); }
   };
 
   const CARDS = [
@@ -2997,7 +3024,7 @@ function StepExport() {
       id: "palette", suffix: "palette.json", title: "Color Palette JSON",
       desc: state.paletteExportMode === "categorized"
         ? "A .zip with one JSON per colour → import each as a separate palette (category) in Bricks’ picker."
-        : "Every colour in a single Bricks palette — one import.",
+        : "Every colour in a single Bricks palette: one import.",
       sub: "Bricks → Style Manager → Color Palettes → Import",
       gen: (s) => generateColorPaletteJSON(s, systemName), mime: "application/json",
       label: state.paletteExportMode === "categorized" ? "↓ Palettes .zip (" + buildPaletteGroups(state).length + ")" : "↓ Palette JSON",
@@ -3011,7 +3038,7 @@ function StepExport() {
     },
     {
       id: "framework", suffix: "framework.css", title: "Framework CSS",
-      desc: "Base CSS: applies variables to body, headings and sections. Assumes a 16px (100%) root — it pins it, so the 62.5% trick won’t shrink your system.",
+      desc: "Base CSS: applies variables to body, headings and sections. Assumes a 16px (100%) root; it pins it, so the 62.5% trick won’t shrink your system.",
       sub: "Bricks → Settings → Custom Code → CSS (head)",
       gen: (s) => generateFrameworkCSS(s, systemName), mime: "text/css", label: "↓ Framework CSS",
     },
@@ -3021,8 +3048,8 @@ function StepExport() {
     {!user && <GuestBanner onSignIn={() => openAuth("signup")} />}
     {warnings.map((w, i) => <div key={i} className="ds-warning" onClick={() => dispatch({ type: "SET_STEP", payload: w.step })}>⚠ {w.msg}</div>)}
     <div className="ds-form-group" style={{ marginBottom: 20 }}>
-      <label>Variable prefix <span style={{ fontWeight: 400, color: "var(--ds-text-3)" }}>(optional)</span></label>
-      <input className={"ds-input" + (state.varPrefix && !/^[a-z][a-z0-9-]*$/.test(state.varPrefix) ? " ds-input-error" : "")} value={state.varPrefix} placeholder="e.g. ds, brand, acme" onChange={(e) => dispatch({ type: "SET_FIELD", field: "varPrefix", value: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} />
+      <label htmlFor="exp-varprefix">Variable prefix <span style={{ fontWeight: 400, color: "var(--ds-text-3)" }}>(optional)</span></label>
+      <input id="exp-varprefix" className={"ds-input" + (state.varPrefix && !/^[a-z][a-z0-9-]*$/.test(state.varPrefix) ? " ds-input-error" : "")} value={state.varPrefix} placeholder="e.g. ds, brand, acme" onChange={(e) => dispatch({ type: "SET_FIELD", field: "varPrefix", value: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} />
       <div className="ds-helper">{state.varPrefix ? "--" + state.varPrefix + "-space-m, --" + state.varPrefix + "-primary, ..." : "Leave empty for default naming: --space-m, --primary, ..."}</div>
     </div>
     <div className="ds-form-group" style={{ marginBottom: 20 }}>
@@ -3035,8 +3062,8 @@ function StepExport() {
     </div>
     {state.paletteExportMode === "categorized" && (
       <div className="ds-form-group" style={{ marginBottom: 20 }}>
-        <label>Palette name prefix <span style={{ fontWeight: 400, color: "var(--ds-text-3)" }}>(optional)</span></label>
-        <input className="ds-input" value={state.palettePrefix || ""} placeholder="e.g. BM, Acme" maxLength={24} onChange={(e) => dispatch({ type: "SET_FIELD", field: "palettePrefix", value: e.target.value.replace(/[^A-Za-z0-9 ]/g, "") })} />
+        <label htmlFor="exp-palprefix">Palette name prefix <span style={{ fontWeight: 400, color: "var(--ds-text-3)" }}>(optional)</span></label>
+        <input id="exp-palprefix" className="ds-input" value={state.palettePrefix || ""} placeholder="e.g. BM, Acme" maxLength={24} onChange={(e) => dispatch({ type: "SET_FIELD", field: "palettePrefix", value: e.target.value.replace(/[^A-Za-z0-9 ]/g, "") })} />
         <div className="ds-helper">{(state.palettePrefix || "").trim() ? "Categories in Bricks: “" + state.palettePrefix.trim() + " Primary”, “" + state.palettePrefix.trim() + " White”, “" + state.palettePrefix.trim() + " Black”…" : "Optional prefix to namespace the categories (e.g. “BM” → “BM Primary”, “BM White”…)."}</div>
       </div>
     )}
@@ -3092,7 +3119,7 @@ function StepContent() {
   const step = STEPS.find((s) => s.id === state.currentStep);
   const C = [null, StepLayout, StepSpacing, StepSectionSpacing, StepColors, StepTypography, StepGaps, StepRadius, StepButtons, StepPreview, StepExport][state.currentStep];
   return (<div className="ds-content">
-    <div className="ds-content-header"><h2>{step.label}</h2><p>{DESCS[step.id]}</p></div>
+    <div className="ds-content-header"><h1>{step.label}</h1><p>{DESCS[step.id]}</p></div>
     <div className="ds-content-body"><div key={state.currentStep} className="ds-step-anim">{C && <C />}</div></div>
   </div>);
 }
@@ -3147,8 +3174,8 @@ function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, 
     <div className="ds-dash">
       {!user && <GuestBanner onSignIn={() => onAuth("signup")} />}
       <div className="ds-dash-head">
-        <div><h2 className="ds-dash-title">My design systems</h2><p className="ds-dash-sub">{user ? systems.length + " / " + (limit == null ? "∞" : limit) + " in cloud" : systems.length + " system" + (systems.length === 1 ? "" : "s") + " on this device"}</p></div>
-        <button className="ds-btn ds-btn-primary" onClick={onNew} disabled={atMax} data-tip={atMax ? "Cloud limit reached (" + limit + ")" : undefined}><Ico name="plus" />New system</button>
+        <div><h1 className="ds-dash-title">My design systems</h1><p className="ds-dash-sub">{user ? systems.length + " / " + (limit == null ? "∞" : limit) + " in cloud" : systems.length + " system" + (systems.length === 1 ? "" : "s") + " on this device"}</p></div>
+        {systems.length > 0 && <button className="ds-btn ds-btn-primary" onClick={onNew} disabled={atMax} data-tip={atMax ? "Cloud limit reached (" + limit + ")" : undefined}><Ico name="plus" />New system</button>}
       </div>
       {systems.length === 0
         ? <div className="ds-dash-empty">
@@ -3160,7 +3187,7 @@ function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, 
         : <div className="ds-dash-grid">
             {systems.map((s) => <SystemCard key={s.id} sys={s} onOpen={onOpen} onDuplicate={onDuplicate} onDelete={onDelete} onRename={onRename} />)}
           </div>}
-      <div className="ds-credit">A free tool by <a href={CAL_URL} target="_blank" rel="noopener noreferrer">Samir Haddad</a> — design &amp; development for Bricks.</div>
+      <div className="ds-credit">A free tool by <a href={CAL_URL} target="_blank" rel="noopener noreferrer">Samir Haddad</a>, design &amp; development for Bricks.</div>
     </div>
   </>);
 }
@@ -3206,7 +3233,7 @@ function AdminUsers({ onBack, darkMode, toggleDark, addToast, selfId, crossPromo
       </div>
     </header>
     <div className="ds-dash">
-      <div className="ds-dash-head"><div><h2 className="ds-dash-title">Users</h2><p className="ds-dash-sub">Admin · manage limits &amp; accounts</p></div></div>
+      <div className="ds-dash-head"><div><h1 className="ds-dash-title">Users</h1><p className="ds-dash-sub">Admin · manage limits &amp; accounts</p></div></div>
       <div className="ds-dash-content">
         <CrossPromoEditor value={crossPromo} onSave={onSaveCrossPromo} />
         {err ? <div className="ds-warning">⚠ {err}</div>
@@ -3280,7 +3307,7 @@ function AccountView({ user, onBack, darkMode, toggleDark, addToast, onSignOut, 
     </header>
     <div className="ds-dash">
       <div className="ds-account">
-        <div className="ds-dash-head" style={{ maxWidth: "none", margin: "0 0 24px" }}><div><h2 className="ds-dash-title">Account</h2><p className="ds-dash-sub">Your profile</p></div></div>
+        <div className="ds-dash-head" style={{ maxWidth: "none", margin: "0 0 24px" }}><div><h1 className="ds-dash-title">Account</h1><p className="ds-dash-sub">Your profile</p></div></div>
         <div className="ds-account-head"><Avatar user={user} size={64} admin={isAdmin} /><div><div className="ds-account-name">{userDisplayName(user)}</div><div className="ds-account-email">{user.email}</div></div></div>
         <div className="ds-grid-2">
           <div className="ds-form-group"><label>First name</label><input className="ds-input" value={firstName} onChange={(e) => setFirstName(e.target.value)} /></div>
@@ -3425,7 +3452,7 @@ export default function App() {
       const candidates = readLocalSystems().filter((s) => !existingIds.has(s.id));
       if (!candidates.length) return;
       const slots = (lim == null) ? candidates.length : (lim - existing.length);
-      if (slots <= 0) { addToast("Cloud is full — local systems kept on this device", "info"); return; }
+      if (slots <= 0) { addToast("Cloud is full; local systems kept on this device", "info"); return; }
       if (candidates.length <= slots) await migrateThese(candidates);
       else setMigratePrompt({ candidates, slots }); // hay que elegir
     } catch (e) { addToast("Could not load your cloud systems", "err"); }
