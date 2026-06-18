@@ -39,7 +39,7 @@ function flRemBaked(min, max, s) {
   return "clamp(" + remNum(loPx) + "rem, calc(" + remNum(interceptPx) + "rem + " + f(slope * 100) + "vw), " + remNum(hiPx) + "rem)";
 }
 // Clamp fluido PARAMETRIZADO (modo full-width): la pendiente/intercepto se expresan con las
-// variables maestras (--vp-min / --vp-max / --vp-range) en vez de hornear los números, así
+// variables maestras (--vp-min / --vp-max) en vez de hornear los números, así
 // editar esas maestras reescala TODO el sistema (también tras exportar, en Bricks).
 // ceilPx (opcional, ultrawide) sube el tope del clamp para que los display sigan creciendo > vpMax.
 // Las var() salen SIN prefijo aquí; `pv()` les añade el varPrefix al exportar.
@@ -52,7 +52,11 @@ function flRem(min, max, s, ceilPx) {
   const lo = Math.min(a, b), hi = Math.max(a, b);
   const ceil = (ceilPx != null && isFinite(Number(ceilPx))) ? Math.max(hi, remNum(ceilPx)) : hi;
   const delta = +(hi - lo).toFixed(4);
-  const slope = "(" + delta + " / var(--vp-range))";
+  // Rango INLINE (var(--vp-max) - var(--vp-min)), no una variable --vp-range que contiene un calc:
+  // así el divisor queda como (120 - 23.4375), no calc(120 - 23.4375) — evita el calc anidado que
+  // algunos motores/builders rechazan. Sigue reescalando al editar --vp-min / --vp-max.
+  const range = "(var(--vp-max) - var(--vp-min))";
+  const slope = "(" + delta + " / " + range + ")";
   const pref = "calc((" + lo + " - " + slope + " * var(--vp-min)) * 1rem + " + slope + " * 100vw)";
   return "clamp(" + lo + "rem, " + pref + ", " + ceil + "rem)";
 }
@@ -1163,12 +1167,19 @@ function GuestBanner({ onSignIn }) {
     </div>
   );
 }
-const APP_VERSION = "v1.3";
+const APP_VERSION = "v1.3.1";
 // Changelog (user-facing). Lo último arriba. tag: new | improved | fixed.
 // REGLA: SOLO cambios de cara al usuario. NUNCA incluir nada de backend/infra
 // (Vercel, Supabase, analytics, hosting, claves, etc.).
 const CL_TAGS = { new: { label: "New", cls: "new" }, improved: { label: "Improved", cls: "imp" }, fixed: { label: "Fixed", cls: "fix" } };
 const CHANGELOG = [
+  {
+    v: "1.3.1", date: "18 Jun 2026",
+    items: [
+      { tag: "improved", text: "Full-width fluid tokens use a more compatible formula across browsers and builders." },
+      { tag: "fixed", text: "Full-width systems could render too small on themes with a non-16px root font-size; the framework CSS now pins it." },
+    ],
+  },
   {
     v: "1.3", date: "17 Jun 2026",
     items: [
@@ -2037,7 +2048,6 @@ function generateVariablesJSON(state) {
   } else {
     vars.push(mk('vp-min', String(remNum(state.minViewport)), 'Layout'));
     vars.push(mk('vp-max', String(remNum(state.maxViewport)), 'Layout'));
-    vars.push(mk('vp-range', 'calc(var(--vp-max) - var(--vp-min))', 'Layout'));
     vars.push(mk('max-width-main', 'calc(var(--vp-max) * 1rem)', 'Layout'));
   }
   vars.push(mk('max-width-small', '100vw', 'Layout'));
@@ -2346,6 +2356,9 @@ function generateFrameworkCSS(state, systemName) {
   const primary = v(slugify(state.colors.palettes[0]?.name || 'primary'));
   let css = "/* ================================================\n * " + dsName + " — FRAMEWORK BASE CSS\n * Apply tokens to HTML elements globally\n * Paste into: Bricks → Settings → Custom Code → CSS\n * Generated: " + ts + "\n * ================================================ */\n\n";
 
+  css += "/* — Root base ————————————————————————————— */\n";
+  css += "/* Tokens are baked in rem at a 16px root. If your theme uses the 62.5% trick (1rem = 10px),\n   the whole system would render at 62.5% of its size. This pins the root to 16px so values are exact.\n   Remove this rule only if you intentionally use a different root font-size. */\n";
+  css += ":root {\n  font-size: 100%;\n}\n\n";
   css += "/* — Base & smooth scroll ————————————————— */\n";
   css += "html {\n  scroll-behavior: smooth;\n}\n";
   css += "[id] {\n  scroll-margin-top: var(--header-h, " + v('offset') + ");\n}\n";
@@ -2998,7 +3011,7 @@ function StepExport() {
     },
     {
       id: "framework", suffix: "framework.css", title: "Framework CSS",
-      desc: "Base CSS: applies variables to body, headings and sections.",
+      desc: "Base CSS: applies variables to body, headings and sections. Assumes a 16px (100%) root — it pins it, so the 62.5% trick won’t shrink your system.",
       sub: "Bricks → Settings → Custom Code → CSS (head)",
       gen: (s) => generateFrameworkCSS(s, systemName), mime: "text/css", label: "↓ Framework CSS",
     },
