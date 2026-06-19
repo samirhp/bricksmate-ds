@@ -795,6 +795,13 @@ const css_styles = `
   .ds-spromo-label{flex:1;display:flex;align-items:center;justify-content:center;background:var(--ds-bg);border:1px solid var(--ds-border);border-radius:var(--ds-radius);font-size:11.5px;font-weight:600;color:var(--ds-text);padding:8px 10px;transition:all .15s}
   .ds-spromo-arrow{width:36px;display:flex;align-items:center;justify-content:center;background:var(--ds-accent);color:#fff;border-radius:var(--ds-radius);font-size:14px;flex-shrink:0;transition:background .15s}
   .ds-spromo-cta:hover .ds-spromo-label{border-color:var(--ds-accent)} .ds-spromo-cta:hover .ds-spromo-arrow{background:var(--ds-accent-hover)}
+  /* Página de cross-promo: form + preview en vivo (estilo sidebar) */
+  .ds-crosspromo-grid{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:24px;max-width:1000px;margin:0 auto;align-items:start}
+  .ds-crosspromo-prevlabel{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--ds-text-3);margin-bottom:8px}
+  .ds-crosspromo-prevlabel span{font-weight:400;text-transform:none;letter-spacing:0;color:var(--ds-text-3)}
+  .ds-crosspromo-preview{background:var(--ds-bg-card);border:1px solid var(--ds-border-light);border-radius:var(--ds-radius-lg);padding:16px;position:sticky;top:20px}
+  .ds-crosspromo-preview .ds-spromo{margin:0;padding-top:0;border-top:none}
+  @media (max-width:760px){.ds-crosspromo-grid{grid-template-columns:1fr}.ds-crosspromo-preview{position:static}}
   .ds-credit{margin-top:28px;text-align:center;font-size:12px;color:var(--ds-text-3)}
   .ds-credit a{color:var(--ds-accent);text-decoration:none;font-weight:500}
   .ds-credit a:hover{text-decoration:underline}
@@ -830,7 +837,7 @@ const css_styles = `
   .ds-avatar-admin{box-shadow:0 0 0 2px var(--ds-bg-card),0 0 0 3.5px var(--ds-accent)}
   /* Menú de perfil (dropdown) */
   .ds-profile{position:relative}
-  .ds-profile-trigger{display:flex;align-items:center;gap:8px;background:none;border:1px solid transparent;cursor:pointer;font-family:inherit;padding:4px 8px 4px 5px;border-radius:var(--ds-radius);transition:background .15s,border-color .15s}
+  .ds-profile-trigger{display:flex;align-items:center;gap:8px;background:none;border:1px solid transparent;cursor:pointer;font-family:inherit;padding:3px 14px 3px 4px;border-radius:999px;transition:background .15s,border-color .15s}
   .ds-profile-trigger:hover{background:var(--ds-bg);border-color:var(--ds-border-light)}
   .ds-profile.open .ds-profile-trigger{background:var(--ds-bg);border-color:var(--ds-border-light)}
   .ds-profile-name{font-size:12.5px;color:var(--ds-text);font-weight:500;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -981,6 +988,7 @@ function Ico({ name, size = 16 }) {
     edit: <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3zM13.5 6.5l3 3" />,
     settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></>,
     users: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>,
+    promo: <><path d="M3 10v4h3l5 4V6L6 10H3Z" /><path d="M15 9a4 4 0 0 1 0 6" /></>,
     logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></>,
   }[name];
   return (
@@ -1136,7 +1144,7 @@ function Avatar({ user, size = 32, admin = false }) {
 }
 
 // Control de cuenta en cabecera (menú de perfil desplegable)
-function AuthControl({ user, isAdmin, onAuth, onSignOut, onAccount, onOpenAdmin }) {
+function AuthControl({ user, isAdmin, onAuth, onSignOut, onAccount, onOpenAdmin, onOpenCrossPromo }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -1167,6 +1175,7 @@ function AuthControl({ user, isAdmin, onAuth, onSignOut, onAccount, onOpenAdmin 
           <div className="ds-profile-div" />
           <button className="ds-profile-item" role="menuitem" onClick={() => { setOpen(false); onAccount(); }}><Ico name="settings" size={16} />Account settings</button>
           {isAdmin && onOpenAdmin && <button className="ds-profile-item" role="menuitem" onClick={() => { setOpen(false); onOpenAdmin(); }}><Ico name="users" size={16} />Users</button>}
+          {isAdmin && onOpenCrossPromo && <button className="ds-profile-item" role="menuitem" onClick={() => { setOpen(false); onOpenCrossPromo(); }}><Ico name="promo" size={16} />Cross-promo</button>}
           <div className="ds-profile-div" />
           <button className="ds-profile-item" role="menuitem" onClick={() => { setOpen(false); onSignOut(); }}><Ico name="logout" size={16} />Sign out</button>
         </div>
@@ -1285,7 +1294,7 @@ function VersionPill() {
     {open && <ChangelogModal onClose={() => setOpen(false)} />}
   </>);
 }
-function EditorHeader({ onBack, autoSave, onToggleAutoSave, dirty, onSave, darkMode, toggleDark, user, onAuth, onAccount, onSignOut, isAdmin, onOpenAdmin }) {
+function EditorHeader({ onBack, autoSave, onToggleAutoSave, dirty, onSave, darkMode, toggleDark, user, onAuth, onAccount, onSignOut, isAdmin, onOpenAdmin, onOpenCrossPromo }) {
   return (<header className="ds-header">
     <button className="ds-header-back" onClick={onBack} data-tip="Back to my systems">←</button>
     <BrandMark />
@@ -1299,7 +1308,7 @@ function EditorHeader({ onBack, autoSave, onToggleAutoSave, dirty, onSave, darkM
       {(autoSave || !dirty)
         ? <span className="ds-saved-pill" data-tip={autoSave ? "Changes are saved automatically" : "All changes saved"}><Ico name="check" size={14} />{autoSave ? "Auto-saved" : "Saved"}</span>
         : <button className="ds-btn ds-btn-primary ds-btn-sm" onClick={onSave} data-tip="Save changes (⌘/Ctrl + S)"><Ico name="check" size={14} />Save changes</button>}
-      <AuthControl user={user} isAdmin={isAdmin} onAuth={onAuth} onAccount={onAccount} onSignOut={onSignOut} onOpenAdmin={onOpenAdmin} />
+      <AuthControl user={user} isAdmin={isAdmin} onAuth={onAuth} onAccount={onAccount} onSignOut={onSignOut} onOpenAdmin={onOpenAdmin} onOpenCrossPromo={onOpenCrossPromo} />
       <button className="ds-header-theme" onClick={toggleDark} data-tip="Toggle light / dark theme"><ThemeIcon dark={darkMode} /></button>
     </div>
   </header>);
@@ -2884,10 +2893,9 @@ const CROSS_PROMO_DEFAULT = {
   link: "https://cal.com/samirh",
 };
 const PROMO_ASPECTS = [["1", "Square (1:1)"], ["4 / 3", "Landscape (4:3)"], ["3 / 4", "Portrait (3:4)"], ["16 / 9", "Wide (16:9)"]];
-function SidebarPromo() {
-  const { crossPromo } = useDSContext();
-  const p = { ...CROSS_PROMO_DEFAULT, ...(crossPromo || {}) };
-  if (!p.visible) return null;
+// Card del cross-promo (reutilizada por el sidebar y por el preview del editor de cross-promo).
+function PromoCard({ p }) {
+  if (!p || !p.visible) return null;
   return (
     <div className="ds-spromo">
       {p.image && <img className="ds-spromo-img" style={{ aspectRatio: p.aspect || "1" }} src={p.image} alt={p.title || ""} onError={(e) => { e.currentTarget.style.display = "none"; }} />}
@@ -2899,30 +2907,56 @@ function SidebarPromo() {
     </div>
   );
 }
-// Editor del cross-promo (solo admin, en la página de administración)
-function CrossPromoEditor({ value, onSave }) {
-  const [draft, setDraft] = useState({ ...CROSS_PROMO_DEFAULT, ...(value || {}) });
+function SidebarPromo() {
+  const { crossPromo } = useDSContext();
+  return <PromoCard p={{ ...CROSS_PROMO_DEFAULT, ...(crossPromo || {}) }} />;
+}
+// Vista independiente del cross-promo (solo admin): edita la card + preview en vivo del borrador.
+function CrossPromoView({ value, onSave, onBack, darkMode, toggleDark, user, isAdmin, onAccount, onSignOut, onOpenAdmin, onOpenCrossPromo }) {
+  const base = { ...CROSS_PROMO_DEFAULT, ...(value || {}) };
+  const [draft, setDraft] = useState(base);
   useEffect(() => { setDraft({ ...CROSS_PROMO_DEFAULT, ...(value || {}) }); }, [value]);
   const set = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
-  const changed = JSON.stringify(draft) !== JSON.stringify({ ...CROSS_PROMO_DEFAULT, ...(value || {}) });
-  return (
-    <div className="ds-card" style={{ marginBottom: 18 }}>
-      <h4 style={{ marginTop: 0 }}>Cross-promo <span style={{ fontWeight: 400, color: "var(--ds-text-3)", fontSize: 12 }}>— shown in the editor sidebar to every user</span></h4>
-      <div className="ds-toggle-row" role="switch" tabIndex={0} aria-checked={draft.visible} onKeyDown={TGL_KEY} onClick={() => set("visible", !draft.visible)}>
-        <div className={"ds-toggle-track" + (draft.visible ? " on" : "")}><div className="ds-toggle-thumb" /></div>
-        <div className="ds-toggle-text"><strong>Visible</strong><span>Show the cross-promo card in the step sidebar</span></div>
+  const changed = JSON.stringify(draft) !== JSON.stringify(base);
+  return (<>
+    <header className="ds-header">
+      <button className="ds-header-back" onClick={onBack} data-tip="Back to my systems">←</button>
+      <BrandMark />
+      <span className="ds-wordmark">BricksMate DS</span>
+      <VersionPill />
+      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+        <AuthControl user={user} isAdmin={isAdmin} onAccount={onAccount} onSignOut={onSignOut} onOpenAdmin={onOpenAdmin} onOpenCrossPromo={onOpenCrossPromo} />
+        <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode"><ThemeIcon dark={darkMode} /></button>
       </div>
-      <div className="ds-grid-2" style={{ marginTop: 12 }}>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Title</label><input className="ds-input" value={draft.title} onChange={(e) => set("title", e.target.value)} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Button text</label><input className="ds-input" value={draft.buttonText} onChange={(e) => set("buttonText", e.target.value)} /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Image URL</label><input className="ds-input" value={draft.image} onChange={(e) => set("image", e.target.value)} placeholder="/samirh.png or https://…" /></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Image aspect</label><select className="ds-input" value={draft.aspect} onChange={(e) => set("aspect", e.target.value)}>{PROMO_ASPECTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
-        <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Link (URL)</label><input className="ds-input" value={draft.link} onChange={(e) => set("link", e.target.value)} placeholder="https://…" /></div>
+    </header>
+    <div className="ds-dash">
+      <div className="ds-dash-head" style={{ maxWidth: "none", margin: "0 0 24px" }}><div><h1 className="ds-dash-title">Cross-promo</h1><p className="ds-dash-sub">Admin · the promo card shown in every user’s editor sidebar</p></div></div>
+      <div className="ds-crosspromo-grid">
+        <div className="ds-card" style={{ marginBottom: 0 }}>
+          <h4 style={{ marginTop: 0 }}>Settings</h4>
+          <div className="ds-toggle-row" role="switch" tabIndex={0} aria-checked={draft.visible} onKeyDown={TGL_KEY} onClick={() => set("visible", !draft.visible)}>
+            <div className={"ds-toggle-track" + (draft.visible ? " on" : "")}><div className="ds-toggle-thumb" /></div>
+            <div className="ds-toggle-text"><strong>Visible</strong><span>Show the cross-promo card in the step sidebar</span></div>
+          </div>
+          <div className="ds-grid-2" style={{ marginTop: 12 }}>
+            <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Title</label><input className="ds-input" value={draft.title} onChange={(e) => set("title", e.target.value)} /></div>
+            <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Button text</label><input className="ds-input" value={draft.buttonText} onChange={(e) => set("buttonText", e.target.value)} /></div>
+            <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Image URL</label><input className="ds-input" value={draft.image} onChange={(e) => set("image", e.target.value)} placeholder="/samirh.png or https://…" /></div>
+            <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Image aspect</label><select className="ds-input" value={draft.aspect} onChange={(e) => set("aspect", e.target.value)}>{PROMO_ASPECTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
+            <div className="ds-form-group" style={{ marginBottom: 0 }}><label style={{ fontSize: 12 }}>Link (URL)</label><input className="ds-input" value={draft.link} onChange={(e) => set("link", e.target.value)} placeholder="https://…" /></div>
+          </div>
+          <div className="ds-form-group" style={{ marginTop: 12, marginBottom: 0 }}><label style={{ fontSize: 12 }}>Description</label><textarea className="ds-input" rows={2} style={{ resize: "vertical" }} value={draft.description} onChange={(e) => set("description", e.target.value)} /></div>
+          <button className="ds-btn ds-btn-primary" style={{ marginTop: 14 }} disabled={!changed} onClick={() => onSave(draft)}><Ico name="check" />Save &amp; publish</button>
+        </div>
+        <div>
+          <div className="ds-crosspromo-prevlabel">Preview <span>· how it looks in the sidebar</span></div>
+          <div className="ds-crosspromo-preview">
+            {draft.visible ? <PromoCard p={draft} /> : <div className="ds-helper" style={{ textAlign: "center", padding: "24px 8px" }}>Hidden. The card won’t show to users.</div>}
+          </div>
+        </div>
       </div>
-      <div className="ds-form-group" style={{ marginTop: 12, marginBottom: 0 }}><label style={{ fontSize: 12 }}>Description</label><textarea className="ds-input" rows={2} style={{ resize: "vertical" }} value={draft.description} onChange={(e) => set("description", e.target.value)} /></div>
-      <button className="ds-btn ds-btn-primary" style={{ marginTop: 14 }} disabled={!changed} onClick={() => onSave(draft)}><Ico name="check" />Save cross-promo</button>
     </div>
-  );
+  </>);
 }
 
 const HEADER_SCRIPT = `<script>
@@ -3158,7 +3192,7 @@ function SystemCard({ sys, onOpen, onDuplicate, onDelete, onRename }) {
   </div>);
 }
 
-function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, onDelete, onRename, user, onAuth, onAccount, onSignOut, limit, isAdmin, onOpenAdmin }) {
+function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, onDelete, onRename, user, onAuth, onAccount, onSignOut, limit, isAdmin, onOpenAdmin, onOpenCrossPromo }) {
   const systems = library.systems;
   const atMax = !!user && limit != null && systems.length >= limit;
   return (<>
@@ -3167,7 +3201,7 @@ function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, 
       <span className="ds-wordmark">BricksMate DS</span>
       <VersionPill />
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
-        <AuthControl user={user} isAdmin={isAdmin} onAuth={onAuth} onAccount={onAccount} onSignOut={onSignOut} onOpenAdmin={onOpenAdmin} />
+        <AuthControl user={user} isAdmin={isAdmin} onAuth={onAuth} onAccount={onAccount} onSignOut={onSignOut} onOpenAdmin={onOpenAdmin} onOpenCrossPromo={onOpenCrossPromo} />
         <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode"><ThemeIcon dark={darkMode} /></button>
       </div>
     </header>
@@ -3193,7 +3227,7 @@ function Dashboard({ library, darkMode, toggleDark, onOpen, onNew, onDuplicate, 
 }
 
 // Página de administración: listado de usuarios + límite editable (solo admin; gate real en la BD)
-function AdminUsers({ onBack, darkMode, toggleDark, addToast, selfId, crossPromo, onSaveCrossPromo, user, isAdmin, onAccount, onSignOut }) {
+function AdminUsers({ onBack, darkMode, toggleDark, addToast, selfId, user, isAdmin, onAccount, onSignOut, onOpenCrossPromo }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState(null);
   useEffect(() => {
@@ -3228,14 +3262,13 @@ function AdminUsers({ onBack, darkMode, toggleDark, addToast, selfId, crossPromo
       <span className="ds-wordmark">BricksMate DS</span>
       <VersionPill />
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
-        <AuthControl user={user} isAdmin={isAdmin} onAccount={onAccount} onSignOut={onSignOut} />
+        <AuthControl user={user} isAdmin={isAdmin} onAccount={onAccount} onSignOut={onSignOut} onOpenCrossPromo={onOpenCrossPromo} />
         <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode"><ThemeIcon dark={darkMode} /></button>
       </div>
     </header>
     <div className="ds-dash">
       <div className="ds-dash-head"><div><h1 className="ds-dash-title">Users</h1><p className="ds-dash-sub">Admin · manage limits &amp; accounts</p></div></div>
       <div className="ds-dash-content">
-        <CrossPromoEditor value={crossPromo} onSave={onSaveCrossPromo} />
         {err ? <div className="ds-warning">⚠ {err}</div>
           : rows == null ? <div className="ds-auth-loading">Loading users…</div>
           : rows.length === 0 ? <p className="ds-dash-sub">No users yet.</p>
@@ -3279,7 +3312,7 @@ function AdminUserRow({ row, onSetLimit, onDelete, isSelf }) {
 }
 
 // Panel de usuario: editar nombre/apellidos/país (vía updateUser → solo el propio usuario)
-function AccountView({ user, onBack, darkMode, toggleDark, addToast, onSignOut, isAdmin, onAccount, onOpenAdmin }) {
+function AccountView({ user, onBack, darkMode, toggleDark, addToast, onSignOut, isAdmin, onAccount, onOpenAdmin, onOpenCrossPromo }) {
   const m = user?.user_metadata || {};
   const [firstName, setFirstName] = useState(m.first_name || "");
   const [lastName, setLastName] = useState(m.last_name || "");
@@ -3301,7 +3334,7 @@ function AccountView({ user, onBack, darkMode, toggleDark, addToast, onSignOut, 
       <span className="ds-wordmark">BricksMate DS</span>
       <VersionPill />
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
-        <AuthControl user={user} isAdmin={isAdmin} onAccount={onAccount} onSignOut={onSignOut} onOpenAdmin={onOpenAdmin} />
+        <AuthControl user={user} isAdmin={isAdmin} onAccount={onAccount} onSignOut={onSignOut} onOpenAdmin={onOpenAdmin} onOpenCrossPromo={onOpenCrossPromo} />
         <button className="ds-header-theme" onClick={toggleDark} title="Toggle dark mode"><ThemeIcon dark={darkMode} /></button>
       </div>
     </header>
@@ -3630,15 +3663,17 @@ export default function App() {
       {!authReady
         ? <div className="ds-auth-loading">Loading…</div>
         : view === "admin"
-        ? <AdminUsers onBack={() => setView("dashboard")} darkMode={darkMode} toggleDark={toggleDark} addToast={addToast} myLimit={userLimit} selfId={user?.id} crossPromo={crossPromo} onSaveCrossPromo={saveCrossPromo} user={user} isAdmin={isAdmin} onAccount={() => setView("account")} onSignOut={signOut} />
+        ? <AdminUsers onBack={() => setView("dashboard")} darkMode={darkMode} toggleDark={toggleDark} addToast={addToast} myLimit={userLimit} selfId={user?.id} user={user} isAdmin={isAdmin} onAccount={() => setView("account")} onSignOut={signOut} onOpenCrossPromo={() => setView("crosspromo")} />
+        : view === "crosspromo"
+        ? <CrossPromoView value={crossPromo} onSave={saveCrossPromo} onBack={() => setView("dashboard")} darkMode={darkMode} toggleDark={toggleDark} user={user} isAdmin={isAdmin} onAccount={() => setView("account")} onSignOut={signOut} onOpenAdmin={() => setView("admin")} onOpenCrossPromo={() => setView("crosspromo")} />
         : view === "account"
-        ? <AccountView user={user} onBack={() => setView("dashboard")} darkMode={darkMode} toggleDark={toggleDark} addToast={addToast} onSignOut={signOut} isAdmin={isAdmin} onAccount={() => setView("account")} onOpenAdmin={() => setView("admin")} />
+        ? <AccountView user={user} onBack={() => setView("dashboard")} darkMode={darkMode} toggleDark={toggleDark} addToast={addToast} onSignOut={signOut} isAdmin={isAdmin} onAccount={() => setView("account")} onOpenAdmin={() => setView("admin")} onOpenCrossPromo={() => setView("crosspromo")} />
         : view === "dashboard"
-        ? <Dashboard library={library} darkMode={darkMode} toggleDark={toggleDark} onOpen={openSystem} onNew={createSystem} onDuplicate={duplicateSystem} onDelete={deleteSystem} onRename={renameSystem} user={user} onAuth={openAuth} onAccount={() => setView("account")} onSignOut={signOut} limit={userLimit} isAdmin={isAdmin} onOpenAdmin={() => setView("admin")} />
+        ? <Dashboard library={library} darkMode={darkMode} toggleDark={toggleDark} onOpen={openSystem} onNew={createSystem} onDuplicate={duplicateSystem} onDelete={deleteSystem} onRename={renameSystem} user={user} onAuth={openAuth} onAccount={() => setView("account")} onSignOut={signOut} limit={userLimit} isAdmin={isAdmin} onOpenAdmin={() => setView("admin")} onOpenCrossPromo={() => setView("crosspromo")} />
         : isNarrow
         ? <EditorMobileNotice onBack={backToDashboard} darkMode={darkMode} toggleDark={toggleDark} />
         : <>
-            <EditorHeader onBack={backToDashboard} autoSave={library.autoSave} onToggleAutoSave={toggleAutoSave} dirty={dirty} onSave={() => saveDoc(true)} darkMode={darkMode} toggleDark={toggleDark} user={user} onAuth={openAuth} onAccount={() => setView("account")} onSignOut={signOut} isAdmin={isAdmin} onOpenAdmin={() => setView("admin")} />
+            <EditorHeader onBack={backToDashboard} autoSave={library.autoSave} onToggleAutoSave={toggleAutoSave} dirty={dirty} onSave={() => saveDoc(true)} darkMode={darkMode} toggleDark={toggleDark} user={user} onAuth={openAuth} onAccount={() => setView("account")} onSignOut={signOut} isAdmin={isAdmin} onOpenAdmin={() => setView("admin")} onOpenCrossPromo={() => setView("crosspromo")} />
             <div className="ds-main"><Sidebar name={currentSystem?.name || "Untitled"} onRename={(n) => renameSystem(currentId, n)} /><ErrorBoundary resetKey={state.currentStep}><StepContent /></ErrorBoundary></div>
             <Footer />
           </>}
